@@ -21,9 +21,8 @@
 
 ## 2. Architecture Diagram
 
-### Component: SB1.0 Server Sidebar Page (View + Controller)
-
 ```text
+Component: SB1.0 Server Sidebar Page (View + Controller)
 ┌──────────────────────────────────────────────┐
 │ Class: SB1.1 ServerSidebarView               │
 ├──────────────────────────────────────────────┤
@@ -48,38 +47,37 @@
 │ Fields                                       │
 │ - sidebarView : ServerSidebarView            │
 │ - searchBarView : ServerSearchBarView        │
-│ - searchService : ServerSearchService        │
-├──────────────────────────────────────────────┤
-│ Methods                                      │
-│ - onSearchInputChanged(query : String)       │
-│ - onSearchCleared()                          │
-│ - onServerListUpdated(servers : List<Sum>)   │
-│ - applySearchFilter(query : String)          │
-└──────────────────────────────────────────────┘
-          ▲                          │
-          │ User input events        │ Search requests
-          │                          ▼
-┌──────────────────────────────────────────────┐
-│ Class: SB1.2 ServerSearchBarView             │
-├──────────────────────────────────────────────┤
-│ Fields                                       │
-│ - placeholderText : String                   │
-│ - inputText : String                         │
-│ - isFocused : Boolean                        │
-├──────────────────────────────────────────────┤
-│ Methods                                      │
-│ - render()                                   │
-│ - captureInput()                             │
-│ - clearInput()                               │
-│ - showActiveState()                          │
-└──────────────────────────────────────────────┘
-```
-
-### Component: SB2.0 Server Data Module (Model + Service)
-
-```text
-┌──────────────────────────────────────────────┐
-│ Class: SB2.2 ServerSearchService             │
+│ - searchService : ServerSearchService        │──────────┐
+├──────────────────────────────────────────────┤          │
+│ Methods                                      │          │
+│ - onSearchInputChanged(query : String)       │          │
+│ - onSearchCleared()                          │          │ Logic / Search Requests
+│ - onServerListUpdated(servers : List<Sum>)   │          │ (to SB2.2 below)
+│ - applySearchFilter(query : String)          │          │
+└──────────────────────────────────────────────┘          │
+          ▲                                               │
+          │ User input events                             │
+                                                          │
+┌──────────────────────────────────────────────┐          │
+│ Class: SB1.2 ServerSearchBarView             │          │
+├──────────────────────────────────────────────┤          │
+│ Fields                                       │          │
+│ - placeholderText : String                   │          │
+│ - inputText : String                         │          │
+│ - isFocused : Boolean                        │          │
+├──────────────────────────────────────────────┤          │
+│ Methods                                      │          │
+│ - render()                                   │          │
+│ - captureInput()                             │          │
+│ - clearInput()                               │          │
+│ - showActiveState()                          │          │
+└──────────────────────────────────────────────┘          │
+                                                          │
+                                                          │
+Component: SB2.0 Server Data Module (Model + Service)     │
+                                                          │
+┌──────────────────────────────────────────────┐          │
+│ Class: SB2.2 ServerSearchService             │<─────────┘
 ├──────────────────────────────────────────────┤
 │ Fields                                       │
 │ - availableServers : List<ServerSummary>     │
@@ -125,6 +123,10 @@
 * **Methods**: Behaviors invoked through interactions
 
 ---
+
+
+
+
 
 ## 3. Class Diagrams
 
@@ -507,7 +509,7 @@ State: SS1.4 SearchClearedState
 
 ## 10. Public Interfaces
 
-### Component: SB1.0 Server Sidebar Page
+<!-- ### Component: SB1.0 Server Sidebar Page
 
 **External Dependencies — SB1.0 Uses:**
 * **From SB2.0 Server Data Module:**
@@ -523,9 +525,27 @@ State: SS1.4 SearchClearedState
 * `SB2.2.normalizeSearchQuery(query : string)`
 * `SB2.3.fetchUserServers(userIdentifier : string)`
 * `SB2.3.refreshServerCache()`
-* `SB2.1.ServerSummary()`
+* `SB2.1.ServerSummary()` -->
+
+
+### Component: SB1.0 Server Sidebar Page
+
+**External Dependencies — SB1.0 Uses:**
+* **From SB2.0 Server Data Module:**
+    * `SB2.2 ServerSearchService.filterServersByName(query : string)`
+    * `SB2.2 ServerSearchService.normalizeSearchQuery(query : string)`
+    * `SB2.3 ServerRepository.fetchUserServers(userIdentifier : string)`
+    * `SB2.3 ServerRepository.refreshServerCache()`
 
 ---
+
+### Component: SB2.0 Server Data Module
+
+**Public Methods Exposed to SB1.0:**
+* `SB2.2.filterServersByName(query : string)` — Primary logic for sidebar filtering.
+* `SB2.2.normalizeSearchQuery(query : string)` — Pre-processing for search input.
+* `SB2.3.fetchUserServers(userIdentifier : string)` — Initial data load for the sidebar.
+* `SB2.3.refreshServerCache()` — Forces a background data sync.
 
 ## 11. Data Schemas
 
