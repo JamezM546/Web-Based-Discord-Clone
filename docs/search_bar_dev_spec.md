@@ -21,6 +21,9 @@
 
 ---
 
+### Our Rationale & Justification
+Our header follows the professional outline given in the slides from our in class discussion. We were sure to update the header on every iteration of the document and include all others of each version. The format generated is readable and clear. The only refinements that had to be made were to exclude some non-relevant notes first generated to ensure only the information needed is included. 
+
 ## 2. Architecture Diagram
 
 ```text
@@ -136,6 +139,9 @@ Component: SB2.0 Server Data Module (Model + Service)     │
 
 ---
 
+### Our Rationale & Justification
+By defining the sidebar view, sidebar control, and server search as separate components that make up our feature, the code is kept modular. The architectural structure also takes into account the MVC architecture model we discussed in class. By having a class also focused on providing data to our controller class, it ensures that changes made to our database or schema can be kept independent from the other modules in the feature. The module structure will also help to simplify debugging or feature addition in the future if needed. 
+
 
 
 
@@ -163,6 +169,10 @@ Class: SB2.3 ServerRepository
 ```
 
 ---
+
+### Our Rationale & Justification
+The class diagram takes the structure of classes directly from the previous section of the dev spec document. We had to refine the architecture diagram section after generating this section, as some of the relationships here were not clearly defined in the visual diagram above. The relationships here help to show the modularity between our different classes and how data travels from our database all the way up to the sidebar view for the user to see, as well as vice versa, in how the user’s search gets down to the data level to perform the query. 
+
 
 ## 4. List of Classes
 
@@ -209,6 +219,11 @@ Class: SB2.3 ServerRepository
     * Efficient UI rendering and comparisons
 
 ---
+
+### Our Rationale & Justification
+Each class here maps to a class defined earlier in the document. They are grouped by component to ensure the purpose and relationships between each are clear. Each class mentions its purpose and responsibility to make sure its functionality is necessary and cannot be done by another already existing class. This minimizes the chances of our feature becoming unnecessarily complicated or difficult to develop. 
+
+
 
 ## 5. State Diagrams
 
@@ -300,6 +315,8 @@ State: SS1.4 SearchClearedState
 * **Fields**: Data defining state
 
 ---
+### Our Rationale & Justification
+The state diagrams generated aligned well with the format of the feature defined in earlier sections. The LLM was able to generate diagrams that handle possible states of the search bar from empty to active search and ending in cleared search. It also created states for the server results, including filtered and empty results, covering the range of possible states that could occur. 
 
 ## 6. Flow Charts (Scenario‑Based)
 
@@ -396,6 +413,9 @@ State: SS1.4 SearchClearedState
 **Explanation:** Clearing the search always follows a deterministic reset path. Regardless of prior results, the system normalizes internal data, restores the complete server list, and returns to the default sidebar state, preventing inconsistent UI behavior.
 
 ---
+### Our Rationale & Justification
+Our search bar feature is pretty narrow, so we believe that the shown scenarios cover all possible and realistic use cases of the features. The first two situations show possible flows after a user types in a search (either a search with matches or a search without matches). While these could be combined into one flow chart, keeping them separate will help with future feature development if we want to add more specific functionality in either case. The last case deals with clearing an active search, which is the only other scenario we saw fit to add. 
+
 
 ## 7. Possible Threats and Failures
 
@@ -463,6 +483,10 @@ State: SS1.4 SearchClearedState
 | **[TECH‑12 ESLint](https://eslint.org/docs/latest/)** | 9.x | Linting | Catches logic and consistency issues in controller and service code; reduces risk of state-transition and API-signature errors called out in Risks to Completion. |
 | **[TECH‑13 Prettier](https://prettier.io/docs/en/)** | 3.x | Formatting | Keeps code style consistent across views and modules; lowers friction when multiple developers work on the same classes and interfaces. |
 
+### Our Rationale & Justification
+With our project being a web application, this tech stack follows what many standard developers use in their web applications. All libraries used are common and known by most of our team, allowing for easier development down the line. Because this project will rely heavily on AI, it may also be helpful to stick with a technology stack, of which there are many examples and training data. 
+
+
 ## 9. APIs
 
 ### Component: SB1.0 Server Sidebar Page
@@ -519,6 +543,10 @@ State: SS1.4 SearchClearedState
     * *none*
 
 ---
+
+### Our Rationale & Justification
+This section maps directly from previously established classes earlier in the document. We have already discussed our justification for the class structure and its methods earlier, and this section simply pulls and redefines those same methods. The methods defined here allow for a modular structure to the feature and keep data and UI methods separate but able to communicate with eachother, allowing for easier debugging and readable code. 
+
 
 ## 10. Public Interfaces
 
