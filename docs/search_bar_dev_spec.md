@@ -1,7 +1,7 @@
 # Dev Specification Document
 **Project:** Web‑Based Discord Clone with Enhanced Usability Features  
 **Feature:** Clear Server Search Bar  
-**Version:** v0.1
+**Version:** v0.2
 
 ---
 
@@ -10,12 +10,14 @@
 | Version | Date       | Editor      | Summary of Changes |
 | :------ | :--------- | :---------- | :----------------- |
 | **v0.1**| 2026‑02‑11 | Salma Ghazi | Initial Draft; Document created; header established |
+| **v0.2**| 2026‑02‑15 | Elvis Valcarcel | Draft revision to add architecture/techstack rationale |
 
 ### Authors & Contributors
 
 | Name            | Role / Responsibility | Contributed Versions |
 | :-------------- | :-------------------- | :------------------- |
 | **Salma Ghazi** | Product / Spec Author | v0.1                 |
+| **Elvis Valcarcel** | Editor | v0.2                 |
 
 ---
 
@@ -121,6 +123,16 @@ Component: SB2.0 Server Data Module (Model + Service)     │
 * **▲ / ▼ / ►**: Directional interaction or dependency
 * **Fields**: Persistent state owned by the class
 * **Methods**: Behaviors invoked through interactions
+
+### Deployment and Where Components Run
+
+| Component | Runtime Location | Rationale |
+| :-------- | :---------------- | :-------- |
+| **SB1.0 Server Sidebar Page** (SB1.1 ServerSidebarView, SB1.2 ServerSearchBarView, SB1.3 ServerSidebarController) | **Client** (browser) | The sidebar and search bar are interactive UI; they must run in the client to capture input, render filtered lists, and keep search state without round-trips for every keystroke. |
+| **SB2.0 Server Data Module** — SB2.2 ServerSearchService, SB2.1 ServerSummary | **Client** (browser) | Filtering and normalization operate on the in-memory server list already loaded for the sidebar; keeping them on the client avoids latency and server load for each search. |
+| **SB2.0 Server Data Module** — SB2.3 ServerRepository | **Client** (browser) with **server/API** calls | The repository runs in the client but calls backend APIs to fetch and refresh server data; persistence (PostgreSQL) and optional caching (Redis) live on the server. |
+
+**Information flow (summary):** User input flows from ServerSearchBarView → ServerSidebarController, which calls ServerSearchService to filter; ServerSearchService reads from Repository-held data (and Repository pulls from server/API). Results flow back: Controller → ServerSidebarView (and search bar state). No search-specific data is sent to the server per keystroke; only initial load and explicit refresh hit the backend.
 
 ---
 
@@ -437,19 +449,20 @@ State: SS1.4 SearchClearedState
 
 | Technology | Version | Purpose | Justification vs Alternatives |
 | :--- | :--- | :--- | :--- |
-| **[TECH‑01 TypeScript](https://www.typescriptlang.org/docs/)** | 5.x | Client logic/UI | Static typing improves maintainability vs JS. |
-| **[TECH‑02 React](https://react.dev/)** | 18.x | UI Framework | Strong ecosystem vs alternatives. |
-| **[TECH‑03 Node.js](https://nodejs.org/en/docs)** | 20.x | Backend Runtime | Unified stack, efficient async model. |
-| **[TECH‑04 Express.js](https://expressjs.com/)** | 4.x | Backend Framework | Lightweight, flexible for REST. |
-| **[TECH‑05 PostgreSQL](https://www.postgresql.org/docs/)** | 15.x | Database | Strong relational integrity. |
-| **[TECH‑06 Redis](https://redis.io/docs/)** | 7.x | Caching | Low‑latency shared caching. |
-| **[TECH‑07 RESTful API](https://restfulapi.net/)** | Arch. | Communication | Simpler integration vs GraphQL. |
-| **[TECH‑08 CSS3](https://developer.mozilla.org/en-US/docs/Web/CSS)** | CSS3 | Styling | Web standard for presentation. |
-| **[TECH‑09 Vite](https://vitejs.dev/guide/)** | 5.x | Build Tool | Faster startup vs Webpack. |
-| **[TECH‑10 Git](https://git-scm.com/docs)** | 2.x | Version Control | Industry standard. |
-| **[TECH‑11 GitHub](https://docs.github.com/)** | Platform | Hosting | Ecosystem integration. |
-| **[TECH‑12 ESLint](https://eslint.org/docs/latest/)** | 9.x | Linting | Prevents logic issues. |
-| **[TECH‑13 Prettier](https://prettier.io/docs/en/)** | 3.x | Formatting | Eliminates styling inconsistencies. |
+| **[TECH‑01 TypeScript](https://www.typescriptlang.org/docs/)** | 5.x | Client logic/UI | Static typing improves maintainability vs plain JS and aligns with the spec’s class/method signatures (e.g. `ServerSummary[]`, `query : string`), reducing integration errors between views, controller, and services. |
+| **[TECH‑02 React](https://react.dev/)** | 18.x | UI Framework | Component model maps cleanly to ServerSidebarView and ServerSearchBarView; state (search query, filtered list) fits React state/hooks; strong ecosystem supports debouncing and controlled inputs required by the flow charts. |
+| **[TECH‑03 Node.js](https://nodejs.org/en/docs)** | 20.x | Backend Runtime | Unified JavaScript/TypeScript across client and server; efficient async model supports ServerRepository’s `fetchUserServers` and `refreshServerCache` without blocking; LTS aligns with long-term maintenance. |
+| **[TECH‑04 Express.js](https://expressjs.com/)** | 4.x | Backend Framework | Lightweight, flexible for REST endpoints that serve server-list and membership data (see Data Schemas); middleware supports auth and rate limiting referenced in Security & Privacy and failure modes. |
+| **[TECH‑05 PostgreSQL](https://www.postgresql.org/docs/)** | 15.x | Database | Stores ServerSummaryRecord and UserServerMembershipRecord; strong relational integrity and indexing support the membership and server lookups that feed the sidebar and search; fits the schema definitions in this spec. |
+| **[TECH‑06 Redis](https://redis.io/docs/)** | 7.x | Caching | Optional cache for server-list snapshots (DS‑03 ServerCacheSnapshotRecord) and session data; reduces load on PostgreSQL when ServerRepository refreshes or multiple clients request server lists; supports the “degraded mode using cached data” recovery in FM‑SB2‑04. |
+| **[TECH‑07 RESTful API](https://restfulapi.net/)** | Arch. | Communication | REST is used for server-list and membership endpoints consumed by SB2.3 ServerRepository (e.g. fetch user’s servers, refresh); simpler than GraphQL for this feature’s read-focused, resource-oriented needs and aligns with the Public Interfaces. |
+| **[TECH‑08 CSS3](https://developer.mozilla.org/en-US/docs/Web/CSS)** | CSS3 | Styling | Web standard for sidebar layout, search bar, and empty/filtered states (SS1.0–SS1.4); no extra framework needed for the described UI states. |
+| **[TECH‑09 Vite](https://vitejs.dev/guide/)** | 5.x | Build Tool | Fast dev startup and HMR support rapid iteration on views and controller; TypeScript and React supported out of the box; lighter than Webpack for this client-heavy feature. |
+| **[TECH‑10 Git](https://git-scm.com/docs)** | 2.x | Version Control | Industry standard for tracking spec and code changes; supports the version history and multi-contributor workflow implied by the document header. |
+| **[TECH‑11 GitHub](https://docs.github.com/)** | Platform | Hosting | Hosting and CI/CD for the repo; integrates with Git and supports the collaborative and deployment workflow for client and server. |
+| **[TECH‑12 ESLint](https://eslint.org/docs/latest/)** | 9.x | Linting | Catches logic and consistency issues in controller and service code; reduces risk of state-transition and API-signature errors called out in Risks to Completion. |
+| **[TECH‑13 Prettier](https://prettier.io/docs/en/)** | 3.x | Formatting | Keeps code style consistent across views and modules; lowers friction when multiple developers work on the same classes and interfaces. |
+
 ## 9. APIs
 
 ### Component: SB1.0 Server Sidebar Page
