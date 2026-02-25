@@ -1,0 +1,571 @@
+import React, { createContext, useContext, useState, ReactNode } from 'react';
+import { User, Server, Channel, Message, FriendRequest, DirectMessage } from '../types';
+
+// Mock data
+const mockUsers: User[] = [
+  {
+    id: '1',
+    username: 'Nafisa',
+    email: 'nafisa@example.com',
+    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&h=150&fit=crop',
+    status: 'online',
+  },
+  {
+    id: '2',
+    username: 'Ashraf',
+    email: 'ashraf@example.com',
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop',
+    status: 'online',
+  },
+  {
+    id: '3',
+    username: 'James',
+    email: 'james@example.com',
+    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&h=150&fit=crop',
+    status: 'idle',
+  },
+  {
+    id: '4',
+    username: 'Elvis',
+    email: 'elvis@example.com',
+    avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&h=150&fit=crop',
+    status: 'online',
+  },
+  {
+    id: '5',
+    username: 'Salma',
+    email: 'salma@example.com',
+    avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop',
+    status: 'dnd',
+  },
+];
+
+const mockServers: Server[] = [
+  {
+    id: 's1',
+    name: 'Team Project',
+    icon: '🚀',
+    ownerId: '1',
+    members: ['1', '2', '3', '4', '5'],
+  },
+  {
+    id: 's2',
+    name: 'Gaming Squad',
+    icon: '🎮',
+    ownerId: '2',
+    members: ['1', '2', '3'],
+  },
+  {
+    id: 's3',
+    name: 'Study Group',
+    icon: '📚',
+    ownerId: '3',
+    members: ['1', '3', '4', '5'],
+  },
+];
+
+const mockChannels: Channel[] = [
+  { id: 'c1', name: 'general', serverId: 's1', type: 'text' },
+  { id: 'c2', name: 'announcements', serverId: 's1', type: 'text' },
+  { id: 'c3', name: 'development', serverId: 's1', type: 'text' },
+  { id: 'c4', name: 'general', serverId: 's2', type: 'text' },
+  { id: 'c5', name: 'game-night', serverId: 's2', type: 'text' },
+  { id: 'c6', name: 'general', serverId: 's3', type: 'text' },
+  { id: 'c7', name: 'homework-help', serverId: 's3', type: 'text' },
+];
+
+const mockMessages: Message[] = [
+  {
+    id: 'm1',
+    content: 'Hey everyone! Welcome to the project server 🎉',
+    authorId: '1',
+    channelId: 'c1',
+    timestamp: new Date('2026-02-16T10:00:00'),
+  },
+  {
+    id: 'm2',
+    content: 'Thanks for setting this up! Excited to work together.',
+    authorId: '2',
+    channelId: 'c1',
+    timestamp: new Date('2026-02-16T10:05:00'),
+  },
+  {
+    id: 'm3',
+    content: 'What features are we implementing first?',
+    authorId: '3',
+    channelId: 'c1',
+    timestamp: new Date('2026-02-16T10:10:00'),
+  },
+  {
+    id: 'm4',
+    content: 'I\'m working on the user system - registration, login, and profiles.',
+    authorId: '1',
+    channelId: 'c1',
+    timestamp: new Date('2026-02-16T10:15:00'),
+  },
+  {
+    id: 'm5',
+    content: 'I\'ll handle servers - creating, deleting, and settings.',
+    authorId: '2',
+    channelId: 'c1',
+    timestamp: new Date('2026-02-16T10:16:00'),
+  },
+  {
+    id: 'm6',
+    content: 'I can take care of the channels - text channels with permissions.',
+    authorId: '3',
+    channelId: 'c1',
+    timestamp: new Date('2026-02-18T09:00:00'),
+  },
+  {
+    id: 'm7',
+    content: 'We\'ll work on messaging - real-time chat, timestamps, edit/delete, and emojis!',
+    authorId: '4',
+    channelId: 'c1',
+    timestamp: new Date('2026-02-18T09:15:00'),
+  },
+  {
+    id: 'm8',
+    content: 'The emoji picker is working great! 😄',
+    authorId: '5',
+    channelId: 'c1',
+    timestamp: new Date('2026-02-18T09:30:00'),
+  },
+  {
+    id: 'm9',
+    content: 'Should we have a meeting tomorrow to discuss the deadline?',
+    authorId: '2',
+    channelId: 'c1',
+    timestamp: new Date('2026-02-18T10:00:00'),
+  },
+  {
+    id: 'm10',
+    content: 'Yes, let\'s meet at 10 AM. I\'ll prepare the agenda.',
+    authorId: '1',
+    channelId: 'c1',
+    timestamp: new Date('2026-02-18T10:05:00'),
+  },
+  // Announcements channel messages for demo
+  {
+    id: 'm11',
+    content: '📢 Important: Please review the project roadmap in the development channel.',
+    authorId: '1',
+    channelId: 'c2',
+    timestamp: new Date('2026-02-18T09:00:00'),
+  },
+  {
+    id: 'm12',
+    content: '🎯 Milestone: We\'ve completed 60% of the core features!',
+    authorId: '2',
+    channelId: 'c2',
+    timestamp: new Date('2026-02-18T11:00:00'),
+  },
+  // Development channel messages for demo
+  {
+    id: 'm13',
+    content: 'Just pushed the new authentication flow. Please test it!',
+    authorId: '1',
+    channelId: 'c3',
+    timestamp: new Date('2026-02-18T08:30:00'),
+  },
+  {
+    id: 'm14',
+    content: 'Found a bug in the server settings modal. Working on a fix.',
+    authorId: '2',
+    channelId: 'c3',
+    timestamp: new Date('2026-02-18T09:45:00'),
+  },
+  {
+    id: 'm15',
+    content: 'The channel permissions system is ready for review 🚀',
+    authorId: '3',
+    channelId: 'c3',
+    timestamp: new Date('2026-02-18T10:30:00'),
+  },
+  // DM messages for demo
+  {
+    id: 'm16',
+    content: 'Hey! Want to grab coffee after the meeting?',
+    authorId: '2',
+    dmId: 'dm1',
+    timestamp: new Date('2026-02-18T08:00:00'),
+  },
+  {
+    id: 'm17',
+    content: 'Sure! How about the place downtown?',
+    authorId: '1',
+    dmId: 'dm1',
+    timestamp: new Date('2026-02-18T08:15:00'),
+  },
+  {
+    id: 'm18',
+    content: 'Perfect! See you at 2 PM ☕',
+    authorId: '2',
+    dmId: 'dm1',
+    timestamp: new Date('2026-02-18T08:20:00'),
+  },
+];
+
+interface AppContextType {
+  currentUser: User | null;
+  users: User[];
+  servers: Server[];
+  channels: Channel[];
+  messages: Message[];
+  friendRequests: FriendRequest[];
+  directMessages: DirectMessage[];
+  selectedServer: Server | null;
+  selectedChannel: Channel | null;
+  selectedDM: DirectMessage | null;
+  lastReadMessages: Record<string, Date>;
+  login: (email: string, password: string) => boolean;
+  register: (username: string, email: string, password: string) => boolean;
+  logout: () => void;
+  setSelectedServer: (server: Server | null) => void;
+  setSelectedChannel: (channel: Channel | null) => void;
+  setSelectedDM: (dm: DirectMessage | null) => void;
+  createServer: (name: string, icon: string) => void;
+  deleteServer: (serverId: string) => void;
+  updateServerSettings: (serverId: string, name: string, icon: string) => void;
+  createChannel: (serverId: string, name: string) => void;
+  sendMessage: (content: string, channelId?: string, dmId?: string) => void;
+  editMessage: (messageId: string, newContent: string) => void;
+  deleteMessage: (messageId: string) => void;
+  toggleReaction: (messageId: string, emoji: string) => void;
+  sendFriendRequest: (toUserId: string) => void;
+  acceptFriendRequest: (requestId: string) => void;
+  rejectFriendRequest: (requestId: string) => void;
+  getFriends: () => User[];
+  createDirectMessage: (userId: string) => void;
+  updateUserStatus: (status: User['status']) => void;
+  markAsRead: (channelId?: string, dmId?: string) => void;
+  getUnreadCount: (channelId?: string, dmId?: string) => number;
+  getUnreadMessages: (channelId?: string, dmId?: string) => Message[];
+}
+
+const AppContext = createContext<AppContextType | undefined>(undefined);
+
+export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [users, setUsers] = useState<User[]>(mockUsers);
+  const [servers, setServers] = useState<Server[]>(mockServers);
+  const [channels, setChannels] = useState<Channel[]>(mockChannels);
+  const [messages, setMessages] = useState<Message[]>(mockMessages);
+  const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([
+    { id: 'fr1', fromUserId: '4', toUserId: '1', status: 'pending' },
+  ]);
+  const [directMessages, setDirectMessages] = useState<DirectMessage[]>([
+    { id: 'dm1', participants: ['1', '2'], lastMessageTime: new Date() },
+  ]);
+  const [selectedServer, setSelectedServer] = useState<Server | null>(null);
+  const [selectedChannel, setSelectedChannel] = useState<Channel | null>(null);
+  const [selectedDM, setSelectedDM] = useState<DirectMessage | null>(null);
+  const [lastReadMessages, setLastReadMessages] = useState<Record<string, Date>>({
+    // Set up demo for AI summary feature - simulate users haven't read recent messages
+    'c1': new Date('2026-02-18T08:00:00'), // general channel - has 5 unread messages
+    'c2': new Date('2026-02-17T12:00:00'), // announcements channel
+    'c3': new Date('2026-02-17T12:00:00'), // development channel
+    'c4': new Date('2026-02-17T12:00:00'), // gaming general
+    'c5': new Date('2026-02-17T12:00:00'), // game-night
+    'c6': new Date('2026-02-17T12:00:00'), // study general
+    'c7': new Date('2026-02-17T12:00:00'), // homework-help
+    'dm1': new Date('2026-02-17T12:00:00'), // DM with first contact
+  });
+
+  const login = (email: string, password: string): boolean => {
+    const user = users.find((u) => u.email === email);
+    if (user) {
+      setCurrentUser(user);
+      return true;
+    }
+    return false;
+  };
+
+  const register = (username: string, email: string, password: string): boolean => {
+    const exists = users.find((u) => u.email === email);
+    if (exists) return false;
+
+    const newUser: User = {
+      id: String(users.length + 1),
+      username,
+      email,
+      avatar: `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&h=150&fit=crop`,
+      status: 'online',
+    };
+    setUsers([...users, newUser]);
+    setCurrentUser(newUser);
+    return true;
+  };
+
+  const logout = () => {
+    setCurrentUser(null);
+    setSelectedServer(null);
+    setSelectedChannel(null);
+    setSelectedDM(null);
+  };
+
+  const createServer = (name: string, icon: string) => {
+    if (!currentUser) return;
+    const newServer: Server = {
+      id: `s${servers.length + 1}`,
+      name,
+      icon,
+      ownerId: currentUser.id,
+      members: [currentUser.id],
+    };
+    setServers([...servers, newServer]);
+
+    // Create default general channel
+    const generalChannel: Channel = {
+      id: `c${channels.length + 1}`,
+      name: 'general',
+      serverId: newServer.id,
+      type: 'text',
+    };
+    setChannels([...channels, generalChannel]);
+  };
+
+  const deleteServer = (serverId: string) => {
+    setServers(servers.filter((s) => s.id !== serverId));
+    setChannels(channels.filter((c) => c.serverId !== serverId));
+    setMessages(messages.filter((m) => !channels.find((c) => c.id === m.channelId && c.serverId === serverId)));
+    if (selectedServer?.id === serverId) {
+      setSelectedServer(null);
+      setSelectedChannel(null);
+    }
+  };
+
+  const updateServerSettings = (serverId: string, name: string, icon: string) => {
+    setServers(servers.map((s) => (s.id === serverId ? { ...s, name, icon } : s)));
+  };
+
+  const createChannel = (serverId: string, name: string) => {
+    const newChannel: Channel = {
+      id: `c${channels.length + 1}`,
+      name,
+      serverId,
+      type: 'text',
+    };
+    setChannels([...channels, newChannel]);
+  };
+
+  const sendMessage = (content: string, channelId?: string, dmId?: string) => {
+    if (!currentUser) return;
+    const newMessage: Message = {
+      id: `m${messages.length + 1}`,
+      content,
+      authorId: currentUser.id,
+      channelId,
+      dmId,
+      timestamp: new Date(),
+    };
+    setMessages([...messages, newMessage]);
+
+    // Update DM last message time
+    if (dmId) {
+      setDirectMessages(
+        directMessages.map((dm) =>
+          dm.id === dmId ? { ...dm, lastMessageTime: new Date() } : dm
+        )
+      );
+    }
+  };
+
+  const editMessage = (messageId: string, newContent: string) => {
+    setMessages(
+      messages.map((m) =>
+        m.id === messageId ? { ...m, content: newContent, edited: true } : m
+      )
+    );
+  };
+
+  const deleteMessage = (messageId: string) => {
+    setMessages(messages.filter((m) => m.id !== messageId));
+  };
+
+  const toggleReaction = (messageId: string, emoji: string) => {
+    if (!currentUser) return;
+    
+    setMessages(
+      messages.map((m) => {
+        if (m.id !== messageId) return m;
+        
+        const reactions = m.reactions || [];
+        const existingReaction = reactions.find((r) => r.emoji === emoji);
+        
+        if (existingReaction) {
+          // If user already reacted with this emoji, remove their reaction
+          const userIndex = existingReaction.users.indexOf(currentUser.id);
+          if (userIndex > -1) {
+            const updatedUsers = existingReaction.users.filter((id) => id !== currentUser.id);
+            if (updatedUsers.length === 0) {
+              // Remove reaction entirely if no users left
+              return {
+                ...m,
+                reactions: reactions.filter((r) => r.emoji !== emoji),
+              };
+            } else {
+              // Update the reaction with remaining users
+              return {
+                ...m,
+                reactions: reactions.map((r) =>
+                  r.emoji === emoji ? { ...r, users: updatedUsers } : r
+                ),
+              };
+            }
+          } else {
+            // Add user to existing reaction
+            return {
+              ...m,
+              reactions: reactions.map((r) =>
+                r.emoji === emoji ? { ...r, users: [...r.users, currentUser.id] } : r
+              ),
+            };
+          }
+        } else {
+          // Add new reaction
+          return {
+            ...m,
+            reactions: [...reactions, { emoji, users: [currentUser.id] }],
+          };
+        }
+      })
+    );
+  };
+
+  const sendFriendRequest = (toUserId: string) => {
+    if (!currentUser) return;
+    const newRequest: FriendRequest = {
+      id: `fr${friendRequests.length + 1}`,
+      fromUserId: currentUser.id,
+      toUserId,
+      status: 'pending',
+    };
+    setFriendRequests([...friendRequests, newRequest]);
+  };
+
+  const acceptFriendRequest = (requestId: string) => {
+    setFriendRequests(
+      friendRequests.map((fr) =>
+        fr.id === requestId ? { ...fr, status: 'accepted' as const } : fr
+      )
+    );
+  };
+
+  const rejectFriendRequest = (requestId: string) => {
+    setFriendRequests(
+      friendRequests.map((fr) =>
+        fr.id === requestId ? { ...fr, status: 'rejected' as const } : fr
+      )
+    );
+  };
+
+  const getFriends = (): User[] => {
+    if (!currentUser) return [];
+    const friendIds = friendRequests
+      .filter((fr) => fr.status === 'accepted' && (fr.fromUserId === currentUser.id || fr.toUserId === currentUser.id))
+      .map((fr) => (fr.fromUserId === currentUser.id ? fr.toUserId : fr.fromUserId));
+    return users.filter((u) => friendIds.includes(u.id));
+  };
+
+  const createDirectMessage = (userId: string) => {
+    if (!currentUser) return;
+    const exists = directMessages.find(
+      (dm) =>
+        dm.participants.includes(currentUser.id) && dm.participants.includes(userId)
+    );
+    if (!exists) {
+      const newDM: DirectMessage = {
+        id: `dm${directMessages.length + 1}`,
+        participants: [currentUser.id, userId],
+        lastMessageTime: new Date(),
+      };
+      setDirectMessages([...directMessages, newDM]);
+      setSelectedDM(newDM);
+    } else {
+      setSelectedDM(exists);
+    }
+    setSelectedServer(null);
+    setSelectedChannel(null);
+  };
+
+  const updateUserStatus = (status: User['status']) => {
+    if (!currentUser) return;
+    const updatedUser = { ...currentUser, status };
+    setCurrentUser(updatedUser);
+    setUsers(users.map((u) => (u.id === currentUser.id ? updatedUser : u)));
+  };
+
+  const markAsRead = (channelId?: string, dmId?: string) => {
+    if (channelId) {
+      setLastReadMessages({ ...lastReadMessages, [channelId]: new Date() });
+    } else if (dmId) {
+      setLastReadMessages({ ...lastReadMessages, [dmId]: new Date() });
+    }
+  };
+
+  const getUnreadCount = (channelId?: string, dmId?: string) => {
+    const lastRead = lastReadMessages[channelId || dmId || ''];
+    if (!lastRead) return 0;
+    const messagesToCheck = channelId ? messages.filter(m => m.channelId === channelId) : messages.filter(m => m.dmId === dmId);
+    return messagesToCheck.filter(m => m.timestamp > lastRead).length;
+  };
+
+  const getUnreadMessages = (channelId?: string, dmId?: string) => {
+    const lastRead = lastReadMessages[channelId || dmId || ''];
+    if (!lastRead) return [];
+    const messagesToCheck = channelId ? messages.filter(m => m.channelId === channelId) : messages.filter(m => m.dmId === dmId);
+    return messagesToCheck.filter(m => m.timestamp > lastRead);
+  };
+
+  return (
+    <AppContext.Provider
+      value={{
+        currentUser,
+        users,
+        servers,
+        channels,
+        messages,
+        friendRequests,
+        directMessages,
+        selectedServer,
+        selectedChannel,
+        selectedDM,
+        lastReadMessages,
+        login,
+        register,
+        logout,
+        setSelectedServer,
+        setSelectedChannel,
+        setSelectedDM,
+        createServer,
+        deleteServer,
+        updateServerSettings,
+        createChannel,
+        sendMessage,
+        editMessage,
+        deleteMessage,
+        toggleReaction,
+        sendFriendRequest,
+        acceptFriendRequest,
+        rejectFriendRequest,
+        getFriends,
+        createDirectMessage,
+        updateUserStatus,
+        markAsRead,
+        getUnreadCount,
+        getUnreadMessages,
+      }}
+    >
+      {children}
+    </AppContext.Provider>
+  );
+};
+
+export const useApp = () => {
+  const context = useContext(AppContext);
+  if (!context) {
+    throw new Error('useApp must be used within AppProvider');
+  }
+  return context;
+};
