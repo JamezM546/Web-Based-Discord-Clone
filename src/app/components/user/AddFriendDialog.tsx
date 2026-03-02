@@ -38,21 +38,21 @@ export const AddFriendDialog: React.FC<AddFriendDialogProps> = ({ open, onOpenCh
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-[#313338] text-white border-none" aria-describedby={undefined}>
+      <DialogContent className="bg-[#0d1a2e] border border-[#1e3248] text-[#e2e8f0]" aria-describedby={undefined}>
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <UserPlus className="size-5" />
+          <DialogTitle className="flex items-center gap-2 text-[#e2e8f0]">
+            <UserPlus className="size-5 text-[#06b6d4]" />
             Add Friend
           </DialogTitle>
         </DialogHeader>
 
-        <DialogDescription className="text-[#b5bac1] text-sm">
+        <DialogDescription className="text-[#475569] text-sm">
           Add a friend by entering their username.
         </DialogDescription>
 
         <div className="space-y-4 py-4">
           <div>
-            <Label htmlFor="username" className="text-[#b5bac1] uppercase text-xs font-semibold">
+            <Label htmlFor="username" className="text-[#64748b] uppercase text-xs font-semibold tracking-wider">
               Username
             </Label>
             <Input
@@ -60,23 +60,19 @@ export const AddFriendDialog: React.FC<AddFriendDialogProps> = ({ open, onOpenCh
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-              className="bg-[#1e1f22] border-none text-white mt-2"
+              className="bg-[#060c18] border border-[#1e3248] text-[#e2e8f0] mt-2 focus-visible:ring-[#06b6d4]/50 placeholder:text-[#475569]"
               placeholder="Enter username"
             />
           </div>
 
           {message && (
-            <p
-              className={`text-sm ${
-                message.includes('sent') ? 'text-green-400' : 'text-red-400'
-              }`}
-            >
+            <p className={`text-sm ${message.includes('sent') ? 'text-green-400' : 'text-red-400'}`}>
               {message}
             </p>
           )}
 
-          <div className="p-3 bg-[#1e1f22] rounded text-xs text-[#b5bac1]">
-            <p className="font-semibold mb-1">Available users:</p>
+          <div className="p-3 bg-[#060c18] border border-[#1e3248] rounded-xl text-xs text-[#475569]">
+            <p className="font-semibold mb-1 text-[#64748b]">Available users:</p>
             {users
               .filter((u) => u.id !== currentUser?.id)
               .map((u) => (
@@ -89,12 +85,12 @@ export const AddFriendDialog: React.FC<AddFriendDialogProps> = ({ open, onOpenCh
           <Button
             onClick={() => onOpenChange(false)}
             variant="ghost"
-            className="text-white hover:bg-[#4e5058]"
+            className="text-[#94a3b8] hover:text-[#e2e8f0] hover:bg-[#1a2d45]"
           >
             Cancel
           </Button>
-          <Button onClick={handleSend} className="bg-[#5865f2] hover:bg-[#4752c4] text-white">
-            Send Friend Request
+          <Button onClick={handleSend} className="bg-[#06b6d4] hover:bg-[#0891b2] text-white border-none">
+            Send Request
           </Button>
         </DialogFooter>
       </DialogContent>

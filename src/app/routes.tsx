@@ -1,53 +1,66 @@
-import { createBrowserRouter } from 'react-router';
+import { createBrowserRouter, Outlet } from 'react-router';
 import { LoginForm } from './components/auth/LoginForm';
 import { RegisterForm } from './components/auth/RegisterForm';
 import { MainLayout } from './pages/MainLayout';
+import MockupsPage from './pages/MockupsPage';
 import { AppProvider } from './context/AppContext';
 
 // Wrapper component to provide context to all routes
-const RootLayout = ({ children }: { children: React.ReactNode }) => {
-  return <AppProvider>{children}</AppProvider>;
-};
+function RootLayout() {
+  return (
+    <AppProvider>
+      <Outlet />
+    </AppProvider>
+  );
+}
+
+// Error component for routing errors
+function ErrorPage() {
+  return (
+    <div className="h-screen flex items-center justify-center bg-[#060c18]">
+      <div className="text-center">
+        <h1 className="text-2xl text-[#e2e8f0] mb-2">Something went wrong</h1>
+        <p className="text-[#475569] mb-4">Please refresh the page</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="px-4 py-2 bg-[#06b6d4] hover:bg-[#0891b2] text-white rounded-lg transition-colors"
+        >
+          Refresh
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export const router = createBrowserRouter([
   {
-    path: '/',
-    element: (
-      <RootLayout>
-        <LoginForm />
-      </RootLayout>
-    ),
-  },
-  {
-    path: '/login',
-    element: (
-      <RootLayout>
-        <LoginForm />
-      </RootLayout>
-    ),
-  },
-  {
-    path: '/register',
-    element: (
-      <RootLayout>
-        <RegisterForm />
-      </RootLayout>
-    ),
-  },
-  {
-    path: '/channels',
-    element: (
-      <RootLayout>
-        <MainLayout />
-      </RootLayout>
-    ),
-  },
-  {
-    path: '*',
-    element: (
-      <RootLayout>
-        <LoginForm />
-      </RootLayout>
-    ),
+    element: <RootLayout />,
+    errorElement: <ErrorPage />,
+    children: [
+      {
+        path: '/',
+        element: <LoginForm />,
+      },
+      {
+        path: '/login',
+        element: <LoginForm />,
+      },
+      {
+        path: '/register',
+        element: <RegisterForm />,
+      },
+      {
+        path: '/channels',
+        element: <MainLayout />,
+      },
+      {
+        path: '/mockups',
+        element: <MockupsPage />,
+      },
+      {
+        path: '*',
+        element: <LoginForm />,
+      },
+    ],
   },
 ]);

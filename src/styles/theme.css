@@ -179,7 +179,7 @@
     line-height: 1.5;
   }
 
-  /* Discord-style scrollbar - thin and subtle */
+  /* Thin, subtle scrollbar */
   * {
     scrollbar-width: thin;
     scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
@@ -214,5 +214,33 @@
   .dark *::-webkit-scrollbar-thumb:hover,
   [class*="bg-[#"] *::-webkit-scrollbar-thumb:hover {
     background-color: rgba(0, 0, 0, 0.6);
+  }
+
+  /* ── WCAG 2.2 focus-visible ──────────────────────────────────────────────
+     Provide a high-contrast keyboard focus ring for every interactive element.
+     The cyan (#06b6d4) ring passes against the app's dark navy backgrounds.
+  */
+  :focus-visible {
+    outline: 2px solid #06b6d4 !important;
+    outline-offset: 2px;
+  }
+
+  /* Message input: no focus ring on click (user preference) */
+  .message-input-no-focus-ring:focus-visible {
+    outline: none !important;
+    outline-offset: 0;
+  }
+
+  /* Screen-reader-only utility (mirrors Tailwind's sr-only) */
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
   }
 }

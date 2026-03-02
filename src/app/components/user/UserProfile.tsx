@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { Settings, Mic, Headphones, LogOut } from 'lucide-react';
+import { Settings, LogOut } from 'lucide-react';
 import { useNavigate } from 'react-router';
+import { UserSettings } from './UserSettings';
+import { StatusDot, getStatusLabel } from '../ui/StatusDot';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,6 +16,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/
 export const UserProfile: React.FC = () => {
   const { currentUser, logout, updateUserStatus } = useApp();
   const navigate = useNavigate();
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   if (!currentUser) return null;
 
@@ -22,112 +25,94 @@ export const UserProfile: React.FC = () => {
     navigate('/login');
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'online':
-        return 'bg-green-500';
-      case 'idle':
-        return 'bg-yellow-500';
-      case 'dnd':
-        return 'bg-red-500';
-      default:
-        return 'bg-gray-500';
-    }
-  };
+  const displayedName = currentUser.displayName || currentUser.username;
 
   return (
-    <div className="h-[52px] bg-[#232428] px-2 flex items-center justify-between">
-      <DropdownMenu>
-        <DropdownMenuTrigger className="flex items-center gap-2 flex-1 hover:bg-[#35373c] rounded px-1 py-1">
-          <div className="relative">
-            <img src={currentUser.avatar} alt={currentUser.username} className="size-8 rounded-full" />
-            <div
-              className={`absolute bottom-0 right-0 size-3 rounded-full border-2 border-[#232428] ${getStatusColor(
-                currentUser.status
-              )}`}
-            />
-          </div>
-          <div className="flex-1 min-w-0 text-left">
-            <div className="text-white text-sm font-semibold truncate">{currentUser.username}</div>
-            <div className="text-[#949ba4] text-xs capitalize">{currentUser.status}</div>
-          </div>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent className="w-56 bg-[#111214] border-none text-white mb-2">
-          <DropdownMenuItem
-            onClick={() => updateUserStatus('online')}
-            className="text-[#949ba4] hover:text-white hover:bg-[#5865f2] cursor-pointer"
+    <>
+      <div className="h-14 bg-[#0a1628] border-t border-[#1e3248] px-3 flex items-center gap-2">
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            className="flex items-center gap-2.5 flex-1 hover:bg-[#1a2d45] rounded-xl px-2 py-1.5 transition-colors min-w-0"
+            aria-label={`User menu for ${displayedName}, status: ${getStatusLabel(currentUser.status)}`}
           >
-            <div className="size-3 rounded-full bg-green-500 mr-2" />
-            Online
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            onClick={() => updateUserStatus('idle')}
-            className="text-[#949ba4] hover:text-white hover:bg-[#5865f2] cursor-pointer"
-          >
-            <div className="size-3 rounded-full bg-yellow-500 mr-2" />
-            Idle
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            onClick={() => updateUserStatus('dnd')}
-            className="text-[#949ba4] hover:text-white hover:bg-[#5865f2] cursor-pointer"
-          >
-            <div className="size-3 rounded-full bg-red-500 mr-2" />
-            Do Not Disturb
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            onClick={() => updateUserStatus('offline')}
-            className="text-[#949ba4] hover:text-white hover:bg-[#5865f2] cursor-pointer"
-          >
-            <div className="size-3 rounded-full bg-gray-500 mr-2" />
-            Invisible
-          </DropdownMenuItem>
-          <DropdownMenuSeparator className="bg-[#3f4147]" />
-          <DropdownMenuItem
-            onClick={handleLogout}
-            className="text-red-400 hover:text-white hover:bg-red-600 cursor-pointer"
-          >
-            <LogOut className="size-4 mr-2" />
-            Log Out
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+            <div className="relative flex-shrink-0">
+              <img
+                src={currentUser.avatar}
+                alt=""
+                aria-hidden="true"
+                className="size-8 rounded-full ring-2 ring-[#1e3248]"
+              />
+              <StatusDot
+                status={currentUser.status}
+                borderColor="#0a1628"
+                className="absolute -bottom-0.5 -right-0.5"
+              />
+            </div>
+            <div className="flex-1 min-w-0 text-left">
+              <div className="text-[#e2e8f0] text-sm font-semibold truncate">{displayedName}</div>
+              <div className="text-[#475569] text-xs" aria-hidden="true">{getStatusLabel(currentUser.status)}</div>
+            </div>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="w-52 bg-[#0a1628] border border-[#1e3248] text-[#e2e8f0] shadow-xl mb-1">
+            <div className="px-2 py-1.5 text-xs text-[#475569] font-semibold uppercase tracking-wider" role="heading" aria-level={3}>
+              Set Status
+            </div>
+            <DropdownMenuItem
+              onClick={() => updateUserStatus('online')}
+              className="text-[#94a3b8] hover:text-[#e2e8f0] hover:bg-[#1a2d45] cursor-pointer"
+            >
+              <StatusDot status="online" borderColor="#0a1628" className="mr-2.5 flex-shrink-0" />
+              Online
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => updateUserStatus('idle')}
+              className="text-[#94a3b8] hover:text-[#e2e8f0] hover:bg-[#1a2d45] cursor-pointer"
+            >
+              <StatusDot status="idle" borderColor="#0a1628" className="mr-2.5 flex-shrink-0" />
+              Away
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => updateUserStatus('dnd')}
+              className="text-[#94a3b8] hover:text-[#e2e8f0] hover:bg-[#1a2d45] cursor-pointer"
+            >
+              <StatusDot status="dnd" borderColor="#0a1628" className="mr-2.5 flex-shrink-0" />
+              Busy
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => updateUserStatus('offline')}
+              className="text-[#94a3b8] hover:text-[#e2e8f0] hover:bg-[#1a2d45] cursor-pointer"
+            >
+              <StatusDot status="offline" borderColor="#0a1628" className="mr-2.5 flex-shrink-0" />
+              Invisible
+            </DropdownMenuItem>
+            <DropdownMenuSeparator className="bg-[#1e3248]" />
+            <DropdownMenuItem
+              onClick={handleLogout}
+              className="text-red-400 hover:text-white hover:bg-red-500/20 cursor-pointer"
+            >
+              <LogOut className="size-4 mr-2" aria-hidden="true" />
+              Sign Out
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
-      <div className="flex items-center gap-1">
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <button className="p-2 hover:bg-[#35373c] rounded text-[#b5bac1] hover:text-white">
-                <Mic className="size-4" />
+              <button
+                onClick={() => setSettingsOpen(true)}
+                aria-label="Open user settings"
+                className="p-2 hover:bg-[#1a2d45] rounded-lg text-[#475569] hover:text-[#94a3b8] transition-colors flex-shrink-0"
+              >
+                <Settings className="size-4" aria-hidden="true" />
               </button>
             </TooltipTrigger>
-            <TooltipContent>
-              <p>Mute</p>
-            </TooltipContent>
-          </Tooltip>
-
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button className="p-2 hover:bg-[#35373c] rounded text-[#b5bac1] hover:text-white">
-                <Headphones className="size-4" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Deafen</p>
-            </TooltipContent>
-          </Tooltip>
-
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button className="p-2 hover:bg-[#35373c] rounded text-[#b5bac1] hover:text-white">
-                <Settings className="size-4" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>User Settings</p>
-            </TooltipContent>
+            <TooltipContent><p>Settings</p></TooltipContent>
           </Tooltip>
         </TooltipProvider>
       </div>
-    </div>
+
+      <UserSettings open={settingsOpen} onOpenChange={setSettingsOpen} />
+    </>
   );
 };

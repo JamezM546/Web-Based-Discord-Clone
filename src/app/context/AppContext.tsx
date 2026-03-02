@@ -1,5 +1,11 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { User, Server, Channel, Message, FriendRequest, DirectMessage } from '../types';
+import { User, Server, Channel, Message, FriendRequest, DirectMessage, ServerInvite } from '../types';
+
+// Utility function to create relative timestamps
+const getRelativeTime = (minutesAgo: number): Date => {
+  const now = new Date();
+  return new Date(now.getTime() - minutesAgo * 60 * 1000);
+};
 
 // Mock data
 const mockUsers: User[] = [
@@ -80,70 +86,70 @@ const mockMessages: Message[] = [
     content: 'Hey everyone! Welcome to the project server 🎉',
     authorId: '1',
     channelId: 'c1',
-    timestamp: new Date('2026-02-16T10:00:00'),
+    timestamp: getRelativeTime(50), // 50 minutes ago
   },
   {
     id: 'm2',
     content: 'Thanks for setting this up! Excited to work together.',
     authorId: '2',
     channelId: 'c1',
-    timestamp: new Date('2026-02-16T10:05:00'),
+    timestamp: getRelativeTime(45), // 45 minutes ago
   },
   {
     id: 'm3',
     content: 'What features are we implementing first?',
     authorId: '3',
     channelId: 'c1',
-    timestamp: new Date('2026-02-16T10:10:00'),
+    timestamp: getRelativeTime(40), // 40 minutes ago
   },
   {
     id: 'm4',
     content: 'I\'m working on the user system - registration, login, and profiles.',
     authorId: '1',
     channelId: 'c1',
-    timestamp: new Date('2026-02-16T10:15:00'),
+    timestamp: getRelativeTime(35), // 35 minutes ago
   },
   {
     id: 'm5',
     content: 'I\'ll handle servers - creating, deleting, and settings.',
     authorId: '2',
     channelId: 'c1',
-    timestamp: new Date('2026-02-16T10:16:00'),
+    timestamp: getRelativeTime(30), // 30 minutes ago
   },
   {
     id: 'm6',
     content: 'I can take care of the channels - text channels with permissions.',
     authorId: '3',
     channelId: 'c1',
-    timestamp: new Date('2026-02-18T09:00:00'),
+    timestamp: getRelativeTime(25), // 25 minutes ago
   },
   {
     id: 'm7',
     content: 'We\'ll work on messaging - real-time chat, timestamps, edit/delete, and emojis!',
     authorId: '4',
     channelId: 'c1',
-    timestamp: new Date('2026-02-18T09:15:00'),
+    timestamp: getRelativeTime(20), // 20 minutes ago
   },
   {
     id: 'm8',
     content: 'The emoji picker is working great! 😄',
     authorId: '5',
     channelId: 'c1',
-    timestamp: new Date('2026-02-18T09:30:00'),
+    timestamp: getRelativeTime(15), // 15 minutes ago
   },
   {
     id: 'm9',
     content: 'Should we have a meeting tomorrow to discuss the deadline?',
     authorId: '2',
     channelId: 'c1',
-    timestamp: new Date('2026-02-18T10:00:00'),
+    timestamp: getRelativeTime(10), // 10 minutes ago
   },
   {
     id: 'm10',
     content: 'Yes, let\'s meet at 10 AM. I\'ll prepare the agenda.',
     authorId: '1',
     channelId: 'c1',
-    timestamp: new Date('2026-02-18T10:05:00'),
+    timestamp: getRelativeTime(5), // 5 minutes ago
   },
   // Announcements channel messages for demo
   {
@@ -151,14 +157,14 @@ const mockMessages: Message[] = [
     content: '📢 Important: Please review the project roadmap in the development channel.',
     authorId: '1',
     channelId: 'c2',
-    timestamp: new Date('2026-02-18T09:00:00'),
+    timestamp: getRelativeTime(30), // 30 minutes ago
   },
   {
     id: 'm12',
     content: '🎯 Milestone: We\'ve completed 60% of the core features!',
     authorId: '2',
     channelId: 'c2',
-    timestamp: new Date('2026-02-18T11:00:00'),
+    timestamp: getRelativeTime(10), // 10 minutes ago
   },
   // Development channel messages for demo
   {
@@ -166,21 +172,21 @@ const mockMessages: Message[] = [
     content: 'Just pushed the new authentication flow. Please test it!',
     authorId: '1',
     channelId: 'c3',
-    timestamp: new Date('2026-02-18T08:30:00'),
+    timestamp: getRelativeTime(35), // 35 minutes ago
   },
   {
     id: 'm14',
     content: 'Found a bug in the server settings modal. Working on a fix.',
     authorId: '2',
     channelId: 'c3',
-    timestamp: new Date('2026-02-18T09:45:00'),
+    timestamp: getRelativeTime(20), // 20 minutes ago
   },
   {
     id: 'm15',
     content: 'The channel permissions system is ready for review 🚀',
     authorId: '3',
     channelId: 'c3',
-    timestamp: new Date('2026-02-18T10:30:00'),
+    timestamp: getRelativeTime(8), // 8 minutes ago
   },
   // DM messages for demo
   {
@@ -188,21 +194,21 @@ const mockMessages: Message[] = [
     content: 'Hey! Want to grab coffee after the meeting?',
     authorId: '2',
     dmId: 'dm1',
-    timestamp: new Date('2026-02-18T08:00:00'),
+    timestamp: getRelativeTime(40), // 40 minutes ago
   },
   {
     id: 'm17',
     content: 'Sure! How about the place downtown?',
     authorId: '1',
     dmId: 'dm1',
-    timestamp: new Date('2026-02-18T08:15:00'),
+    timestamp: getRelativeTime(25), // 25 minutes ago
   },
   {
     id: 'm18',
     content: 'Perfect! See you at 2 PM ☕',
     authorId: '2',
     dmId: 'dm1',
-    timestamp: new Date('2026-02-18T08:20:00'),
+    timestamp: getRelativeTime(15), // 15 minutes ago
   },
 ];
 
@@ -214,10 +220,12 @@ interface AppContextType {
   messages: Message[];
   friendRequests: FriendRequest[];
   directMessages: DirectMessage[];
+  serverInvites: ServerInvite[];
   selectedServer: Server | null;
   selectedChannel: Channel | null;
   selectedDM: DirectMessage | null;
   lastReadMessages: Record<string, Date>;
+  replyingTo: Message | null;
   login: (email: string, password: string) => boolean;
   register: (username: string, email: string, password: string) => boolean;
   logout: () => void;
@@ -227,8 +235,11 @@ interface AppContextType {
   createServer: (name: string, icon: string) => void;
   deleteServer: (serverId: string) => void;
   updateServerSettings: (serverId: string, name: string, icon: string) => void;
+  sendServerInvite: (serverId: string, userId: string) => void;
+  acceptServerInvite: (inviteId: string) => void;
+  declineServerInvite: (inviteId: string) => void;
   createChannel: (serverId: string, name: string) => void;
-  sendMessage: (content: string, channelId?: string, dmId?: string) => void;
+  sendMessage: (content: string, channelId?: string, dmId?: string, replyToId?: string, serverInviteId?: string) => void;
   editMessage: (messageId: string, newContent: string) => void;
   deleteMessage: (messageId: string) => void;
   toggleReaction: (messageId: string, emoji: string) => void;
@@ -238,9 +249,11 @@ interface AppContextType {
   getFriends: () => User[];
   createDirectMessage: (userId: string) => void;
   updateUserStatus: (status: User['status']) => void;
+  updateUserProfile: (displayName?: string, avatar?: string) => void;
   markAsRead: (channelId?: string, dmId?: string) => void;
   getUnreadCount: (channelId?: string, dmId?: string) => number;
   getUnreadMessages: (channelId?: string, dmId?: string) => Message[];
+  setReplyingTo: (message: Message | null) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -253,24 +266,32 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [messages, setMessages] = useState<Message[]>(mockMessages);
   const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([
     { id: 'fr1', fromUserId: '4', toUserId: '1', status: 'pending' },
+    // Add accepted friend requests for demo - current user (1) is friends with users 2, 3, 5
+    { id: 'fr2', fromUserId: '1', toUserId: '2', status: 'accepted' },
+    { id: 'fr3', fromUserId: '3', toUserId: '1', status: 'accepted' },
+    { id: 'fr4', fromUserId: '1', toUserId: '5', status: 'accepted' },
   ]);
   const [directMessages, setDirectMessages] = useState<DirectMessage[]>([
     { id: 'dm1', participants: ['1', '2'], lastMessageTime: new Date() },
   ]);
+  const [serverInvites, setServerInvites] = useState<ServerInvite[]>([]);
   const [selectedServer, setSelectedServer] = useState<Server | null>(null);
   const [selectedChannel, setSelectedChannel] = useState<Channel | null>(null);
   const [selectedDM, setSelectedDM] = useState<DirectMessage | null>(null);
   const [lastReadMessages, setLastReadMessages] = useState<Record<string, Date>>({
     // Set up demo for AI summary feature - simulate users haven't read recent messages
-    'c1': new Date('2026-02-18T08:00:00'), // general channel - has 5 unread messages
-    'c2': new Date('2026-02-17T12:00:00'), // announcements channel
-    'c3': new Date('2026-02-17T12:00:00'), // development channel
-    'c4': new Date('2026-02-17T12:00:00'), // gaming general
-    'c5': new Date('2026-02-17T12:00:00'), // game-night
-    'c6': new Date('2026-02-17T12:00:00'), // study general
-    'c7': new Date('2026-02-17T12:00:00'), // homework-help
-    'dm1': new Date('2026-02-17T12:00:00'), // DM with first contact
+    // Set last read times to 61 minutes ago so all messages (60-5 minutes ago) are unread
+    // This ensures the messages fall within the "What You Missed" window
+    'c1': getRelativeTime(61), // Team Project - general channel
+    'c2': getRelativeTime(61), // Team Project - announcements channel
+    'c3': getRelativeTime(61), // Team Project - development channel
+    'c4': getRelativeTime(61), // Gaming Squad - general
+    'c5': getRelativeTime(61), // Gaming Squad - game-night
+    'c6': getRelativeTime(61), // Study Group - general
+    'c7': getRelativeTime(61), // Study Group - homework-help
+    'dm1': getRelativeTime(61), // DM with Ashraf
   });
+  const [replyingTo, setReplyingTo] = useState<Message | null>(null);
 
   const login = (email: string, password: string): boolean => {
     const user = users.find((u) => u.email === email);
@@ -339,6 +360,80 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setServers(servers.map((s) => (s.id === serverId ? { ...s, name, icon } : s)));
   };
 
+  const sendServerInvite = (serverId: string, userId: string) => {
+    if (!currentUser) return;
+    
+    const server = servers.find(s => s.id === serverId);
+    if (!server) return;
+    
+    // Create the invite
+    const newInvite: ServerInvite = {
+      id: `si${serverInvites.length + 1}`,
+      serverId,
+      fromUserId: currentUser.id,
+      toUserId: userId,
+      status: 'pending',
+      timestamp: new Date(),
+    };
+    setServerInvites([...serverInvites, newInvite]);
+    
+    // Create or get DM with the user
+    let dm = directMessages.find(
+      (d) => d.participants.includes(currentUser.id) && d.participants.includes(userId)
+    );
+    
+    if (!dm) {
+      dm = {
+        id: `dm${directMessages.length + 1}`,
+        participants: [currentUser.id, userId],
+        lastMessageTime: new Date(),
+      };
+      setDirectMessages([...directMessages, dm]);
+    }
+    
+    // Send invite message in DM
+    const inviteMessage: Message = {
+      id: `m${messages.length + 1}`,
+      content: `${currentUser.username} invited you to join ${server.name} ${server.icon}`,
+      authorId: currentUser.id,
+      dmId: dm.id,
+      timestamp: new Date(),
+      serverInviteId: newInvite.id,
+    };
+    setMessages([...messages, inviteMessage]);
+    
+    // Update invite with message ID
+    newInvite.messageId = inviteMessage.id;
+  };
+
+  const acceptServerInvite = (inviteId: string) => {
+    const invite = serverInvites.find(si => si.id === inviteId);
+    if (!invite) return;
+    
+    // Update invite status
+    setServerInvites(
+      serverInvites.map((si) =>
+        si.id === inviteId ? { ...si, status: 'accepted' as const } : si
+      )
+    );
+    
+    // Add user to server members
+    setServers(servers.map((s) => {
+      if (s.id === invite.serverId && !s.members.includes(invite.toUserId)) {
+        return { ...s, members: [...s.members, invite.toUserId] };
+      }
+      return s;
+    }));
+  };
+
+  const declineServerInvite = (inviteId: string) => {
+    setServerInvites(
+      serverInvites.map((si) =>
+        si.id === inviteId ? { ...si, status: 'declined' as const } : si
+      )
+    );
+  };
+
   const createChannel = (serverId: string, name: string) => {
     const newChannel: Channel = {
       id: `c${channels.length + 1}`,
@@ -349,7 +444,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setChannels([...channels, newChannel]);
   };
 
-  const sendMessage = (content: string, channelId?: string, dmId?: string) => {
+  const sendMessage = (content: string, channelId?: string, dmId?: string, replyToId?: string, serverInviteId?: string) => {
     if (!currentUser) return;
     const newMessage: Message = {
       id: `m${messages.length + 1}`,
@@ -358,6 +453,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       channelId,
       dmId,
       timestamp: new Date(),
+      replyToId,
+      serverInviteId,
     };
     setMessages([...messages, newMessage]);
 
@@ -496,6 +593,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setUsers(users.map((u) => (u.id === currentUser.id ? updatedUser : u)));
   };
 
+  const updateUserProfile = (displayName?: string, avatar?: string) => {
+    if (!currentUser) return;
+    const updatedUser = { 
+      ...currentUser, 
+      displayName: displayName || undefined, 
+      avatar: avatar || currentUser.avatar 
+    };
+    setCurrentUser(updatedUser);
+    setUsers(users.map((u) => (u.id === currentUser.id ? updatedUser : u)));
+  };
+
   const markAsRead = (channelId?: string, dmId?: string) => {
     if (channelId) {
       setLastReadMessages({ ...lastReadMessages, [channelId]: new Date() });
@@ -508,14 +616,28 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const lastRead = lastReadMessages[channelId || dmId || ''];
     if (!lastRead) return 0;
     const messagesToCheck = channelId ? messages.filter(m => m.channelId === channelId) : messages.filter(m => m.dmId === dmId);
-    return messagesToCheck.filter(m => m.timestamp > lastRead).length;
+    return messagesToCheck.filter(m => new Date(m.timestamp).getTime() > new Date(lastRead).getTime()).length;
   };
 
   const getUnreadMessages = (channelId?: string, dmId?: string) => {
-    const lastRead = lastReadMessages[channelId || dmId || ''];
-    if (!lastRead) return [];
+    const id = channelId || dmId || '';
+    const lastRead = lastReadMessages[id];
+    console.log('getUnreadMessages called:', { channelId, dmId, id, lastRead });
+    
+    if (!lastRead) {
+      console.log('No lastRead timestamp found for:', id);
+      return [];
+    }
+    
     const messagesToCheck = channelId ? messages.filter(m => m.channelId === channelId) : messages.filter(m => m.dmId === dmId);
-    return messagesToCheck.filter(m => m.timestamp > lastRead);
+    console.log('Messages to check:', messagesToCheck.length);
+    console.log('First few messages:', messagesToCheck.slice(0, 3).map(m => ({ id: m.id, timestamp: m.timestamp, content: m.content.substring(0, 30) })));
+    console.log('Last read time:', lastRead);
+    
+    const unread = messagesToCheck.filter(m => new Date(m.timestamp).getTime() > new Date(lastRead).getTime());
+    console.log('Unread messages found:', unread.length);
+    
+    return unread;
   };
 
   return (
@@ -528,10 +650,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         messages,
         friendRequests,
         directMessages,
+        serverInvites,
         selectedServer,
         selectedChannel,
         selectedDM,
         lastReadMessages,
+        replyingTo,
         login,
         register,
         logout,
@@ -541,6 +665,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         createServer,
         deleteServer,
         updateServerSettings,
+        sendServerInvite,
+        acceptServerInvite,
+        declineServerInvite,
         createChannel,
         sendMessage,
         editMessage,
@@ -552,9 +679,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         getFriends,
         createDirectMessage,
         updateUserStatus,
+        updateUserProfile,
         markAsRead,
         getUnreadCount,
         getUnreadMessages,
+        setReplyingTo,
       }}
     >
       {children}
