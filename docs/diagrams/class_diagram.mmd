@@ -1,0 +1,81 @@
+classDiagram
+    %% Manual Summary - Class Diagram (Updated for Actual Codebase)
+    
+    class ManualSummary {
+        +Message[] messages
+        +Function onClose
+        +SummaryData summaryData
+        +Boolean isOpen
+        +Number selectedHours
+        +Boolean isLoading
+        +String error
+        +generateManualSummary()
+        +handleTimeRangeChange()
+        +handleClose()
+        +handleGenerateSummary()
+        +formatTimeframe()
+        +filterMessagesByTimeRange()
+    }
+
+    class Message {
+        +String id
+        +String content
+        +String authorId
+        +String channelId
+        +String dmId
+        +Date timestamp
+        +Boolean edited
+        +MessageReaction[] reactions
+        +String replyToId
+        +String serverInviteId
+    }
+
+    class User {
+        +String id
+        +String username
+        +String displayName
+        +String email
+        +String avatar
+        +String status
+    }
+
+    class SummaryData {
+        +String overview
+        +String[] keyTopics
+        +Object[] mostActiveUsers
+        +Message[] importantMessages
+        +String timeframe
+        +Object stats
+    }
+
+    class AppContext {
+        +User[] users
+        +Message[] messages
+        +Server[] servers
+        +Channel[] channels
+        +Object currentUser
+        +Function addMessage()
+        +Function updateMessage()
+        +Function deleteMessage()
+        +Function fetchMessages()
+    }
+
+    class MessageArea {
+        +Message[] messages
+        +String channelId
+        +Function onMessageSent
+        +Function renderMessages()
+        +Function handleScroll()
+        +Function markAsRead()
+    }
+
+    %% Relationships based on actual implementation
+    ManualSummary --> Message : uses
+    ManualSummary --> SummaryData : creates
+    ManualSummary --> AppContext : consumes
+    MessageArea --> Message : displays
+    MessageArea --> ManualSummary : triggers
+    AppContext --> Message : manages
+    AppContext --> User : manages
+    SummaryData --> Message : references
+    Message --> User : authored by

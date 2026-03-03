@@ -1,0 +1,45 @@
+graph TB
+    %% Manual Summary - Architecture Diagram
+    %% MVC Architecture Pattern
+
+    subgraph "Client Side (View + Controller)"
+        A[Frontend<br/>React]
+        B[ChatChannelView<br/>MS1.1]
+        C[ManualSummaryButtonView<br/>MS1.2]
+        D[ChatChannelController<br/>MS1.3]
+    end
+
+    subgraph "Server Side (Model)"
+        E[Backend Services<br/>Node.js]
+        F[MessageRepository<br/>MS2.1]
+        G[SummaryService<br/>MS2.2]
+        H[API Layer<br/>REST/GraphQL]
+    end
+
+    subgraph "External (Data)"
+        I[Database<br/>PostgreSQL]
+        J[LLM API<br/>OpenAI]
+        K[Authentication<br/>Service]
+    end
+
+    %% MVC Data Flow
+    A --> D
+    B --> D
+    C --> D
+    D --> H
+    H --> F
+    H --> G
+    F --> I
+    G --> J
+    G --> K
+
+    %% Styling
+    classDef clientClass fill:#e3f2fd,stroke:#1a73e8,stroke-width:3px
+    classDef serverClass fill:#e8f5e8,stroke:#34a853,stroke-width:3px
+    classDef externalClass fill:#ffebee,stroke:#ea4335,stroke-width:3px
+    classDef componentClass fill:#ffffff,stroke:#666666,stroke-width:2px
+
+    class A,D clientClass
+    class E,F,G,H serverClass
+    class I,J,K externalClass
+    class B,C componentClass
