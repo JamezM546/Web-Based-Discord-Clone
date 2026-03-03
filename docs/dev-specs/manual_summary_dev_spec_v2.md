@@ -9,14 +9,14 @@
 | :--- | :--- | :--- | :--- |
 | 0.1 | 2026-02-13 | Nafisa Ahmed | Initial document creation for Manual Summary On Demand user story |
 | 0.2 | 2026-02-13 | Elvis Valcarcel | Adjusted for consistency across devspecs |
-| 2.0 | 2026-03-03 | AI Assistant | Updated diagrams to match actual codebase, optimized content, removed fluff |
+| 2.0 | 2026-03-03 | Salma Ghazi | Updated diagrams to match actual codebase, optimized content, removed fluff |
 
 ### Authors & Contributors
 | Name | Role / Responsibility | Contributed Versions |
 | :--- | :--- | :--- |
 | Nafisa Ahmed | Product Owner | v0.1 |
 | Elvis Valcarcel | Editor | v0.2 |
-| AI Assistant | Technical Update | v2.0 |
+| Salma Ghazi | Technical Update | v2.0 |
 
 ## 2. Architecture Diagram
 
