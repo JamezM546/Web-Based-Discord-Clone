@@ -4,7 +4,7 @@ graph TB
 
     subgraph "Client Side (View + Controller)"
         A[Frontend<br/>React]
-        B[ChatChannelView<br/>MS1.1]
+        B[ManualSummary<br/>MS1.1]
         C[ManualSummaryButtonView<br/>MS1.2]
         D[ChatChannelController<br/>MS1.3]
     end
@@ -23,23 +23,28 @@ graph TB
     end
 
     %% MVC Data Flow
+    A --> B
+    A --> C
     A --> D
     B --> D
     C --> D
-    D --> H
+    D --> E
+    D --> F
+    D --> G
+    F --> H
     H --> F
-    H --> G
+    F --> G
+    G --> I
     F --> I
     G --> J
-    G --> K
+    J --> K
 
     %% Styling
     classDef clientClass fill:#e3f2fd,stroke:#1a73e8,stroke-width:3px
     classDef serverClass fill:#e8f5e8,stroke:#34a853,stroke-width:3px
     classDef externalClass fill:#ffebee,stroke:#ea4335,stroke-width:3px
     classDef componentClass fill:#ffffff,stroke:#666666,stroke-width:2px
-
-    class A,D clientClass
+    class A,B,C,D clientClass
     class E,F,G,H serverClass
     class I,J,K externalClass
     class B,C componentClass

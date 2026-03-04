@@ -1,0 +1,32 @@
+graph TB
+    %% What You Missed Summary (WYMS) - Architecture Diagram
+    %% MVC Architecture Pattern
+
+    subgraph "Client Side (View)"
+        A[Frontend<br/>React]
+        B[WhatYouMissed<br/>WYMS1.1<br/>Summary Bar + Expand Button]
+        C[WhatYouMissed<br/>WYMS1.2<br/>Expanded Summary Display]
+    end
+
+    subgraph "Client Side (Controller)"
+        D[User Interactions<br/>Event Handlers<br/>- onExpand<br/>- onDismiss<br/>- onJumpToUnread]
+    end
+
+    subgraph "Client Side (Model)"
+        E[AppContext<br/>State Management]
+        F[Message Data<br/>unreadMessages]
+        G[User Data<br/>users]
+        H[Summary State<br/>isExpanded]
+    end
+
+    %% MVC Data Flow
+    A --> B
+    A --> C
+    B --> D
+    C --> D
+    D --> E
+    D --> H
+    E --> F
+    E --> G
+    H --> E
+    E --> A

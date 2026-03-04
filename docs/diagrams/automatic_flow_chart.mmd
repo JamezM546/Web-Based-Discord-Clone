@@ -1,0 +1,15 @@
+flowchart TD
+    A[User opens channel/DM] --> B{Unread messages?}
+    B -->|Yes| C[Show WYMS bar]
+    B -->|No| D[No WYMS bar]
+    C --> E{User clicks expand?}
+    E -->|Yes| F[Generate summary]
+    E -->|No| G[Stay compact]
+    F --> H[Show expanded summary]
+    H --> I{User dismisses?}
+    I -->|Yes| J[Mark as read]
+    I -->|No| H
+    G --> K{User dismisses?}
+    K -->|Yes| J
+    K -->|No| G
+    J --> L[Hide WYMS bar]

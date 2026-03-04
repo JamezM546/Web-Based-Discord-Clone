@@ -1,0 +1,29 @@
+classDiagram
+    class WhatYouMissed {
+        +unreadMessages: Message[]
+        +onDismiss: () => void
+        +onJumpToUnread?: () => void
+        +channelId?: string
+        +dmId?: string
+        +isExpanded: boolean
+        +generateAutomaticSummary()
+        +getHardcodedSummary()
+        +formatTimestamp()
+    }
+
+    class Message {
+        +id: string
+        +content: string
+        +authorId: string
+        +timestamp: Date
+    }
+
+    class User {
+        +id: string
+        +username: string
+        +displayName: string
+        +avatar: string
+    }
+
+    WhatYouMissed --> Message
+    WhatYouMissed --> User

@@ -40,86 +40,56 @@ This architecture uses a MVC pattern to make sure that the application stays res
 
 ![Class Diagram](../diagrams/class_diagram.png)
 
-**Class: MS1.3 ChatChannelController**
-* interacts with → Class: MS1.1 ChatChannelView
-* interacts with → Class: MS1.2 ManualSummaryButtonView
-* depends on → Class: MS2.1 MessageRepository
-* depends on → Class: MS2.2 SummaryService
-* operates on → Class: MS2.4 MessageRecord
-* produces → Class: MS2.3 SummaryResult
-* transforms into → Class: MS1.5 SummaryViewModel
+**Actual Implementation (Single Component):**
 
-**Class: MS1.1 ChatChannelView**
-* displays → Class: MS1.4 MessageViewModel
-* displays → Class: MS1.5 SummaryViewModel
+**Class: MS1.1 ManualSummary**
+* **Props Interface**: `ManualSummaryProps` (lines 7-10)
+  - `messages: Message[]` - Array of messages to summarize
+  - `onClose: () => void` - Callback to close modal dialog
+* **Local State**:
+  - `selectedHours: number` - Time range selection (line 120)
+  - `isGenerating: boolean` - Loading state during generation (line 121)
+  - `summaryData: SummaryData | null` - Generated summary results (line 122)
+  - `announcement: string` - Status messages for user feedback (line 123)
+* **Global State**: `users: User[]` from AppContext via `useApp()` hook (line 3)
+* **Key Functions**:
+  - `generateManualSummary(messages, users, startDate, endDate)` - Core summary generation (line 36)
+  - `handlePreset(hours)` - Time preset selection handler (line 215)
+  - `generate(hours)` - Orchestrates summary generation with timeout (line 196)
+  - `handleKeyDown(e)` - Keyboard navigation for accessibility (line 175)
 
-**Class: MS1.2 ManualSummaryButtonView**
-* triggers → Class: MS1.3 ChatChannelController
+**Data Structures:**
 
-**Class: MS2.1 MessageRepository**
-* provides data to → Class: MS1.3 ChatChannelController
-* provides data to → Class: MS2.2 SummaryService
-* reads → Class: MS2.4 MessageRecord
-
-**Class: MS2.2 SummaryService**
-* operates on → Class: MS2.4 MessageRecord
-* produces → Class: MS2.3 SummaryResult
-* transforms into → Class: MS1.5 SummaryViewModel
-
-**Class: MS2.4 MessageRecord**  
-**Class: MS2.3 SummaryResult**  
-**Class: MS1.4 MessageViewModel**  
-**Class: MS1.5 SummaryViewModel**  
+**SummaryData Interface** (lines 12-24)
+* `overview: string` - Generated summary overview
+* `keyTopics: string[]` - Extracted key topics
+* `mostActiveUsers: { username: string; count: number }[]` - Active user statistics
+* `importantMessages: Message[]` - Important messages identified
+* `timeframe: string` - Summary time period
+* `stats: { totalMessages, uniqueUsers, questionsAsked, decisionsMarked }` - Summary statistics
 
 ### Rationale and Justification:
-This class structure keeps different data entities such as the MessageRecord separate from the more UI-specific models (SummaryViewModel) so that if there are any changes to the database schema, it doesn't break the frontend logic. It also keeps most of the interaction logic in the ChatChannelController.
+The actual implementation uses a pragmatic single-component approach that handles all MVC responsibilities internally. The ManualSummary component manages its own state, processes data with the `generateManualSummary` function, and provides a complete modal interface. This approach provides a self-contained, efficient implementation that aligns with the current codebase structure while maintaining clear separation of concerns.
 
 ## 4. List of Classes
 
-#### Component: MS1.0 Chat Channel Page (View + Controller)
+### Actual Implementation: Single React Component
 
-**Class: MS1.1 ChatChannelView**
-* **Purpose & Responsibility:** Responsible for rendering the chat channel interface, including message history and the manual summary panel. Manages UI states such as summary visible/hidden and updated message lists.
-* **Implements Design Features:** Manual Summary On Demand (user-controlled summary display), Dynamic UI state transitions (show/hide summary without disrupting chat flow).
+**Class: MS1.1 ManualSummary**
+* **Purpose & Responsibility:** Single React component that displays modal dialog for manual AI summary generation. Shows time preset options, generates summaries on demand, and displays results with full statistics.
+* **Implements Design Features:** Manual Summary On Demand (complete UI), Time range selection, Modal dialog interface, User interaction handling, Accessibility support.
+* **Props:** `messages`, `onClose`
+* **State:** `selectedHours`, `isGenerating`, `summaryData`, `announcement`
+* **Data Sources:** AppContext for users, props for messages and callbacks
 
-**Class: MS1.2 ManualSummaryButtonView**
-* **Purpose & Responsibility:** Represents the interactive UI element that allows users to request a manual summary. Manages enabled/disabled state and triggers summary generation requests.
-* **Implements Design Features:** Manual Summary On Demand (explicit user-triggered action), User autonomy (summary not forced).
+### Data Structures
 
-**Class: MS1.3 ChatChannelController**
-* **Purpose & Responsibility:** Coordinates interactions between the view layer and backend services. Handles user-triggered summary requests, retrieves relevant messages, invokes summarization logic, and updates the UI accordingly.
-* **Implements Design Features:** Manual Summary On Demand (end-to-end orchestration), Separation of concerns (UI vs business logic), Controlled data flow between modules.
-
-**Class: MS1.4 MessageViewModel**
-* **Purpose & Responsibility:** Represents message data formatted specifically for UI rendering. Contains only fields necessary for visual presentation in the chat channel.
-* **Implements Design Features:** Model-View separation, Efficient rendering.
-
-**Class: MS1.5 SummaryViewModel**
-* **Purpose & Responsibility:** Represents summarized content formatted for display within the chat interface. Contains summary text and minimal metadata required for UI presentation.
-* **Implements Design Features:** Manual Summary On Demand (UI presentation layer), Lightweight summary display without exposing raw backend structures.
-
-#### Component: MS2.0 Message & Summarization Module (Model + Service)
-
-**Class: MS2.1 MessageRepository**
-* **Purpose & Responsibility:** Handles retrieval and persistence of message data and last-read markers from the database. Acts as the data access layer for chat messages.
-* **Implements Design Features:** Efficient retrieval, Persistence of read-state tracking, Data abstraction from UI layer.
-
-**Class: MS2.2 SummaryService**
-* **Purpose & Responsibility:** Processes message data and generates a condensed textual summary. Transforms raw message records into a summarized representation suitable for presentation.
-* **Implements Design Features:** Manual Summary On Demand (core summarization logic), Encapsulation of summarization engine integration (LLM-based or heuristic via SummarizationProvider), Data model transformation into view models.
-
-#### Data Storage Classes / Structs
-
-**Class: MS2.3 SummaryResult**
-* **Purpose & Responsibility:** Represents the structured result of a summarization operation before transformation into a UI-specific model.
-* **Implements Design Features:** Intermediate summarization representation, Separation between processing output and presentation model.
-
-**Class: MS2.4 MessageRecord**
-* **Purpose & Responsibility:** Represents persistent message data retrieved from the database. Contains full message metadata required for summarization and read-state calculations.
-* **Implements Design Features:** Persistent storage representation, Data source for summarization, Incremental retrieval.
+**SummaryData Interface**
+* **Purpose & Responsibility:** Data structure representing the complete summary output with overview, topics, user activity, and statistics.
+* **Implements Design Features:** Structured summary data, Statistical analysis, User activity tracking.
 
 ### Rationale and Justification:
-This class list assigns different parts of the application their own responsibilities. Views are responsible for the UI, Controllers are responsible for the business logic, and Repositories are responsible for the data persistence. The MessageViewModel and SummaryViewModel make sure that the raw database entries like MessageRecord aren't directly exposed to the client.
+The actual implementation uses a pragmatic single-component approach that handles all MVC responsibilities internally. The ManualSummary component manages its own state, processes data with the `generateManualSummary` function, and provides a complete modal interface. This approach provides a self-contained, efficient implementation that aligns with the current codebase structure while maintaining clear separation of concerns.
 
 ## 5. State Diagrams
 
@@ -130,39 +100,46 @@ This class list assigns different parts of the application their own responsibil
 ![Flow Chart](../diagrams/flow_chart.png)
 
 #### Scenario: SC1.0 Manual Summary With New Messages Available
-**Starting State:** MS1.0 ChannelIdleState
-**Ending State:** MS1.3 SummaryVisibleState
+**Starting State:** CLOSED
+**Ending State:** SUMMARY_VISIBLE
 
-1.  **[Start]** → **[State]** MS1.0 ChannelIdleState
-2.  **[Input/Output]** User clicks "Manual Summary" button
-3.  **[Process]** Transition to MS1.1 SummaryLoadingState
-4.  **[Process]** Invoke `fetchMessagesAfter` or `fetchMessagesWithinTimeWindow`
-5.  **[Decision]** `retrievedMessages.size > 0?`
-    * **Yes** → **[Process]** Transition to MS1.2 GeneratingSummaryState
-    * **[Process]** Invoke `generateSummary`
-    * **[Process]** Transition to MS1.3 SummaryVisibleState → **(End)**
+1. **[Start]** → **[State]** CLOSED (Modal not visible)
+2. **[Input/Output]** User clicks "Manual Summary" button → **[Controller]** `handlePreset` triggered
+3. **[Process]** Transition to GENERATING state
+4. **[Process]** `generate` function calls `generateManualSummary` with time range
+5. **[Process]** Set `isGenerating: true` and show "Generating summary…" announcement
+6. **[Process]** After 650ms timeout, set `summaryData` and `isGenerating: false`
+7. **[Decision]** `summaryData.stats.totalMessages > 0?`
+    * **Yes** → **[View]** Show modal with summary content → **(End)**
     * **No** → (Handled by SC1.1)
 
-**Explanation:** The flow begins in the idle channel state. When the user manually requests a summary, the system transitions to the loading state and retrieves unread messages. If new messages exist, the system generates a summary and transitions to the summary visible state.
+**Explanation:** User clicks time preset button, triggering the generation process. The component processes messages within the specified time range and displays results in a modal dialog.
 
 #### Scenario: SC1.1 Manual Summary With No New Messages
-**Starting State:** MS1.0 ChannelIdleState
-**Ending State:** MS1.5 NoNewMessagesState
+**Starting State:** CLOSED
+**Ending State:** NO_MESSAGES
 
-1.  **[Start]** → **[State]** MS1.0 ChannelIdleState
-2.  **[Input]** User clicks "Manual Summary" button
-3.  **[Process]** Transition to MS1.1 SummaryLoadingState
-4.  **[Process]** Invoke `fetchMessagesAfter` or `fetchMessagesWithinTimeWindow`
-5.  **[Decision]** `retrievedMessages.size > 0?`
+1. **[Start]** → **[State]** CLOSED (Modal not visible)
+2. **[Input/Output]** User clicks "Manual Summary" button → **[Controller]** `handlePreset` triggered
+3. **[Process]** Transition to GENERATING state
+4. **[Process]** `generate` function calls `generateManualSummary` with time range
+5. **[Process]** Set `isGenerating: true` and show "Generating summary…" announcement
+6. **[Process]** After 650ms timeout, set `summaryData` and `isGenerating: false`
+7. **[Decision]** `summaryData.stats.totalMessages > 0?`
     * **Yes** → (Handled by SC1.0)
-    * **No** → **[Process]** Transition to MS1.5 NoNewMessagesState → **(End)**
+    * **No** → **[View]** Show modal with "No messages found" → **(End)**
 
-**Explanation:** If the repository returns no new messages, the predicate evaluates to false. The system transitions directly to the no-new-messages state, displaying a message indicating there has been no activity since the user was last present.
+**Explanation:** Similar to successful flow but displays empty state when no messages exist in the specified time range.
 
 #### Scenario: SC1.2 Dismiss Visible Summary
-**Starting State:** MS1.3 SummaryVisibleState
-**Ending State:** MS1.0 ChannelIdleState
+**Starting State:** SUMMARY_VISIBLE
+**Ending State:** CLOSED
 
+1. **[Start]** → **[State]** SUMMARY_VISIBLE (Modal visible)
+2. **[Input]** User dismisses summary panel
+3. **[Process]** Transition to CLOSED state
+4. **[Process]** Reset `summaryData` and `isGenerating`
+5. **[Process]** Hide modal → **(End)**
 1.  **[Start]** → **[State]** MS1.3 SummaryVisibleState
 2.  **[Input]** User dismisses summary panel
 3.  **[Process]** Transition to MS1.4 SummaryDismissedState
