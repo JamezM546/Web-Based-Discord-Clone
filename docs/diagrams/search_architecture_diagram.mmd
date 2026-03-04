@@ -1,0 +1,32 @@
+graph TB
+    %% Clear Server Search Bar - Architecture Diagram
+    %% MVC Architecture Pattern
+
+    subgraph "Client Side (View)"
+        A[Frontend<br/>React]
+        B[ServerSearchInput<br/>SB1.1<br/>Search Field + Clear Button]
+        C[ServerSearch<br/>SB1.2<br/>Server List Display]
+    end
+
+    subgraph "Client Side (Controller)"
+        D[User Interactions<br/>Event Handlers<br/>- onChange<br/>- onClear<br/>- onServerSelect]
+    end
+
+    subgraph "Client Side (Model)"
+        E[AppContext<br/>State Management]
+        F[Server Data<br/>servers]
+        G[User Data<br/>currentUser]
+        H[Search Query<br/>searchQuery]
+    end
+
+    %% MVC Data Flow
+    A --> B
+    A --> C
+    B --> D
+    C --> D
+    D --> E
+    D --> H
+    E --> F
+    E --> G
+    H --> E
+    E --> A
