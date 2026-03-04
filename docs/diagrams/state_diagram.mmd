@@ -2,31 +2,40 @@ stateDiagram-v2
     %% Manual Summary - State Machine Diagram
     %% Based on actual ManualSummary.tsx implementation
 
-    [*] --> CLOSED
+    [*] --> INITIALIZING
 
-    %% Transitions with method scopes
-    CLOSED --> GENERATING : ManualSummary.generate()\n[component mounts]
-    
-    GENERATING --> DISPLAYED : generateManualSummary()\n[relevantMessages.length > 0]
-    GENERATING --> NO_MESSAGES : generateManualSummary()\n[relevantMessages.length === 0]
-    
-    DISPLAYED --> GENERATING : ManualSummary.handlePreset()\n[time range changes]
-    
-    NO_MESSAGES --> GENERATING : ManualSummary.handlePreset()\n[time range changes]
-    
-    %% Close transitions (available from any open state)
-    GENERATING --> CLOSED : ManualSummary.onClose()\n[Escape key or backdrop click]
-    DISPLAYED --> CLOSED : ManualSummary.onClose()\n[Escape key or backdrop click]
-    NO_MESSAGES --> CLOSED : ManualSummary.onClose()\n[Escape key or backdrop click]
+    %% Initial component mount
+    INITIALIZING --> LOADING : componentDidMount()\n[useEffect runs generate()]
 
-    %% Legend
-    note right of CLOSED
+    %% Generation process
+    LOADING --> HAS_SUMMARY : generateManualSummary()\n[summaryData populated && messages > 0]
+    LOADING --> NO_MESSAGES : generateManualSummary()\n[summaryData populated && messages === 0]
+
+    %% Time range changes (from any state except loading)
+    HAS_SUMMARY --> LOADING : handlePreset()\n[new time range selected]
+    NO_MESSAGES --> LOADING : handlePreset()\n[new time range selected]
+
+    %% Close transitions (from any state)
+    INITIALIZING --> [*] : onClose()\n[Escape/backdrop click]
+    LOADING --> [*] : onClose()\n[Escape/backdrop click]
+    HAS_SUMMARY --> [*] : onClose()\n[Escape/backdrop click]
+    NO_MESSAGES --> [*] : onClose()\n[Escape/backdrop click]
+
+    %% State definitions and transitions
+    note right of INITIALIZING
         **State Definitions:**
-        CLOSED: Modal closed, no processing
-        GENERATING: Modal open, processing summary
-        DISPLAYED: Modal open, showing summary
-        NO_MESSAGES: Modal open, no messages found
-        
-        **Transition Format:**
-        Component.method() [condition]
+        INITIALIZING: Component mounted, setting up portal
+        LOADING: Generating summary, showing spinner
+        HAS_SUMMARY: Summary ready, displaying results
+        NO_MESSAGES: No messages found in time range
+
+        **Key State Variables:**
+        isGenerating: boolean (true during LOADING)
+        summaryData: null or SummaryData object
+        selectedHours: 0.5 | 1 | 3 (time range)
+
+        **Transition Triggers:**
+        componentDidMount: Initial render
+        handlePreset: Time range button clicked
+        onClose: Escape key or backdrop click
     end note
