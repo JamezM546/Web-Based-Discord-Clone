@@ -1,0 +1,38 @@
+graph TB
+    %% Manual Summary - Architecture Diagram
+    %% MVC Architecture Pattern
+
+    subgraph "Client Side (View)"
+        A[Frontend<br/>React]
+        B[ManualSummary<br/>MS1.1<br/>Modal Dialog + Time Presets]
+        C[ManualSummary<br/>MS1.2<br/>Summary Display + Stats]
+    end
+
+    subgraph "Client Side (Controller)"
+        D[User Interactions<br/>Event Handlers<br/>- onClose<br/>- handlePreset<br/>- generate]
+    end
+
+    subgraph "Client Side (Model)"
+        E[AppContext<br/>State Management]
+        F[Message Data<br/>messages]
+        G[User Data<br/>users]
+        H[Summary State<br/>selectedHours<br/>isGenerating<br/>summaryData]
+    end
+
+    %% MVC Data Flow
+    A --> B
+    A --> C
+    B --> D
+    C --> D
+    D --> E
+    D --> H
+    E --> F
+    E --> G
+    H --> E
+    E --> A
+
+    %% Styling
+    classDef clientClass fill:#e3f2fd,stroke:#1a73e8,stroke-width:3px
+    classDef componentClass fill:#ffffff,stroke:#666666,stroke-width:2px
+    class A,B,C,D,E,F,G,H clientClass
+    class B,C componentClass
