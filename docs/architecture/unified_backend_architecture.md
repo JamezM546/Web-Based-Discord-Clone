@@ -133,7 +133,7 @@ All services are exposed through a single API endpoint structure:
 
 ### 5.2 Simple Caching Strategy
 
-For our initial launch, we'll use **in-memory caching** with the option to add Redis later:
+For our initial launch, we'll use **in-memory caching**:
 
 **Current Approach:**
 - **Memory Cache** - Node.js process-level caching for frequent queries
@@ -141,7 +141,6 @@ For our initial launch, we'll use **in-memory caching** with the option to add R
 - **Search Cache** - Cache popular search results in memory
 
 **Future Enhancements:**
-- Add Redis when we need distributed caching
 - Implement CDN for static assets
 - Add database query result caching
 
@@ -408,7 +407,6 @@ interface JWTPayload {
 
 **Phase 2 (Growth):**
 - Add database read replicas
-- Add Redis for distributed caching
 - Load balancer with multiple server instances
 
 **Phase 3 (Scale):**
