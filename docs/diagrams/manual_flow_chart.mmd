@@ -1,0 +1,50 @@
+flowchart TD
+    %% Manual Summary - Flow Chart (Updated for Actual Implementation)
+
+    A([User clicks Summary Button]) --> B[Open ManualSummary Component]
+    B --> C[Set isOpen true, isLoading true]
+    C --> D[Display time range presets]
+    D --> E[User selects time range]
+    E --> F[handleGenerateSummary called]
+    F --> G[filterMessagesByTimeRange]
+    G --> H{Messages found?}
+
+    H -->|Yes| I[generateManualSummary process]
+    H -->|No| J[Return empty summary]
+
+    I --> K[Extract key topics and user activity]
+    K --> L[Identify important messages]
+    L --> M[Generate overview text]
+    M --> N[Create SummaryData object]
+    N --> O[Set isLoading false, Display summary]
+
+    J --> P[Set isLoading false, Show no messages]
+    O --> Q[User can change time range]
+    P --> Q
+
+    Q --> E
+    O --> R([User closes summary])
+    P --> R
+    R --> S[Set isOpen false, Cleanup state]
+    S --> T([END])
+
+    %% Error handling
+    I --> U{Processing error?}
+    U -->|Yes| V[Set error state, Display error]
+    U -->|No| K
+    V --> W[User can retry or close]
+    W --> F
+    W --> R
+
+    %% Styling
+    classDef startEnd fill:#e3f2fd,stroke:#1a73e8,stroke-width:2px
+    classDef process fill:#e8f5e8,stroke:#34a853,stroke-width:2px
+    classDef decision fill:#fff3e0,stroke:#fbbc04,stroke-width:2px
+    classDef data fill:#ffebee,stroke:#ea4335,stroke-width:2px
+    classDef error fill:#fce8e6,stroke:#d93025,stroke-width:2px
+
+    class A,T startEnd
+    class B,C,D,F,G,I,K,L,M,N,O,Q,R,S process
+    class E,H,U decision
+    class J,P data
+    class V,W error

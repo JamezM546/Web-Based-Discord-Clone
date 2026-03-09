@@ -1,38 +1,71 @@
 graph TB
     %% Manual Summary - Architecture Diagram
-    %% MVC Architecture Pattern
+    %% Shows both current client-side implementation and preserved backend design
 
-    subgraph "Client Side (View)"
-        A[Frontend<br/>React]
-        B[ManualSummary<br/>MS1.1<br/>Modal Dialog + Time Presets]
-        C[ManualSummary<br/>MS1.2<br/>Summary Display + Stats]
+    subgraph "Current Implementation: Client Side"
+        subgraph "View Layer"
+            A[ManualSummary<br/>MS1.1<br/>React Modal Component]
+            A1[Time Presets<br/>0.5/1/3 Hours]
+            A2[Summary Display<br/>Stats + Topics]
+            A3[Loading States<br/>Error Handling]
+        end
+        
+        subgraph "Controller Layer"
+            B[Event Handlers<br/>- onClose<br/>- handlePreset<br/>- generate]
+        end
+        
+        subgraph "Model Layer"
+            C[AppContext<br/>State Management]
+            C1[Mock Data<br/>messages]
+            C2[Mock Data<br/>users]
+            C3[Local State<br/>selectedHours<br/>isGenerating<br/>summaryData]
+        end
     end
 
-    subgraph "Client Side (Controller)"
-        D[User Interactions<br/>Event Handlers<br/>- onClose<br/>- handlePreset<br/>- generate]
+    subgraph "Preserved Backend Design: Server Side"
+        subgraph "MS2.0 Message & Summarization Module"
+            D[MS2.1 SummaryService<br/>generateSummary<br/>Time-based Processing]
+            E[MS2.2 SummarizationProvider<br/>summarize<br/>LLM Integration]
+            F[MS2.3 MessageRepository<br/>fetchMessagesAfter<br/>fetchMessagesWithinTimeWindow]
+            G[MS2.4 MessageRecord<br/>Database Schema]
+        end
+        
+        subgraph "MSOD3.0 Backend Service"
+            H[MSOD3.1 ManualSummaryController<br/>API Endpoints]
+            I[MSOD3.2 ManualSummaryService<br/>Summary Generation Logic]
+            J[MSOD3.3 SummaryCard<br/>Response Model]
+        end
     end
 
-    subgraph "Client Side (Model)"
-        E[AppContext<br/>State Management]
-        F[Message Data<br/>messages]
-        G[User Data<br/>users]
-        H[Summary State<br/>selectedHours<br/>isGenerating<br/>summaryData]
-    end
+    %% Current Implementation Flow
+    A --> A1
+    A --> A2
+    A --> A3
+    A1 --> B
+    A2 --> B
+    A3 --> B
+    B --> C
+    B --> C3
+    C --> C1
+    C --> C2
+    C3 --> C
 
-    %% MVC Data Flow
-    A --> B
-    A --> C
-    B --> D
-    C --> D
-    D --> E
-    D --> H
-    E --> F
-    E --> G
-    H --> E
-    E --> A
+    %% Future Backend Connections (dashed lines)
+    C -.-> F
+    C -.-> D
+    D -.-> E
+    D -.-> G
+    H -.-> I
+    I -.-> D
+    I -.-> F
+    I -.-> G
+    I -.-> J
 
     %% Styling
-    classDef clientClass fill:#e3f2fd,stroke:#1a73e8,stroke-width:3px
+    classDef currentImpl fill:#e3f2fd,stroke:#1a73e8,stroke-width:3px
+    classDef backendDesign fill:#fff3e0,stroke:#f57c00,stroke-width:3px,stroke-dasharray: 5 5
     classDef componentClass fill:#ffffff,stroke:#666666,stroke-width:2px
-    class A,B,C,D,E,F,G,H clientClass
-    class B,C componentClass
+    
+    class A,A1,A2,A3,B,C,C1,C2,C3 currentImpl
+    class D,E,F,G,H,I,J backendDesign
+    class A,A1,A2 componentClass

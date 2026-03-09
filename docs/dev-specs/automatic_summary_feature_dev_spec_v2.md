@@ -70,43 +70,49 @@ This architecture follows MVC (Model-View-Controller) pattern and maximizes comp
 
 ![Class Diagram](../diagrams/automatic_class_diagram.png)
 
-**Actual Implementation (Single Component):**
+**Actual Implementation (Client-Side MVC with Mock Data):**
 
 **Class: WYMS1.1 WhatYouMissed**
 * **Props Interface**: `WhatYouMissedProps` (lines 6-12)
-  - `unreadMessages: Message[]` - Array of unread messages
+  - `unreadMessages: Message[]` - Array of unread messages from AppContext
   - `onDismiss: () => void` - Callback to mark messages as read
   - `onJumpToUnread?: () => void` - Optional callback for navigation
   - `channelId?: string` - Optional channel identifier
   - `dmId?: string` - Optional DM identifier
-* **Local State**: `isExpanded: boolean` (line 84)
-* **Global State**: `users: User[]` from AppContext (line 83)
+* **Local State**: `isExpanded: boolean` (line 84) - Controls expand/collapse UI
+* **Global State**: `users: User[]` from AppContext via `useApp()` hook (line 83)
 * **Key Functions**:
   - `generateAutomaticSummary(messages, users)` - Client-side summary generation (line 14)
-  - `getHardcodedSummary(channelId, dmId)` - Hardcoded summaries for testing (line 45)
+  - `getHardcodedSummary(channelId, dmId)` - Hardcoded summaries for testing/demo (line 45)
   - `formatTimestamp(date)` - Time formatting utility (line 65)
 
-**Reused Concepts from Manual Summary (MS2.0 Module):**
+**Current Implementation Architecture:**
+The WhatYouMissed component is a **single React component** that implements both View and Controller responsibilities:
+- **View Layer**: Renders compact bar, expandable summary, user avatars, and action buttons
+- **Controller Layer**: Handles `onExpand`, `onDismiss`, `onJumpToUnread` events via local state management
+- **Model Layer**: Uses AppContext for global state (`users`, `messages`) and props for data flow
+
+**Backend Design (Preserved for Future Implementation):**
 
 **MS2.1 SummaryService Concept**
-* **Implemented as**: `generateAutomaticSummary` function (line 14)
-* **Functionality**: Analyzes message patterns, user activity, and mentions
-* **Output**: String summary of recent activity
+* **Current Implementation**: `generateAutomaticSummary` function (line 14) - client-side mock
+* **Future Backend**: Server-side service with `generateBullets(messages, maxBullets)` and `generateHighlights(messages, maxHighlights)` methods
+* **Functionality**: Analyzes message patterns, user activity, and mentions to create concise summaries
 
 **MS2.2 SummarizationProvider Concept**
-* **Implemented as**: `getHardcodedSummary` function (line 45)
-* **Functionality**: Provides predefined summaries for specific channels/DMs
-* **Purpose**: Testing and demonstration of LLM integration concept
+* **Current Implementation**: `getHardcodedSummary` function (line 45) - predefined summaries
+* **Future Backend**: LLM integration with `summarize(messageTexts, maxItems)` method
+* **Purpose**: Production-ready AI summarization via external API (OpenAI, etc.)
 
 **MS2.3 MessageRepository Concept**
-* **Implemented as**: AppContext `useApp()` hook (line 83)
-* **Functionality**: Provides access to user data for name resolution
-* **Data Source**: Global application state
+* **Current Implementation**: AppContext `useApp()` hook (line 83) - client-side mock data
+* **Future Backend**: Database access with `fetchMessagesAfter()`, `fetchMessagesWithinTimeWindow()`, `getLastReadMessageIdentifier()`, `setLastReadMessageIdentifier()` methods
+* **Purpose**: Server-side message retrieval and read-state management
 
 **MS2.6 MembershipService Concept**
-* **Implemented as**: Implicit through AppContext access
-* **Functionality**: User authentication and data access
-* **Purpose**: Security and access control
+* **Current Implementation**: Implicit through AppContext access and mock authentication
+* **Future Backend**: `assertUserHasChannelAccess(userId, serverId, channelId)` method
+* **Purpose**: Server-side access control and security validation
 
 ### Rationale and Justification:
 The actual implementation uses a single React component that combines View and Controller responsibilities, while leveraging AppContext for Model data. The summarization concepts from manual summary are implemented as local functions within the component, maintaining the spirit of code reuse while using a simpler, more direct approach suitable for the current codebase.
@@ -116,29 +122,33 @@ The actual implementation uses a single React component that combines View and C
 ### Actual Implementation: Single React Component
 
 **Class: WYMS1.1 WhatYouMissed**
-* **Purpose & Responsibility:** Single React component that displays "What You Missed" summary for unread messages. Shows compact bar with expand functionality and handles all user interactions locally.
+* **Purpose & Responsibility:** Single React component that displays "What You Missed" summary for unread messages. Shows compact bar with expand functionality and handles all user interactions locally using client-side mock data.
 * **Implements Design Features:** What You Missed Summary (complete UI), Automatic summary generation, Expandable interface, User interaction handling.
 * **Props:** `unreadMessages`, `onDismiss`, `onJumpToUnread`, `channelId`, `dmId`
 * **State:** `isExpanded` boolean for expand/collapse functionality
 * **Data Sources:** AppContext for users, props for messages and callbacks
 
-### Reused Concepts from Manual Summary (MS2.0 Module)
+### Backend Design (Preserved for Future Server Implementation)
 
-**MS2.1 SummaryService Concept**
-* **Purpose & Responsibility:** Summarization logic implemented as `generateAutomaticSummary` function. Analyzes message patterns, user activity counts, and mentions to create concise summaries.
-* **Implements Design Features:** What You Missed Summary (automatic generation), Component reuse concept, Client-side processing.
+**MS2.1 SummaryService**
+* **Purpose & Responsibility:** Server-side summarization service with `generateBullets()` and `generateHighlights()` methods. Currently mocked as `generateAutomaticSummary()` function in the client component.
+* **Implements Design Features:** What You Missed Summary (server-side generation), Component reuse concept, LLM integration via SummarizationProvider.
+* **Current Mock:** Client-side function analyzing message patterns and user activity counts.
 
-**MS2.2 SummarizationProvider Concept**
-* **Purpose & Responsibility:** LLM integration concept implemented as `getHardcodedSummary` function. Provides predefined summaries for specific channels/DMs for testing and demonstration.
-* **Implements Design Features:** What You Missed Summary (LLM concept), Component reuse concept, Testing support.
+**MS2.2 SummarizationProvider**
+* **Purpose & Responsibility:** LLM integration service with `summarize(messageTexts, maxItems)` method. Currently mocked as `getHardcodedSummary()` function returning predefined summaries.
+* **Implements Design Features:** What You Missed Summary (AI-powered), Component reuse concept, External API integration.
+* **Current Mock:** Hardcoded summaries for specific channels/DMs for testing and demonstration.
 
-**MS2.3 MessageRepository Concept**
-* **Purpose & Responsibility:** Data access concept implemented via AppContext `useApp()` hook. Provides user data for name resolution and avatar display.
-* **Implements Design Features:** What You Missed Summary (user data access), Component reuse concept, Global state management.
+**MS2.3 MessageRepository**
+* **Purpose & Responsibility:** Server-side data access with `fetchMessagesAfter()`, `fetchMessagesWithinTimeWindow()`, `getLastReadMessageIdentifier()`, and `setLastReadMessageIdentifier()` methods. Currently mocked via AppContext.
+* **Implements Design Features:** What You Missed Summary (message data access), Component reuse concept, Database integration.
+* **Current Mock:** AppContext `useApp()` hook providing client-side mock message data.
 
-**MS2.6 MembershipService Concept**
-* **Purpose & Responsibility:** Access control concept implemented implicitly through AppContext authentication. Ensures user has appropriate access to message data.
+**MS2.6 MembershipService**
+* **Purpose & Responsibility:** Server-side access control with `assertUserHasChannelAccess()` method. Currently mocked through implicit AppContext authentication.
 * **Implements Design Features:** What You Missed Summary (access control), Component reuse concept, Security validation.
+* **Current Mock:** Implicit authentication through AppContext user state.
 
 ### Rationale and Justification:
 The actual implementation uses a pragmatic approach with a single React component that handles all responsibilities while maintaining the conceptual reuse of manual summary components. The MS2.0 concepts are implemented as local functions and AppContext usage, providing a simpler but effective architecture that aligns with the current codebase structure.
@@ -157,13 +167,13 @@ The actual implementation uses a pragmatic approach with a single React componen
 
 1. **[Start]** → **[State]** COMPACT
 2. **[Input/Output]** User opens channel/DM with unread messages
-3. **[Process]** Get `unreadMessages` and `users` from AppContext
-4. **[Process]** Generate automatic summary
+3. **[Process]** Get `unreadMessages` and `users` from AppContext (client-side mock data)
+4. **[Process]** Generate automatic summary using `generateAutomaticSummary()` function
 5. **[Decision]** `unreadMessages.length > 0?`
     * **Yes** → **[View]** Display WYMS bar with unread count → **(End)**
     * **No** → **[Process]** Hide WYMS bar → **(End)**
 
-**Explanation:** The WYMS bar appears when there are unread messages, showing the count and participant avatars.
+**Explanation:** The WYMS bar appears when there are unread messages, showing the count and participant avatars. Summary generation happens client-side using mock data from AppContext.
 
 #### Scenario: WYMS1.1 User Expands Summary
 **Starting State:** COMPACT
@@ -171,11 +181,11 @@ The actual implementation uses a pragmatic approach with a single React componen
 
 1. **[Start]** → **[State]** COMPACT
 2. **[Input]** User clicks expand button → **[Controller]** `onExpand` event triggered
-3. **[Process]** Controller updates `isExpanded` state in AppContext (Model)
+3. **[Process]** Controller updates `isExpanded` local state via `useState`
 4. **[Process]** Transition to EXPANDED
-5. **[View]** Display expanded summary with full text → **(End)**
+5. **[View]** Display expanded summary with full text (from `getHardcodedSummary()` or `generateAutomaticSummary()`) → **(End)**
 
-**Explanation:** Clicking expand triggers the `onExpand` event handler, which updates the `isExpanded` state in the Model, showing the detailed summary.
+**Explanation:** Clicking expand triggers the `onExpand` event handler, which updates the local `isExpanded` state, showing the detailed summary. All state management happens client-side.
 
 #### Scenario: WYMS1.2 User Dismisses Summary
 **Starting State:** COMPACT OR EXPANDED
@@ -183,12 +193,12 @@ The actual implementation uses a pragmatic approach with a single React componen
 
 1. **[Start]** → **[State]** COMPACT OR EXPANDED
 2. **[Input]** User clicks dismiss button → **[Controller]** `onDismiss` event triggered
-3. **[Process]** Controller calls `onDismiss` callback
-4. **[Process]** Mark all messages as read
+3. **[Process]** Controller calls `onDismiss` callback (prop function)
+4. **[Process]** Parent component marks all messages as read in AppContext
 5. **[Process]** Transition to DISMISSED
 6. **[Process]** Hide WYMS bar → **(End)**
 
-**Explanation:** Clicking dismiss triggers the `onDismiss` event handler, which marks all messages as read and hides the WYMS component.
+**Explanation:** Clicking dismiss triggers the `onDismiss` event handler, which calls the parent callback to mark messages as read in the global AppContext state and hides the WYMS component.
 
 ### Rationale and Justification:
 The flow charts cover all primary user interactions with the WYMS component: viewing unread messages, expanding summaries, and dismissing summaries. These scenarios represent the complete user journey through the automatic summary functionality.
@@ -200,8 +210,8 @@ The flow charts cover all primary user interactions with the WYMS component: vie
 | Failure Mode | Description | Recovery Procedure | Likelihood | Impact |
 | :--- | :--- | :--- | :--- | :--- |
 | **FM‑WYMS1‑01 Runtime Crash** | UI rendering or component logic triggers an unrecoverable exception. | Restart client view lifecycle, reinitialize component state. | Medium | High |
-| **FM‑WYMS1‑02 Loss of Runtime State** | Active expansion state lost during UI updates. | Rehydrate state from last known AppContext snapshot. | High | Medium |
-| **FM‑WYMS1‑03 Unexpected State Transition** | UI enters incorrect state (e.g., expanded without messages). | Force state recomputation via component re-render. | Medium | Medium |
+| **FM‑WYMS1‑02 Loss of Runtime State** | Active expansion state lost during UI updates. | Rehydrate state from `useState` default, re-render component. | High | Medium |
+| **FM‑WYMS1‑03 Unexpected State Transition** | UI enters incorrect state (e.g., expanded without messages). | Force state recomputation via component re-render with proper props. | Medium | Medium |
 | **FM‑WYMS1‑04 Resource Exhaustion (Client)** | Excessive DOM updates degrade performance. | Throttle render cycles, debounce expand events. | Medium | Medium |
 
 ### Component: WYMS2.0 User Interactions (Controller)
@@ -209,15 +219,23 @@ The flow charts cover all primary user interactions with the WYMS component: vie
 | Failure Mode | Description | Recovery Procedure | Likelihood | Impact |
 | :--- | :--- | :--- | :--- | :--- |
 | **FM‑WYMS2‑01 Event Handling Errors** | `onExpand`, `onDismiss`, or `onJumpToUnread` handlers fail to execute properly. | Reset event handlers, clear pending timeouts, restore last known state. | Medium | Medium |
-| **FM‑WYMS2‑02 Expansion State Issues** | `isExpanded` state becomes out of sync with UI display. | Re-sync state from DOM value, clear corrupted state. | Medium | Medium |
+| **FM‑WYMS2‑02 Expansion State Issues** | `isExpanded` state becomes out of sync with UI display. | Re-sync state from DOM value, reset to default `false`. | Medium | Medium |
 
 ### Component: WYMS3.0 App Context (Model)
 
 | Failure Mode | Description | Recovery Procedure | Likelihood | Impact |
 | :--- | :--- | :--- | :--- | :--- |
-| **FM‑WYMS3‑01 Data Corruption** | `unreadMessages` array or `users` data becomes inconsistent. | Invalidate context, refetch from source API. | Low | High |
-| **FM‑WYMS3‑02 State Loss** | `isExpanded`, `unreadMessages`, or `users` state cleared unexpectedly. | Restore from localStorage or re-initialize from API. | Medium | High |
-| **FM‑WYMS3‑03 Summary Generation Errors** | Automatic summary generation fails due to malformed data. | Fallback to hardcoded summary, log error for debugging. | Medium | Medium |
+| **FM‑WYMS3‑01 Data Corruption** | `unreadMessages` array or `users` data becomes inconsistent. | Invalidate context, refetch from mock data source (reset to initial state). | Low | High |
+| **FM‑WYMS3‑02 State Loss** | `isExpanded`, `unreadMessages`, or `users` state cleared unexpectedly. | Restore from localStorage or re-initialize from mock data. | Medium | High |
+| **FM‑WYMS3‑03 Summary Generation Errors** | Automatic summary generation fails due to malformed data. | Fallback to hardcoded summary via `getHardcodedSummary()`, log error for debugging. | Medium | Medium |
+
+### Backend Service Failures (Future Implementation)
+
+| Failure Mode | Description | Recovery Procedure | Likelihood | Impact |
+| :--- | :--- | :--- | :--- | :--- |
+| **FM‑WYMS4‑01 SummaryService Unavailable** | Server-side summarization service is down. | Fallback to client-side `generateAutomaticSummary()` function. | Medium | High |
+| **FM‑WYMS4‑02 MessageRepository Failure** | Database access fails for message retrieval. | Use cached messages in AppContext, show "limited data" notice. | Medium | High |
+| **FM‑WYMS4‑03 LLM Provider Timeout** | External summarization API (OpenAI, etc.) times out. | Fallback to heuristic summaries, implement retry with exponential backoff. | Medium | Medium |
 
 ### Connectivity Failures
 

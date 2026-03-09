@@ -26,10 +26,12 @@
 
 | Component | Runtime Location | Rationale |
 | :-------- | :---------------- | :-------- |
-| **MS1.0 Chat Channel Page** (MS1.1 ChatChannelView, MS1.2 ManualSummaryButtonView, MS1.3 ChatChannelController) | **Client** (browser) | The chat view, summary button, and controller run in the browser to handle user interaction, render the summary panel, and manage UI state. The controller issues requests to the backend via API calls. |
-| **MS2.0 Message & Summarization Module** (MS2.1 MessageRepository, MS2.2 SummaryService, SummarizationProvider) | **Server** | MessageRepository and SummaryService run on the server; database access and summarization (LLM/heuristic) occur server-side. This keeps message data and API keys off the client and minimizes data sent to the browser. |
+| **MS1.0 Manual Summary Modal** (MS1.1 ManualSummary) | **Client** (browser) | Single React component handles modal display, time presets, summary generation, and user interactions. Uses AppContext for data and local state for UI management. |
+| **MS2.0 Message & Summarization Module** (MS2.1 MessageRepository, MS2.2 SummaryService, MS2.3 SummarizationProvider) | **Server** | Backend services for message retrieval, summarization, and LLM integration. Currently mocked client-side, will be implemented server-side in backend sprint. |
 
-**Information flow (summary):** User clicks "Manual Summary" → ChatChannelController (client) sends a request to the backend → MessageRepository fetches messages from the database → SummaryService generates the summary (via SummarizationProvider) → Response returns to client → Controller updates ChatChannelView with SummaryViewModel.
+**Current Implementation Flow:** User clicks time preset → ManualSummary component processes messages locally → Displays summary in modal using mock data.
+
+**Future Backend Flow:** User clicks time preset → ManualSummary calls backend API → MessageRepository fetches messages → SummaryService generates summary → Response displays in modal.
 
 **Shared with What You Missed (WYMS):** The MS2.0 Message & Summarization Module is shared with the "What You Missed" preview feature. The WYMS dev spec (`automatic_summary_feature_dev_spec.md`) defines an expanded shared module (SummaryService, SummarizationProvider, MessageRepository, MembershipService) that both features use. When integrating both features, the WYMS spec's expanded MS2.0 definition should be adopted; MessageRepository, SummaryService, and related components are reused by WYMS for preview generation. **MessageRepository API alignment:** Manual (MS2.1) and Automatic (MS2.3) share the same interface: `fetchMessagesAfter`, `fetchMessagesWithinTimeWindow`, `getLastReadMessageIdentifier`, and `setLastReadMessageIdentifier`; WYMS may use a dedicated LastReadRepository that wraps or parallels the last-read methods.
 
@@ -38,25 +40,48 @@ This architecture uses a MVC pattern to make sure that the application stays res
 
 ## 3. Class Diagrams
 
-![Class Diagram](../diagrams/class_diagram.png)
+![Manual Architecture Diagram](../diagrams/manual_architecture_diagram.png)
 
-**Actual Implementation (Single Component):**
+**Actual Implementation (Client-Side Modal with Mock Data):**
 
 **Class: MS1.1 ManualSummary**
 * **Props Interface**: `ManualSummaryProps` (lines 7-10)
-  - `messages: Message[]` - Array of messages to summarize
+  - `messages: Message[]` - Array of messages to summarize from AppContext
   - `onClose: () => void` - Callback to close modal dialog
 * **Local State**:
-  - `selectedHours: number` - Time range selection (line 120)
+  - `selectedHours: number` - Time range selection (0.5, 1, 3 hours) (line 120)
   - `isGenerating: boolean` - Loading state during generation (line 121)
   - `summaryData: SummaryData | null` - Generated summary results (line 122)
-  - `announcement: string` - Status messages for user feedback (line 123)
+  - `announcement: string` - Status messages for accessibility (line 123)
 * **Global State**: `users: User[]` from AppContext via `useApp()` hook (line 3)
 * **Key Functions**:
-  - `generateManualSummary(messages, users, startDate, endDate)` - Core summary generation (line 36)
+  - `generateManualSummary(messages, users, startDate, endDate)` - Client-side summary generation (line 36)
   - `handlePreset(hours)` - Time preset selection handler (line 215)
   - `generate(hours)` - Orchestrates summary generation with timeout (line 196)
   - `handleKeyDown(e)` - Keyboard navigation for accessibility (line 175)
+
+**Current Implementation Architecture:**
+The ManualSummary component is a **single React component** that implements both View and Controller responsibilities:
+- **View Layer**: Renders modal dialog with time presets, loading states, summary results, and statistics
+- **Controller Layer**: Handles time range selection, summary generation, modal close, and keyboard navigation
+- **Model Layer**: Uses AppContext for global state (`users`, `messages`) and local state for UI management
+
+**Backend Design (Preserved for Future Server Implementation):**
+
+**MS2.1 MessageRepository**
+* **Current Implementation**: Messages passed as props from parent component (client-side mock)
+* **Future Backend**: Server-side data access with `fetchMessagesAfter()`, `fetchMessagesWithinTimeWindow()`, `getLastReadMessageIdentifier()`, and `setLastReadMessageIdentifier()` methods
+* **Purpose**: Server-side message retrieval and time-based filtering for manual summaries
+
+**MS2.2 SummaryService**
+* **Current Implementation**: `generateManualSummary()` function - client-side mock with hardcoded channel summaries
+* **Future Backend**: Server-side service with `generateSummary(messages)` method coordinating with SummarizationProvider
+* **Purpose**: Server-side orchestration of message analysis and summary generation
+
+**MS2.3 SummarizationProvider**
+* **Current Implementation**: Hardcoded summaries in `generateManualSummary()` for specific channels/DMs (lines 90-118)
+* **Future Backend**: LLM integration service with `summarize(messageTexts)` method
+* **Purpose**: Production-ready AI summarization via external API (OpenAI, etc.)
 
 **Data Structures:**
 
@@ -76,11 +101,33 @@ The actual implementation uses a pragmatic single-component approach that handle
 ### Actual Implementation: Single React Component
 
 **Class: MS1.1 ManualSummary**
-* **Purpose & Responsibility:** Single React component that displays modal dialog for manual AI summary generation. Shows time preset options, generates summaries on demand, and displays results with full statistics.
-* **Implements Design Features:** Manual Summary On Demand (complete UI), Time range selection, Modal dialog interface, User interaction handling, Accessibility support.
+* **Purpose & Responsibility:** Single React component that displays modal dialog for manual AI summary generation. Shows time preset options, generates summaries on demand using client-side mock data, and displays results with full statistics.
+* **Implements Design Features:** Manual Summary On Demand (complete UI), Time range selection, Modal dialog interface, User interaction handling, Accessibility support, Client-side mock processing.
 * **Props:** `messages`, `onClose`
 * **State:** `selectedHours`, `isGenerating`, `summaryData`, `announcement`
 * **Data Sources:** AppContext for users, props for messages and callbacks
+
+### Backend Design (Preserved for Future Server Implementation)
+
+**MS2.1 MessageRepository**
+* **Purpose & Responsibility:** Server-side data access with `fetchMessagesAfter()`, `fetchMessagesWithinTimeWindow()`, `getLastReadMessageIdentifier()`, and `setLastReadMessageIdentifier()` methods. Currently mocked via message props.
+* **Implements Design Features:** Manual Summary On Demand (message data access), Component reuse concept, Database integration, Time-based filtering.
+* **Current Mock:** Messages passed as props from parent component using client-side mock data.
+
+**MS2.2 SummaryService**
+* **Purpose & Responsibility:** Server-side service with `generateSummary(messages)` method coordinating with SummarizationProvider. Currently mocked as `generateManualSummary()` function.
+* **Implements Design Features:** Manual Summary On Demand (server-side generation), Component reuse concept, LLM integration via SummarizationProvider.
+* **Current Mock:** Client-side function with hardcoded channel summaries and heuristic analysis.
+
+**MS2.3 SummarizationProvider**
+* **Purpose & Responsibility:** LLM integration service with `summarize(messageTexts)` method. Currently mocked via hardcoded summaries in `generateManualSummary()`.
+* **Implements Design Features:** Manual Summary On Demand (AI-powered), Component reuse concept, External API integration.
+* **Current Mock:** Hardcoded summaries for specific channels/DMs with pattern matching for important messages.
+
+**MS2.4 MessageRecord**
+* **Purpose & Responsibility:** Server-side message data structure with full metadata for summarization. Currently mocked via Message type from AppContext.
+* **Implements Design Features:** Manual Summary On Demand (message data structure), Component reuse concept, Database schema.
+* **Current Mock:** Message objects from client-side AppContext mock data.
 
 ### Data Structures
 
@@ -93,27 +140,27 @@ The actual implementation uses a pragmatic single-component approach that handle
 
 ## 5. State Diagrams
 
-![State Diagram](../diagrams/state_diagram.png)
+![Manual State Diagram](../diagrams/manual_state_diagram.png)
 
 ## 6. Flow Charts (Scenario‑Based)
 
-![Flow Chart](../diagrams/flow_chart.png)
+![Manual Flow Chart](../diagrams/manual_flow_chart.png)
 
 #### Scenario: SC1.0 Manual Summary With New Messages Available
 **Starting State:** CLOSED
 **Ending State:** SUMMARY_VISIBLE
 
 1. **[Start]** → **[State]** CLOSED (Modal not visible)
-2. **[Input/Output]** User clicks "Manual Summary" button → **[Controller]** `handlePreset` triggered
+2. **[Input/Output]** User clicks "Manual Summary" button → **[Controller]** `handlePreset` triggered with default 3 hours
 3. **[Process]** Transition to GENERATING state
-4. **[Process]** `generate` function calls `generateManualSummary` with time range
+4. **[Process]** `generate` function calls `generateManualSummary` with time range using client-side mock data
 5. **[Process]** Set `isGenerating: true` and show "Generating summary…" announcement
-6. **[Process]** After 650ms timeout, set `summaryData` and `isGenerating: false`
+6. **[Process]** After 650ms timeout, process messages and set `summaryData` and `isGenerating: false`
 7. **[Decision]** `summaryData.stats.totalMessages > 0?`
-    * **Yes** → **[View]** Show modal with summary content → **(End)**
+    * **Yes** → **[View]** Show modal with summary content, stats, and topics → **(End)**
     * **No** → (Handled by SC1.1)
 
-**Explanation:** User clicks time preset button, triggering the generation process. The component processes messages within the specified time range and displays results in a modal dialog.
+**Explanation:** User clicks time preset button, triggering the client-side generation process. The component processes messages within the specified time range using mock data and displays results in a modal dialog with full statistics and user activity analysis.
 
 #### Scenario: SC1.1 Manual Summary With No New Messages
 **Starting State:** CLOSED
@@ -124,41 +171,37 @@ The actual implementation uses a pragmatic single-component approach that handle
 3. **[Process]** Transition to GENERATING state
 4. **[Process]** `generate` function calls `generateManualSummary` with time range
 5. **[Process]** Set `isGenerating: true` and show "Generating summary…" announcement
-6. **[Process]** After 650ms timeout, set `summaryData` and `isGenerating: false`
+6. **[Process]** After 650ms timeout, process messages and set `summaryData` and `isGenerating: false`
 7. **[Decision]** `summaryData.stats.totalMessages > 0?`
     * **Yes** → (Handled by SC1.0)
-    * **No** → **[View]** Show modal with "No messages found" → **(End)**
+    * **No** → **[View]** Show modal with "No messages found" message → **(End)**
 
-**Explanation:** Similar to successful flow but displays empty state when no messages exist in the specified time range.
+**Explanation:** Similar to successful flow but displays empty state when no messages exist in the specified time range. All processing happens client-side with mock data.
 
 #### Scenario: SC1.2 Dismiss Visible Summary
 **Starting State:** SUMMARY_VISIBLE
 **Ending State:** CLOSED
 
-1. **[Start]** → **[State]** SUMMARY_VISIBLE (Modal visible)
-2. **[Input]** User dismisses summary panel
+1. **[Start]** → **[State]** SUMMARY_VISIBLE (Modal visible with results)
+2. **[Input]** User clicks "Done" button or X icon → **[Controller]** `onClose` callback triggered
 3. **[Process]** Transition to CLOSED state
-4. **[Process]** Reset `summaryData` and `isGenerating`
-5. **[Process]** Hide modal → **(End)**
-1.  **[Start]** → **[State]** MS1.3 SummaryVisibleState
-2.  **[Input]** User dismisses summary panel
-3.  **[Process]** Transition to MS1.4 SummaryDismissedState
-4.  **[Process]** Invoke `resetSummaryState()`
-5.  **[Process]** Transition to MS1.0 ChannelIdleState → **(End)**
+4. **[Process]** Reset `summaryData` to null and `isGenerating` to false
+5. **[Process]** Hide modal via portal cleanup → **(End)**
 
-**Explanation:** Once visible, the user may dismiss the summary. The system transitions to a dismissed state, resets flags, and returns to the idle state.
+**Explanation:** User dismisses the modal, triggering cleanup of local state and portal removal. All state management happens client-side.
 
 #### Scenario: SC1.3 Re‑Request Summary After Dismissal
-**Starting State:** MS1.4 SummaryDismissedState
-**Ending State:** MS1.3 SummaryVisibleState
+**Starting State:** CLOSED
+**Ending State:** SUMMARY_VISIBLE or NO_MESSAGES
 
-1.  **[Start]** → **[State]** MS1.4 SummaryDismissedState
-2.  **[Input]** User clicks "Manual Summary" button
-3.  **[Decision]** `retrievedMessages.size > 0?`
-    * **Yes** → (Continue via SC1.0)
-    * **No** → (Continue via SC1.1)
+1. **[Start]** → **[State]** CLOSED (Modal not visible, previous state cleaned up)
+2. **[Input]** User clicks "Manual Summary" button again → **[Controller]** `handlePreset` triggered
+3. **[Process]** Follow same flow as SC1.0 or SC1.1 depending on message availability
+4. **[Decision]** `messages in time range > 0?`
+    * **Yes** → Continue via SC1.0 (show summary)
+    * **No** → Continue via SC1.1 (show no messages)
 
-**Explanation:** If the user dismisses a summary but later decides to request it again, the system follows the same loading and generation flow as the initial request. This ensures consistent behavior and guarantees that the summary always reflects the most recent unread activity before being displayed again.
+**Explanation:** If the user dismisses a summary but later decides to request it again, the system follows the same generation flow as the initial request. This ensures consistent behavior and guarantees that the summary always reflects the most recent messages within the selected time range.
 
 ### Rationale and Justification:
 This flow chart gives a diagram-like view of the user's experience and how the system behaves. It showcases how every user action should trigger a response from the system. Also by handling some edge cases such as "No New Messages", it also makes sure that the system will be able to handle real-life use successfully without breaking or entering some sort of undefined state. This all helps makes sure that the feature is ready to be created.
@@ -335,163 +378,60 @@ This technology stack uses standard technologies such as PostgreSQL, React, Node
 
 ## 9. APIs & Public Interfaces
 
-### Component: MS1.0 Chat Channel Page
+### Current Implementation: React Component
 
-**Class: MS1.1 ChatChannelView**
-* **Public Methods:**
-    * `render() : void`
-    * `displayMessages(messages : MessageViewModel[]) : void`
-    * `showSummary(summary : SummaryViewModel) : void`
-    * `hideSummary() : void`
-    * `showLoadingIndicator() : void`
-    * `hideLoadingIndicator() : void`
-* **Private Methods:**
-    * None
-* **Overloads / Overrides:**
-    * None
+#### Class: MS1.1 ManualSummary
+* **Props Interface**: `ManualSummaryProps`
+  - `messages: Message[]` - Messages to summarize
+  - `onClose: () => void` - Modal close callback
+* **Local State**: `selectedHours`, `isGenerating`, `summaryData`, `announcement`
+* **Key Methods**:
+  - `handlePreset(hours)` - Time preset selection
+  - `generate(hours)` - Summary generation orchestration
+  - `handleKeyDown(e)` - Keyboard navigation
 
-**Class: MS1.2 ManualSummaryButtonView**
-* **Public Methods:**
-    * `render() : void`
-    * `setEnabled(isEnabled : boolean) : void`
-    * `bindClickHandler(handler : () => void) : void`
-* **Private Methods:**
-    * None
-* **Overloads / Overrides:**
-    * None
+### Preserved Backend Design: Future Server Implementation
 
-**Class: MS1.3 ChatChannelController**
-* **Public Methods:**
-    * `onManualSummaryRequested() : Promise<void>`
-    * `onSummaryDismissed() : void`
-    * `resetSummaryState() : void`
-* **Private Methods:**
-    * None
-* **Overloads / Overrides:**
-    * None
+#### Class: MS2.1 MessageRepository
+* **Public Methods**:
+  - `fetchMessagesAfter(serverIdentifier, channelIdentifier, lastReadMessageIdentifier, limit) : Promise<MessageRecord[]>`
+  - `fetchMessagesWithinTimeWindow(serverIdentifier, channelIdentifier, timeWindowMinutes, limit) : Promise<MessageRecord[]>`
+  - `getLastReadMessageIdentifier(userIdentifier, channelIdentifier) : Promise<string>`
+  - `setLastReadMessageIdentifier(userIdentifier, channelIdentifier, messageIdentifier) : Promise<void>`
 
-**Class: MS1.4 MessageViewModel**
+#### Class: MS2.2 SummaryService
+* **Public Methods**:
+  - `generateSummary(messages : MessageRecord[]) : Promise<SummaryResult>`
+
+#### Class: MSOD3.1 ManualSummaryController
+* **Public Methods**:
+  - `generateManualSummary(request : ManualSummaryRequest) : Promise<SummaryCard>`
 
 ### Rationale and Justification:
-This API makes sure that the different View Components (ChatChannelView, ManualSummaryButtonView) are for the UI, which the ChatControllerController handles the business logic. By using Promise for the methods, we make sure that the database fetches and AI generation are handled asynchronously for the most responsive user experience.
+Current implementation uses React component props and local state. Future backend implementation will provide RESTful API endpoints that match the same data contracts and method signatures, allowing seamless migration from client-side mock to server-side processing.
 
 ### 10. Public Interfaces
 
-### Component: MS1.0 Chat Channel Page
+### Current Implementation: React Component Dependencies
 
-**Class: MS1.1 ChatChannelView — Public Methods**
-* **Used Within Same Component (MS1.0):**
-    * `render()`
-    * `displayMessages(messages : MessageViewModel[])`
-    * `showSummary(summary : SummaryViewModel)`
-    * `hideSummary()`
-    * `showLoadingIndicator()`
-    * `hideLoadingIndicator()`
-* **Used Across Components in Same Module:**
-    * None
-* **Used Across Modules:**
-    * None
+**External Dependencies — MS1.1 ManualSummary Uses:**
+* **From AppContext (Model):** `servers`, `currentUser`, `users` data for summary generation
+* **From Parent Component (View):** `messages` prop, `onClose` callback for modal management
 
-**Class: MS1.2 ManualSummaryButtonView — Public Methods**
-* **Used Within Same Component (MS1.0):**
-    * `render()`
-    * `setEnabled(isEnabled : boolean)`
-    * `bindClickHandler(handler : () => void)`
-* **Used Across Components in Same Module:**
-    * None
-* **Used Across Modules:**
-    * None
+### Preserved Backend Design: Future Server Dependencies
 
-**Class: MS1.3 ChatChannelController — Public Methods**
-* **Used Within Same Component (MS1.0):**
-    * `onManualSummaryRequested() : Promise<void>`
-    * `onSummaryDismissed() : void`
-    * `resetSummaryState() : void`
-* **Used Across Components in Same Module:**
-    * None
-* **Used Across Modules:**
-    * None
+**External Dependencies — Backend Services Will Use:**
+* **From MS2.0 Message & Summarization Module:**
+  - **MS2.1 MessageRepository:** `fetchMessagesAfter()`, `fetchMessagesWithinTimeWindow()`
+  - **MS2.2 SummaryService:** `generateSummary()` 
+  - **MS2.3 SummarizationProvider:** `summarize()` for LLM integration
 
-**Class: MS1.4 MessageViewModel — Public Methods**
-* **Used Within Same Component (MS1.0):**
-    * `MessageViewModel()`
-* **Used Across Components in Same Module:**
-    * None
-* **Used Across Modules:**
-    * None
+**Module-Level Dependencies:**
+* **MS1.1 ManualSummary** will depend on **MS2.0 Module** via API calls in backend implementation
+* **MS2.0 Module** provides core services for both Manual Summary and What You Missed features
 
-**Class: MS1.5 SummaryViewModel — Public Methods**
-* **Used Within Same Component (MS1.0):**
-    * `SummaryViewModel()`
-* **Used Across Components in Same Module:**
-    * None
-* **Used Across Modules:**
-    * None
-
-### External Dependencies — MS1.0 Uses
-
-* **Uses From MS2.0 Message & Summarization Module:**
-    * `MS2.1 MessageRepository.fetchMessagesAfter(serverIdentifier : string, channelIdentifier : string, lastReadMessageIdentifier : string, limit : number) : Promise<MessageRecord[]>`
-    * `MS2.1 MessageRepository.fetchMessagesWithinTimeWindow(serverIdentifier : string, channelIdentifier : string, timeWindowMinutes : number, limit : number) : Promise<MessageRecord[]>`
-    * `MS2.1 MessageRepository.getLastReadMessageIdentifier(userIdentifier : string, channelIdentifier : string) : Promise<string>`
-    * `MS2.1 MessageRepository.setLastReadMessageIdentifier(userIdentifier : string, channelIdentifier : string, messageIdentifier : string) : Promise<void>`
-    * `MS2.2 SummaryService.generateSummary(messages : MessageRecord[]) : Promise<SummaryResult>`
-    * `MS2.3 SummaryResult`
-    * `MS2.4 MessageRecord`
-
-### Component: MS2.0 Message & Summarization Module
-
-**Class: MS2.1 MessageRepository — Public Methods**
-* **Used Within Same Component (MS2.0):**
-    * `fetchMessagesAfter(serverIdentifier : string, channelIdentifier : string, lastReadMessageIdentifier : string, limit : number) : Promise<MessageRecord[]>`
-    * `fetchMessagesWithinTimeWindow(serverIdentifier : string, channelIdentifier : string, timeWindowMinutes : number, limit : number) : Promise<MessageRecord[]>`
-    * `getLastReadMessageIdentifier(userIdentifier : string, channelIdentifier : string) : Promise<string>`
-    * `setLastReadMessageIdentifier(userIdentifier : string, channelIdentifier : string, messageIdentifier : string) : Promise<void>`
-* **Used Across Components in Same Module:**
-    * None
-* **Used Across Modules (MS1.0):**
-    * `fetchMessagesAfter(...)`, `fetchMessagesWithinTimeWindow(...)`, `getLastReadMessageIdentifier(...)`, `setLastReadMessageIdentifier(...)`
-
-**Class: MS2.2 SummaryService — Public Methods**
-* **Used Within Same Component (MS2.0):**
-    * `generateSummary(messages : MessageRecord[]) : Promise<SummaryResult>`
-* **Used Across Components in Same Module:**
-    * None
-* **Used Across Modules (MS1.0):**
-    * `generateSummary(messages : MessageRecord[]) : Promise<SummaryResult>`
-
-**Class: MS2.3 SummaryResult — Public Methods**
-* **Used Within Same Component (MS2.0):**
-    * `SummaryResult()`
-* **Used Across Components in Same Module:**
-    * None
-* **Used Across Modules (MS1.0):**
-    * `SummaryResult()`
-
-**Class: MS2.4 MessageRecord — Public Methods**
-* **Used Within Same Component (MS2.0):**
-    * `MessageRecord()`
-* **Used Across Components in Same Module:**
-    * None
-* **Used Across Modules (MS1.0):**
-    * `MessageRecord()`
-
-### Module‑Level Dependencies
-
-**Module: MS1.0 Chat Channel Page — Uses From Other Modules:**
-* **MS2.0 Message & Summarization Module**
-    * **MS2.1 MessageRepository**
-        * `fetchMessagesAfter(serverIdentifier : string, channelIdentifier : string, lastReadMessageIdentifier : string, limit : number)`
-    * **MS2.2 SummaryService**
-        * `generateSummary(messages : MessageRecord[])`
-    * `MS2.3 SummaryResult`
-    * `MS2.4 MessageRecord`
-
-**Module: MS2.0 Message & Summarization Module — Uses From Other Modules:**
-* None
-
-### Rationale and Justification
-In these public interfaces, we make sure that the dependencies only go in one direction. The frontend layer (MS1.0) depends on the BLL (MS2.0) and never the other way around. The View methods are used in the internal components, which stops other random parts of the app from potentially messing up what the user sees.
+### Rationale and Justification:
+Current implementation uses React props and AppContext for client-side processing. Future backend implementation will maintain the same data contracts and method signatures, ensuring seamless migration from mock to real backend services.
 
 ### 11. Data Schemas
 

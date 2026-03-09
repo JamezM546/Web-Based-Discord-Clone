@@ -57,52 +57,75 @@ This architecture follows MVC (Model-View-Controller) pattern with React compone
 
 ![Class Diagram](../diagrams/search_class_diagram.png)
 
+**Actual Implementation (Client-Side Components with Mock Data):**
+
 **Class: SB1.1 ServerSearchInput**
-* interacts with → Class: SB2.0 UserInteractions
+* **Props Interface**: `ServerSearchInputProps` (lines 62-67)
+  - `value: string` - Current search query value
+  - `onChange: (value: string) => void` - Search input change handler
+* **Key Functions**:
+  - Search input rendering with clear button functionality (lines 70-87)
+  - Clear button appears when `value` is not empty (lines 78-84)
 
 **Class: SB1.2 ServerSearch**
-* interacts with → Class: SB2.0 UserInteractions
-* interacts with → Class: SB3.0 AppContext
+* **Props Interface**: `ServerSearchProps` (lines 7-10)
+  - `searchQuery: string` - Current search query
+  - `onSearchChange: (query: string) => void` - Search change handler
+* **Global State**: `servers`, `currentUser`, `setSelectedServer`, `setSelectedChannel`, `setSelectedDM` from AppContext via `useApp()` hook (line 13)
+* **Key Functions**:
+  - Server filtering by user membership (line 15)
+  - Server filtering by search query (lines 17-19)
+  - Server selection handler (lines 37-41)
+  - Conditional rendering - returns null if no search query (line 21)
 
-**Class: SB2.0 UserInteractions**
-* processes → Class: SB1.1 ServerSearchInput
-* processes → Class: SB1.2 ServerSearch
-* updates → Class: SB3.0 AppContext
+**Current Implementation Architecture:**
+The Server Search feature uses **two React components** that implement View and Controller responsibilities:
+- **View Layer**: ServerSearchInput renders the search field with clear button, ServerSearch renders the dropdown results
+- **Controller Layer**: Event handlers manage search input changes, clearing, and server selection
+- **Model Layer**: AppContext provides global state (`servers`, `currentUser`) and navigation methods
 
-**Class: SB3.0 AppContext**
-* provides data to → Class: SB1.2 ServerSearch
-* manages → Class: SB3.1 ServerData
-* manages → Class: SB3.2 UserData
+**Backend Design (Preserved for Future Server Implementation):**
 
-**Class: SB3.1 ServerData**
-**Class: SB3.2 UserData**
+**SB3.1 ServerSearchService**
+* **Current Implementation**: Client-side filtering in ServerSearch component (lines 15-19)
+* **Future Backend**: Server-side search service with `searchServers(query, userId)` method
+* **Purpose**: Server-side server search with advanced filtering, ranking, and permissions
+
+**SB3.2 ServerRepository**
+* **Current Implementation**: `servers` array from AppContext (line 13)
+* **Future Backend**: Server-side data access with `getUserServers(userId)` and `searchServersByName(query, userId)` methods
+* **Purpose**: Server-side server data retrieval and search indexing
 
 ### Rationale and Justification:
 This class structure follows MVC architecture with clear separation of View components (ServerSearchInput, ServerSearch), Controller logic (UserInteractions), and Model data (AppContext). The View components handle UI rendering, the Controller handles user interactions and business logic, and the Model manages application state and data.
 
 ## 4. List of Classes
 
-### Component: SB1.0 Search Components (View)
+### Actual Implementation: React Components
 
 **Class: SB1.1 ServerSearchInput**
-* **Purpose & Responsibility:** Represents the visible search bar element. Captures user input, manages focus state, and communicates search text changes to the controller.
-* **Implements Design Features:** Clear Server Search Bar (primary interaction point), Immediate feedback & interaction clarity.
+* **Purpose & Responsibility:** Search input component with clear button functionality. Renders the search field and handles user text input with immediate visual feedback.
+* **Implements Design Features:** Clear Server Search Bar (input field), Clear button with conditional visibility, Client-side input handling.
+* **Props:** `value`, `onChange`
+* **Data Sources:** Parent component state for search query
 
 **Class: SB1.2 ServerSearch**
-* **Purpose & Responsibility:** Displays the filtered server results dropdown. Renders server list with member counts and handles server selection.
-* **Implements Design Features:** Clear Server Search Bar (results display), Dynamic UI updates based on search state.
+* **Purpose & Responsibility:** Dropdown results component that filters and displays servers based on user membership and search query. Handles server selection and navigation updates.
+* **Implements Design Features:** Clear Server Search Bar (results display), User membership filtering, Real-time search filtering, Navigation state management.
+* **Props:** `searchQuery`, `onSearchChange`
+* **Data Sources:** AppContext for servers, user data, and navigation methods
 
-### Component: SB2.0 User Interactions (Controller)
+### Backend Design (Preserved for Future Server Implementation)
 
-**Class: SB2.0 UserInteractions**
-* **Purpose & Responsibility:** Coordinates interactions between views and business logic. Processes search input events via `onChange`, triggers clearing via `onClear`, handles server selection via `onServerSelect`, and updates the search query state in AppContext.
-* **Implements Design Features:** Clear Server Search Bar (search behavior & coordination), UI responsiveness & state synchronization.
+**SB3.1 ServerSearchService**
+* **Purpose & Responsibility:** Server-side search service with `searchServers(query, userId)` method for advanced server search with ranking algorithms and permission filtering.
+* **Implements Design Features:** Clear Server Search Bar (server-side search), Advanced filtering, Search ranking, Permission validation.
+* **Current Mock:** Client-side filtering in ServerSearch component using array methods.
 
-### Component: SB3.0 App Context (Model)
-
-**Class: SB3.0 AppContext**
-* **Purpose & Responsibility:** Central state management that stores and provides server data, user information, and search query state. Manages the `servers` array, `currentUser` object, and `searchQuery` string for real-time filtering.
-* **Implements Design Features:** Clear Server Search Bar (data provisioning & state management), Client‑side performance optimization via centralized state.
+**SB3.2 ServerRepository**
+* **Purpose & Responsibility:** Server-side data access with `getUserServers(userId)` and `searchServersByName(query, userId)` methods for server data retrieval and search indexing.
+* **Implements Design Features:** Clear Server Search Bar (data access), User membership validation, Search optimization.
+* **Current Mock:** `servers` array from AppContext with client-side filtering.
 
 ### Data Storage Classes / Structures
 
@@ -127,59 +150,62 @@ Each class maps to a component in the MVC architecture. The View components hand
 **Starting State:** HIDDEN
 **Ending State:** VISIBLE_WITH_RESULTS
 
-1. **[Start]** → **[State]** HIDDEN
-2. **[Input/Output]** User types in search input → **[Controller]** `onChange` event triggered
-3. **[Process]** Controller updates `searchQuery` in AppContext (Model)
+1. **[Start]** → **[State]** HIDDEN (Search dropdown not visible)
+2. **[Input/Output]** User types in ServerSearchInput → **[Controller]** `onChange` event triggered
+3. **[Process]** Parent component updates search query state and passes to ServerSearch props
 4. **[Process]** Transition to VISIBLE_WITH_RESULTS
-5. **[Process]** Get `servers` and `currentUser` from AppContext
-6. **[Process]** Filter servers by user membership
-7. **[Process]** Filter servers by `searchQuery` name match
+5. **[Process]** ServerSearch component gets `servers` and `currentUser` from AppContext (line 13)
+6. **[Process]** Filter servers by user membership: `userServers = servers.filter(s => s.members.includes(currentUser?.id))` (line 15)
+7. **[Process]** Filter servers by search query: `filteredServers = userServers.filter(server => server.name.toLowerCase().includes(searchQuery.toLowerCase()))` (lines 17-19)
 8. **[Decision]** `filteredServers.length > 0?`
-    * **Yes** → **[View]** Display server list with icons, names, member counts → **(End)**
+    * **Yes** → **[View]** Display server list with icons, names, member counts (lines 27-53) → **(End)**
     * **No** → (Handled by SC1.1)
 
-**Explanation:** The search begins hidden. User typing triggers the `onChange` event handler, which updates the `searchQuery` state in AppContext. The Model filters servers and provides results back to the View for display.
+**Explanation:** The search begins hidden. User typing in ServerSearchInput triggers the `onChange` event, which updates the parent state and re-renders ServerSearch with new props. ServerSearch filters servers using AppContext data and displays results.
 
 #### Scenario: SC1.1 Server Search With No Matching Results
 **Starting State:** HIDDEN
 **Ending State:** VISIBLE_NO_RESULTS
 
-1. **[Start]** → **[State]** HIDDEN
-2. **[Input]** User types in search input → **[Controller]** `onChange` event triggered
-3. **[Process]** Controller updates `searchQuery` in AppContext (Model)
+1. **[Start]** → **[State]** HIDDEN (Search dropdown not visible)
+2. **[Input]** User types in ServerSearchInput → **[Controller]** `onChange` event triggered
+3. **[Process]** Parent component updates search query state and passes to ServerSearch props
 4. **[Process]** Transition to VISIBLE_NO_RESULTS
-5. **[Process]** Get `servers` and `currentUser` from AppContext
-6. **[Process]** Filter servers by user membership
-7. **[Process]** Filter servers by `searchQuery` name match
+5. **[Process]** ServerSearch component gets `servers` and `currentUser` from AppContext
+6. **[Process]** Filter servers by user membership (line 15)
+7. **[Process]** Filter servers by search query (lines 17-19)
 8. **[Decision]** `filteredServers.length > 0?`
     * **Yes** → (Handled by SC1.0)
-    * **No** → **[View]** Display 'No spaces found' → **(End)**
+    * **No** → **[View]** Display 'No spaces found' message (line 28) → **(End)**
 
-**Explanation:** Similar to successful search but displays empty state when no servers match the query. The `onChange` event handler updates the Model, which determines no matches exist.
+**Explanation:** Similar to successful search but displays empty state when no servers match the query. All filtering happens client-side in the ServerSearch component.
 
 #### Scenario: SC1.2 User Selects Server
 **Starting State:** VISIBLE_WITH_RESULTS
 **Ending State:** HIDDEN
 
 1. **[Start]** → **[State]** VISIBLE_WITH_RESULTS
-2. **[Input]** User selects server from results → **[Controller]** `onServerSelect` event triggered
-3. **[Process]** Controller updates selected server in AppContext (Model)
-4. **[Process]** Clear selected channel & DM in AppContext
-5. **[Process]** Clear `searchQuery` in AppContext
-6. **[Process]** Transition to HIDDEN → **(End)**
+2. **[Input]** User clicks server from results → **[Controller]** `onClick` event triggered (line 37)
+3. **[Process]** ServerSearch calls `setSelectedServer(server)` from AppContext (line 38)
+4. **[Process]** Clear selected channel: `setSelectedChannel(null)` (line 39)
+5. **[Process]** Clear selected DM: `setSelectedDM(null)` (line 40)
+6. **[Process]** Clear search query: `onSearchChange('')` (line 41)
+7. **[Process]** Transition to HIDDEN (component returns null due to empty searchQuery) → **(End)**
 
-**Explanation:** Server selection triggers the `onServerSelect` event handler, which updates the Model's navigation state and clears the search query, hiding the results.
+**Explanation:** Server selection triggers navigation state updates in AppContext and clears the search query, which hides the ServerSearch component.
 
 #### Scenario: SC1.3 User Clears Search
 **Starting State:** VISIBLE_WITH_RESULTS OR VISIBLE_NO_RESULTS
 **Ending State:** HIDDEN
 
 1. **[Start]** → **[State]** VISIBLE_WITH_RESULTS OR VISIBLE_NO_RESULTS
-2. **[Input]** User clicks clear button (X) → **[Controller]** `onClear` event triggered
-3. **[Process]** Controller clears `searchQuery` in AppContext (Model)
-4. **[Process]** Transition to HIDDEN → **(End)**
+2. **[Input]** User clicks clear button (X) in ServerSearchInput → **[Controller]** `onClick` event triggered (line 80)
+3. **[Process]** ServerSearchInput calls `onChange('')` to clear search (line 81)
+4. **[Process]** Parent component updates search query state to empty string
+5. **[Process]** ServerSearch component returns null due to empty searchQuery (line 21)
+6. **[Process]** Transition to HIDDEN → **(End)**
 
-**Explanation:** Clicking the clear button triggers the `onClear` event handler, which clears the `searchQuery` state in the Model, hiding the search results. Ready for new searches.
+**Explanation:** Clicking the clear button in ServerSearchInput clears the search query, causing ServerSearch to return null and hide the dropdown.
 
 ### Rationale and Justification:
 The flow charts cover all primary user interactions with the search bar: typing queries, viewing results, selecting servers, and clearing searches. These scenarios represent the complete user journey through the search functionality.

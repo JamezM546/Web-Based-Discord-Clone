@@ -1,32 +1,65 @@
 graph TB
     %% Clear Server Search Bar - Architecture Diagram
-    %% MVC Architecture Pattern
+    %% Shows both current client-side implementation and preserved backend design
 
-    subgraph "Client Side (View)"
-        A[Frontend<br/>React]
-        B[ServerSearchInput<br/>SB1.1<br/>Search Field + Clear Button]
-        C[ServerSearch<br/>SB1.2<br/>Server List Display]
+    subgraph "Current Implementation: Client Side"
+        subgraph "View Layer"
+            A[ServerSearchInput<br/>SB1.1<br/>Search Field + Clear Button]
+            B[ServerSearch<br/>SB1.2<br/>Server List Display]
+            A1[Search Input<br/>Clear Button]
+            A2[Server Results<br/>Icons + Member Counts]
+        end
+        
+        subgraph "Controller Layer"
+            C[Event Handlers<br/>- onChange<br/>- onClear<br/>- onServerSelect]
+        end
+        
+        subgraph "Model Layer"
+            D[AppContext<br/>State Management]
+            D1[Mock Data<br/>servers]
+            D2[Mock Data<br/>currentUser]
+            D3[Parent State<br/>searchQuery]
+        end
     end
 
-    subgraph "Client Side (Controller)"
-        D[User Interactions<br/>Event Handlers<br/>- onChange<br/>- onClear<br/>- onServerSelect]
+    subgraph "Preserved Backend Design: Server Side"
+        subgraph "SB3.0 Search Module"
+            E[SB3.1 ServerSearchService<br/>searchServers<br/>Ranking + Filtering]
+            F[SB3.2 ServerRepository<br/>getUserServers<br/>searchServersByName]
+        end
+        
+        subgraph "Data Layer"
+            G[ServerRecord<br/>Database Schema]
+            H[UserServerMembership<br/>Permission Filtering]
+            I[Search Index<br/>Optimized Queries]
+        end
     end
 
-    subgraph "Client Side (Model)"
-        E[AppContext<br/>State Management]
-        F[Server Data<br/>servers]
-        G[User Data<br/>currentUser]
-        H[Search Query<br/>searchQuery]
-    end
-
-    %% MVC Data Flow
-    A --> B
-    A --> C
-    B --> D
+    %% Current Implementation Flow
+    A --> A1
+    B --> A2
+    A1 --> C
+    A2 --> C
     C --> D
-    D --> E
-    D --> H
-    E --> F
-    E --> G
-    H --> E
-    E --> A
+    C --> D3
+    D --> D1
+    D --> D2
+    D3 --> D
+
+    %% Future Backend Connections (dashed lines)
+    D -.-> F
+    D -.-> E
+    E -.-> F
+    F -.-> G
+    F -.-> H
+    E -.-> I
+    G -.-> H
+
+    %% Styling
+    classDef currentImpl fill:#e3f2fd,stroke:#1a73e8,stroke-width:3px
+    classDef backendDesign fill:#fff3e0,stroke:#f57c00,stroke-width:3px,stroke-dasharray: 5 5
+    classDef componentClass fill:#ffffff,stroke:#666666,stroke-width:2px
+    
+    class A,B,A1,A2,C,D,D1,D2,D3 currentImpl
+    class E,F,G,H,I backendDesign
+    class A,B,A1,A2 componentClass

@@ -1,0 +1,30 @@
+classDiagram
+    %% Clear Server Search Bar - Class Diagram
+
+    class ServerSearchInput {
+        +value
+        +onChange
+        +render()
+        +handleInputChange()
+        +clearSearch()
+    }
+
+    class ServerSearch {
+        +searchQuery
+        +onSearchChange
+        +render()
+        +filterServers()
+        +handleServerSelect()
+    }
+
+    class AppContext {
+        +servers
+        +currentUser
+        +setSelectedServer()
+        +setSelectedChannel()
+        +setSelectedDM()
+    }
+
+    %% Relationships
+    ServerSearchInput --> AppContext : uses
+    ServerSearch --> AppContext : uses

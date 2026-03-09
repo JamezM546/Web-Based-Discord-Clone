@@ -1,0 +1,41 @@
+stateDiagram-v2
+    %% Clear Server Search Bar - State Machine Diagram
+    %% Based on ServerSearch.tsx component
+
+    [*] --> HIDDEN
+
+    %% User starts typing
+    HIDDEN --> VISIBLE_WITH_RESULTS : user types query\n[searchQuery.length > 0 && filteredServers.length > 0]
+
+    HIDDEN --> VISIBLE_NO_RESULTS : user types query\n[searchQuery.length > 0 && filteredServers.length === 0]
+
+    %% User modifies query
+    VISIBLE_WITH_RESULTS --> VISIBLE_WITH_RESULTS : user modifies query\n[filteredServers.length > 0]
+    VISIBLE_WITH_RESULTS --> VISIBLE_NO_RESULTS : user modifies query\n[filteredServers.length === 0]
+
+    VISIBLE_NO_RESULTS --> VISIBLE_WITH_RESULTS : user modifies query\n[filteredServers.length > 0]
+    VISIBLE_NO_RESULTS --> VISIBLE_NO_RESULTS : user modifies query\n[filteredServers.length === 0]
+
+    %% User clears search
+    VISIBLE_WITH_RESULTS --> HIDDEN : user clears input\n[searchQuery === '']
+    VISIBLE_NO_RESULTS --> HIDDEN : user clears input\n[searchQuery === '']
+
+    %% User selects server
+    VISIBLE_WITH_RESULTS --> [*] : user selects server\n[navigate to server, clear search]
+
+    %% State definitions
+    note right of HIDDEN
+        **State Definitions:**
+        HIDDEN: Search results not visible
+        VISIBLE_WITH_RESULTS: Dropdown shows filtered servers
+        VISIBLE_NO_RESULTS: Dropdown shows "no spaces found"
+
+        **Key State Variables:**
+        searchQuery: string (user input)
+        filteredServers: Server[] (matching results)
+
+        **Transition Triggers:**
+        User types: Input onChange event
+        User clears: Clear button or empty input
+        User selects: Server button onClick
+    end note

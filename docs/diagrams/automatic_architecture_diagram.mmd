@@ -1,32 +1,66 @@
 graph TB
     %% What You Missed Summary (WYMS) - Architecture Diagram
-    %% MVC Architecture Pattern
+    %% Shows both current client-side implementation and preserved backend design
 
-    subgraph "Client Side (View)"
-        A[Frontend<br/>React]
-        B[WhatYouMissed<br/>WYMS1.1<br/>Summary Bar + Expand Button]
-        C[WhatYouMissed<br/>WYMS1.2<br/>Expanded Summary Display]
+    subgraph "Current Implementation: Client Side"
+        subgraph "View Layer"
+            A[WhatYouMissed<br/>WYMS1.1<br/>React Component]
+            A1[Compact Bar<br/>Expand Button]
+            A2[Expanded Summary<br/>User Avatars]
+        end
+        
+        subgraph "Controller Layer"
+            B[Event Handlers<br/>- onExpand<br/>- onDismiss<br/>- onJumpToUnread]
+        end
+        
+        subgraph "Model Layer"
+            C[AppContext<br/>State Management]
+            C1[Mock Data<br/>unreadMessages]
+            C2[Mock Data<br/>users]
+            C3[Local State<br/>isExpanded]
+        end
     end
 
-    subgraph "Client Side (Controller)"
-        D[User Interactions<br/>Event Handlers<br/>- onExpand<br/>- onDismiss<br/>- onJumpToUnread]
+    subgraph "Preserved Backend Design: Server Side"
+        subgraph "MS2.0 Message & Summarization Module"
+            D[MS2.1 SummaryService<br/>generateBullets<br/>generateHighlights]
+            E[MS2.2 SummarizationProvider<br/>summarize<br/>LLM Integration]
+            F[MS2.3 MessageRepository<br/>fetchMessagesAfter<br/>fetchMessagesWithinTimeWindow]
+            G[MS2.6 MembershipService<br/>assertUserHasChannelAccess]
+        end
+        
+        subgraph "WYMS3.0 Backend Service"
+            H[WYMS3.1 WhatYouMissedService<br/>Uses MS2.0 Module]
+            I[WYMS2.2 LastReadRepository<br/>getLastReadMessageId]
+        end
     end
 
-    subgraph "Client Side (Model)"
-        E[AppContext<br/>State Management]
-        F[Message Data<br/>unreadMessages]
-        G[User Data<br/>users]
-        H[Summary State<br/>isExpanded]
-    end
+    %% Current Implementation Flow
+    A --> A1
+    A --> A2
+    A1 --> B
+    A2 --> B
+    B --> C
+    B --> C3
+    C --> C1
+    C --> C2
+    C3 --> C
 
-    %% MVC Data Flow
-    A --> B
-    A --> C
-    B --> D
-    C --> D
-    D --> E
-    D --> H
-    E --> F
-    E --> G
-    H --> E
-    E --> A
+    %% Future Backend Connections (dashed lines)
+    C -.-> F
+    C -.-> D
+    C -.-> G
+    D -.-> E
+    H -.-> D
+    H -.-> F
+    H -.-> G
+    H -.-> I
+
+    %% Styling
+    classDef currentImpl fill:#e3f2fd,stroke:#1a73e8,stroke-width:3px
+    classDef backendDesign fill:#fff3e0,stroke:#f57c00,stroke-width:3px,stroke-dasharray: 5 5
+    classDef componentClass fill:#ffffff,stroke:#666666,stroke-width:2px
+    
+    class A,A1,A2,B,C,C1,C2,C3 currentImpl
+    class D,E,F,G,H,I backendDesign
+    class A,A1,A2 componentClass

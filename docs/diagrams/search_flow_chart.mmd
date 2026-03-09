@@ -1,0 +1,30 @@
+flowchart TD
+    %% Clear Server Search Bar - Flow Chart
+
+    A([User types in search input]) --> B[ServerSearch component renders]
+    B --> C{searchQuery.length > 0?}
+
+    C -->|No| D[Return null - hide results]
+    C -->|Yes| E[Get servers from AppContext]
+
+    E --> F[Filter by user membership]
+    F --> G[Filter by name match]
+    G --> H{filteredServers.length > 0?}
+
+    H -->|Yes| I[Display server list]
+    H -->|No| J[Display 'No spaces found']
+
+    I --> K{User selects server?}
+    J --> L{User clears search?}
+
+    K -->|Yes| M[Set selected server, clear channel/DM]
+    K -->|No| N{User modifies query?}
+
+    N -->|Yes| C
+    N -->|No| K
+
+    L -->|Yes| D
+    L -->|No| J
+
+    M --> O([Navigation complete])
+    D --> P([Search idle])
