@@ -31,12 +31,19 @@ services:
       - NODE_ENV=development
       - JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
       - JWT_EXPIRES_IN=7d
+      - DATABASE_URL=postgresql://postgres:postgres123@postgres:5432/discord_clone
+      - DATABASE_HOST=postgres
+      - DATABASE_PORT=5432
+      - DATABASE_NAME=discord_clone
+      - DATABASE_USER=postgres
+      - DATABASE_PASSWORD=postgres123
     volumes:
       - ./simple-server:/app
       - /app/node_modules
     command: npm run dev
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
 
   # Frontend (existing)
   frontend:

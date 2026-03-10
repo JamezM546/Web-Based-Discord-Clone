@@ -14,5 +14,5 @@ COPY . .
 # Expose port
 EXPOSE 3001
 
-# Start server
-CMD ["npm", "run", "dev"]
+# Wait for database to be ready, then start server
+CMD ["sh", "-c", "npm run dev"]

@@ -1,8 +1,6 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-
-// In-memory user storage (replace with database later)
-const users = [];
+const User = require('../models/User');
 
 // Hash password
 const hashPassword = async (password) => {
@@ -12,47 +10,62 @@ const hashPassword = async (password) => {
 
 // Initialize demo accounts from frontend mock data
 const initializeDemoAccounts = async () => {
-  if (users.length === 0) {
-    const demoPasswordHash = await hashPassword('password123');
-    
-    users.push(
-      {
-        id: '1',
-        username: 'Nafisa',
-        email: 'nafisa@example.com',
-        password: demoPasswordHash,
-        createdAt: new Date().toISOString()
-      },
-      {
-        id: '2',
-        username: 'Ashraf',
-        email: 'ashraf@example.com',
-        password: demoPasswordHash,
-        createdAt: new Date().toISOString()
-      },
-      {
-        id: '3',
-        username: 'James',
-        email: 'james@example.com',
-        password: demoPasswordHash,
-        createdAt: new Date().toISOString()
-      },
-      {
-        id: '4',
-        username: 'Elvis',
-        email: 'elvis@example.com',
-        password: demoPasswordHash,
-        createdAt: new Date().toISOString()
-      },
-      {
-        id: '5',
-        username: 'Salma',
-        email: 'salma@example.com',
-        password: demoPasswordHash,
-        createdAt: new Date().toISOString()
+  try {
+    const existingUsers = await User.findByEmail('nafisa@example.com');
+    if (!existingUsers) {
+      const demoPasswordHash = await hashPassword('password123');
+      
+      const demoUsers = [
+        {
+          id: '1',
+          username: 'Nafisa',
+          email: 'nafisa@example.com',
+          passwordHash: demoPasswordHash,
+          displayName: 'Nafisa',
+          avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Nafisa'
+        },
+        {
+          id: '2',
+          username: 'Ashraf',
+          email: 'ashraf@example.com',
+          passwordHash: demoPasswordHash,
+          displayName: 'Ashraf',
+          avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Ashraf'
+        },
+        {
+          id: '3',
+          username: 'James',
+          email: 'james@example.com',
+          passwordHash: demoPasswordHash,
+          displayName: 'James',
+          avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=James'
+        },
+        {
+          id: '4',
+          username: 'Elvis',
+          email: 'elvis@example.com',
+          passwordHash: demoPasswordHash,
+          displayName: 'Elvis',
+          avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Elvis'
+        },
+        {
+          id: '5',
+          username: 'Salma',
+          email: 'salma@example.com',
+          passwordHash: demoPasswordHash,
+          displayName: 'Salma',
+          avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Salma'
+        }
+      ];
+
+      for (const user of demoUsers) {
+        await User.create(user);
       }
-    );
-    console.log('Demo accounts initialized with password: password123');
+      
+      console.log('Demo accounts initialized with password: password123');
+    }
+  } catch (error) {
+    console.error('Error initializing demo accounts:', error);
   }
 };
 
@@ -81,34 +94,24 @@ const verifyPassword = async (password, hashedPassword) => {
 const registerUser = async (userData) => {
   const { username, email, password } = userData;
 
-  // Check if user already exists
-  const existingUser = users.find(u => u.email === email);
-  if (existingUser) {
-    throw new Error('User with this email already exists');
-  }
-
   // Hash password
   const hashedPassword = await hashPassword(password);
 
   // Create user
-  const newUser = {
+  const newUser = await User.create({
     id: Date.now().toString(), // Simple ID generation
     username,
     email,
-    password: hashedPassword,
-    createdAt: new Date().toISOString()
-  };
-
-  users.push(newUser);
+    passwordHash: hashedPassword,
+    displayName: username,
+    avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`
+  });
 
   // Generate token
   const token = generateToken(newUser);
-
-  // Return user without password
-  const { password: _, ...userWithoutPassword } = newUser;
   
   return {
-    user: userWithoutPassword,
+    user: newUser,
     token
   };
 };
@@ -117,45 +120,39 @@ const registerUser = async (userData) => {
 const loginUser = async (loginData) => {
   const { email, password } = loginData;
 
-  // Find user
-  const user = users.find(u => u.email === email);
-  if (!user) {
+  // Find user with password for verification
+  const userWithPassword = await User.findByEmail(email, true);
+  if (!userWithPassword) {
     throw new Error('Invalid email or password');
   }
 
   // Verify password
-  const isValidPassword = await verifyPassword(password, user.password);
+  const isValidPassword = await verifyPassword(password, userWithPassword.password_hash);
   if (!isValidPassword) {
     throw new Error('Invalid email or password');
   }
 
+  // Get user without password for response
+  const user = await User.findByEmail(email, false);
+
   // Generate token
   const token = generateToken(user);
-
-  // Return user without password
-  const { password: _, ...userWithoutPassword } = user;
   
   return {
-    user: userWithoutPassword,
+    user,
     token
   };
 };
 
 // Get user by ID
-const getUserById = (id) => {
-  const user = users.find(u => u.id === id);
-  if (!user) {
-    return null;
-  }
-  
-  // Return user without password
-  const { password: _, ...userWithoutPassword } = user;
-  return userWithoutPassword;
+const getUserById = async (id) => {
+  return await User.findById(id);
 };
 
 // Get all users (for development)
-const getAllUsers = () => {
-  return users.map(({ password, ...user }) => user);
+const getAllUsers = async () => {
+  // This would need to be implemented in User model
+  return [];
 };
 
 module.exports = {

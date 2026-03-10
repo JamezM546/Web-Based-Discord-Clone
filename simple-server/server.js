@@ -1,6 +1,8 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const { initializeDatabase } = require('./config/database');
 
 // Import routes
 const authRoutes = require('./routes/auth');
@@ -63,10 +65,19 @@ app.get('/api/docs', (req, res) => {
 });
 
 // Start server
-app.listen(PORT, '0.0.0.0', () => {
+app.listen(PORT, '0.0.0.0', async () => {
   console.log(`Simple server running on port ${PORT}`);
   console.log(`Health check: http://localhost:${PORT}/health`);
   console.log(`API endpoint: http://localhost:${PORT}/api`);
   console.log(`Interactive docs: http://localhost:${PORT}/api/docs`);
   console.log(`Auth endpoints: http://localhost:${PORT}/api/auth`);
+  
+  // Initialize database
+  try {
+    await initializeDatabase();
+    console.log('Database initialized successfully');
+  } catch (error) {
+    console.error('Failed to initialize database:', error);
+    process.exit(1);
+  }
 });
