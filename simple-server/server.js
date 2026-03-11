@@ -8,6 +8,7 @@ const { initializeDatabase } = require('./config/database');
 const authRoutes = require('./routes/auth');
 const serverRoutes = require('./routes/server');
 const channelRoutes = require('./routes/channel');
+const messageRoutes = require('./routes/message');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -58,6 +59,19 @@ app.get('/api', (req, res) => {
         'PUT /api/channels/:channelId': 'Update channel (protected)',
         'DELETE /api/channels/:channelId': 'Delete channel (protected)',
         'PUT /api/channels/server/:serverId/reorder': 'Reorder channels in server (protected)'
+      },
+      messages: {
+        'POST /api/messages': 'Create new message (protected)',
+        'GET /api/messages/channel/:channelId': 'Get messages for a channel (protected)',
+        'GET /api/messages/dm/:dmId': 'Get messages for a DM (protected)',
+        'GET /api/messages/:messageId': 'Get single message by ID (protected)',
+        'PUT /api/messages/:messageId': 'Update message (protected)',
+        'DELETE /api/messages/:messageId': 'Delete message (protected)',
+        'POST /api/messages/:messageId/reactions': 'Add reaction to message (protected)',
+        'DELETE /api/messages/:messageId/reactions': 'Remove reaction from message (protected)',
+        'GET /api/messages/:messageId/reactions': 'Get message reactions (protected)',
+        'GET /api/messages/search/channel/:channelId': 'Search messages in channel (protected)',
+        'GET /api/messages/search/dm/:dmId': 'Search messages in DM (protected)'
       }
     }
   });
@@ -83,6 +97,9 @@ app.use('/api/servers', serverRoutes);
 
 // Channel routes
 app.use('/api/channels', channelRoutes);
+
+// Message routes
+app.use('/api/messages', messageRoutes);
 
 // API Documentation/Explorer
 app.get('/api/docs', (req, res) => {

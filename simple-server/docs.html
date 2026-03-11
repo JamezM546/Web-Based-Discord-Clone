@@ -196,6 +196,133 @@
             <div id="delete-channel-response" class="response"></div>
         </div>
 
+        <h2>💬 Message Endpoints</h2>
+        
+        <div class="endpoint">
+            <span class="method post">POST</span>
+            <strong>/api/messages</strong> - Send a message
+            <div class="form-group">
+                <label>Content:</label>
+                <textarea id="message-content" placeholder="Enter message content" rows="3"></textarea>
+            </div>
+            <div class="form-group">
+                <label>Channel ID:</label>
+                <input type="text" id="message-channel-id" placeholder="Enter channel ID (or DM ID)">
+            </div>
+            <div class="form-group">
+                <label>DM ID (optional):</label>
+                <input type="text" id="message-dm-id" placeholder="Enter DM ID if sending to DM">
+            </div>
+            <button onclick="sendMessage()">Send Message</button>
+            <div id="message-response" class="response"></div>
+        </div>
+
+        <div class="endpoint">
+            <span class="method get">GET</span>
+            <strong>/api/messages/channel/:channelId</strong> - Get channel messages
+            <div class="form-group">
+                <label>Channel ID:</label>
+                <input type="text" id="get-channel-messages-id" placeholder="Enter channel ID">
+            </div>
+            <button onclick="getChannelMessages()">Get Messages</button>
+            <div id="get-messages-response" class="response"></div>
+        </div>
+
+        <div class="endpoint">
+            <span class="method get">GET</span>
+            <strong>/api/messages/:messageId</strong> - Get single message
+            <div class="form-group">
+                <label>Message ID:</label>
+                <input type="text" id="get-message-id" placeholder="Enter message ID">
+            </div>
+            <button onclick="getMessage()">Get Message</button>
+            <div id="get-single-message-response" class="response"></div>
+        </div>
+
+        <div class="endpoint">
+            <span class="method put">PUT</span>
+            <strong>/api/messages/:messageId</strong> - Update message
+            <div class="form-group">
+                <label>Message ID:</label>
+                <input type="text" id="update-message-id" placeholder="Enter message ID">
+            </div>
+            <div class="form-group">
+                <label>New Content:</label>
+                <textarea id="update-message-content" placeholder="Enter new content" rows="3"></textarea>
+            </div>
+            <button onclick="updateMessage()">Update Message</button>
+            <div id="update-message-response" class="response"></div>
+        </div>
+
+        <div class="endpoint">
+            <span class="method get">GET</span>
+            <strong>/api/messages/search/channel/:channelId</strong> - Search messages
+            <div class="form-group">
+                <label>Channel ID:</label>
+                <input type="text" id="search-channel-id" placeholder="Enter channel ID">
+            </div>
+            <div class="form-group">
+                <label>Search Query:</label>
+                <input type="text" id="search-query" placeholder="Enter search term">
+            </div>
+            <button onclick="searchMessages()">Search Messages</button>
+            <div id="search-messages-response" class="response"></div>
+        </div>
+
+        <div class="endpoint">
+            <span class="method delete">DELETE</span>
+            <strong>/api/messages/:messageId</strong> - Delete message
+            <div class="form-group">
+                <label>Message ID:</label>
+                <input type="text" id="delete-message-id" placeholder="Enter message ID">
+            </div>
+            <button onclick="deleteMessage()">Delete Message</button>
+            <div id="delete-message-response" class="response"></div>
+        </div>
+
+        <div class="endpoint">
+            <span class="method post">POST</span>
+            <strong>/api/messages/:messageId/reactions</strong> - Add reaction
+            <div class="form-group">
+                <label>Message ID:</label>
+                <input type="text" id="reaction-message-id" placeholder="Enter message ID">
+            </div>
+            <div class="form-group">
+                <label>Emoji:</label>
+                <input type="text" id="reaction-emoji" placeholder="Enter emoji (e.g., 👍)">
+            </div>
+            <button onclick="addReaction()">Add Reaction</button>
+            <div id="reaction-response" class="response"></div>
+        </div>
+
+        <div class="endpoint">
+            <span class="method get">GET</span>
+            <strong>/api/messages/:messageId/reactions</strong> - Get reactions
+            <div class="form-group">
+                <label>Message ID:</label>
+                <input type="text" id="get-reactions-message-id" placeholder="Enter message ID">
+            </div>
+            <button onclick="getReactions()">Get Reactions</button>
+            <div id="get-reactions-response" class="response"></div>
+        </div>
+
+        <div class="endpoint">
+            <span class="method delete">DELETE</span>
+            <strong>/api/messages/:messageId/reactions</strong> - Remove reaction
+            <div class="form-group">
+                 <label>Message ID:</label>
+                 <input type="text" id="remove-reaction-message-id" placeholder="Enter message ID">
+         </div>
+        <div class="form-group">
+            <label>Emoji:</label>
+            <input type="text" id="remove-reaction-emoji" placeholder="Enter emoji (e.g., 👍)">
+        </div>
+        <button onclick="removeReaction()">Remove Reaction</button>
+        <div id="remove-reaction-response" class="response"></div>
+    </div>
+
+        
+
         <h2>🔧 Utility Endpoints</h2>
         
         <div class="endpoint">
@@ -222,6 +349,8 @@
             <li>The token will be automatically stored and used for protected routes</li>
             <li>Test protected endpoints to verify authentication works</li>
             <li>Create servers and channels to test the full functionality</li>
+            <li>Create and send messages to test message retrieval</li>
+            <li>Add reactions to test additional features</li>
             <li>Check responses for detailed API information</li>
         </ol>
         
@@ -230,10 +359,10 @@
             <li><strong>Authentication:</strong> Register/Login to get your token</li>
             <li><strong>Create Server:</strong> Use the server management section to create a new server</li>
             <li><strong>Create Channel:</strong> Use the server ID from step 2 to create channels</li>
-            <li><strong>Fetch Data:</strong> Test GET endpoints to retrieve your servers and channels</li>
-            <li><strong>Update/Delete:</strong> Test PUT and DELETE operations on your resources</li>
+            <li><strong>Create Message:</strong> Use the channel ID from step 3 to send messages</li>
+            <li><strong>Fetch Data:</strong> Test GET endpoints to retrieve your servers, channels, and messages</li>
+            <li><strong>Update/Delete:</strong>Test PUT and DELETE operations on your resources</li>
         </ol>
-    </div>
 
     <script>
         let currentToken = '';
@@ -466,6 +595,143 @@
 
             const response = await makeRequest('DELETE', '/api/channels/' + channelId);
             showResponse('delete-channel-response', response);
+        }
+
+        // Message Functions
+        async function sendMessage() {
+            const content = document.getElementById('message-content').value;
+            const channelId = document.getElementById('message-channel-id').value;
+            const dmId = document.getElementById('message-dm-id').value;
+
+            if (!content || (!channelId && !dmId)) {
+                showResponse('message-response', { error: 'Content and either channelId or dmId are required' });
+                return;
+            }
+
+            const data = { content };
+            if (channelId) data.channelId = channelId;
+            if (dmId) data.dmId = dmId;
+
+            const response = await makeRequest('POST', '/api/messages', data);
+            showResponse('message-response', response);
+        }
+
+        async function getChannelMessages() {
+            const channelId = document.getElementById('get-channel-messages-id').value;
+
+            if (!channelId) {
+                showResponse('get-messages-response', { error: 'Channel ID is required' });
+                return;
+            }
+
+            const response = await makeRequest('GET', '/api/messages/channel/' + channelId);
+            showResponse('get-messages-response', response);
+        }
+
+        async function getMessage() {
+            const messageId = document.getElementById('get-message-id').value;
+
+            if (!messageId) {
+                showResponse('get-single-message-response', { error: 'Message ID is required' });
+                return;
+            }
+
+            const response = await makeRequest('GET', '/api/messages/' + messageId);
+            showResponse('get-single-message-response', response);
+        }
+
+        async function updateMessage() {
+            const messageId = document.getElementById('update-message-id').value;
+            const content = document.getElementById('update-message-content').value;
+
+            if (!messageId || !content) {
+                showResponse('update-message-response', { error: 'Message ID and content are required' });
+                return;
+            }
+
+            const response = await makeRequest('PUT', '/api/messages/' + messageId, { content });
+            showResponse('update-message-response', response);
+        }
+
+        async function deleteMessage() {
+            const messageId = document.getElementById('delete-message-id').value;
+
+            if (!messageId) {
+                showResponse('delete-message-response', { error: 'Message ID is required' });
+                return;
+            }
+
+            const response = await makeRequest('DELETE', '/api/messages/' + messageId);
+            showResponse('delete-message-response', response);
+        }
+
+        async function addReaction() {
+            const messageId = document.getElementById('reaction-message-id').value;
+            const emoji = document.getElementById('reaction-emoji').value;
+
+            if (!messageId || !emoji) {
+                showResponse('reaction-response', { error: 'Message ID and emoji are required' });
+                return;
+            }
+
+            const response = await makeRequest('POST', '/api/messages/' + messageId + '/reactions', { emoji });
+            showResponse('reaction-response', response);
+        }
+
+        async function getReactions() {
+            const messageId = document.getElementById('get-reactions-message-id').value;
+
+            if (!messageId) {
+                showResponse('get-reactions-response', { error: 'Message ID is required' });
+                return;
+            }
+
+            const response = await makeRequest('GET', '/api/messages/' + messageId + '/reactions');
+            showResponse('get-reactions-response', response);
+        }
+
+        async function removeReaction() {
+            const messageId = document.getElementById('remove-reaction-message-id').value;
+            const emoji = document.getElementById('remove-reaction-emoji').value;
+
+            if (!messageId || !emoji) {
+                showResponse('remove-reaction-response', {
+                    status: 400,
+                    data: { error: 'Message ID and emoji are required' }
+                });
+                return;
+            }
+
+            const response = await makeRequest(
+                'DELETE',
+                '/api/messages/' + messageId + '/reactions?emoji=' + encodeURIComponent(emoji)
+    );
+
+    showResponse('remove-reaction-response', response);
+}
+
+        async function searchMessages() {
+            const channelId = document.getElementById('search-channel-id').value;
+            const q = document.getElementById('search-query').value;
+
+            if (!channelId || !q) {
+                showResponse('search-messages-response', { error: 'Channel ID and search query are required' });
+                return;
+            }
+
+            const response = await makeRequest('GET', '/api/messages/search/channel/' + channelId + '?q=' + encodeURIComponent(q));
+            showResponse('search-messages-response', response);
+        }
+
+        // Public endpoints (no auth required) Can delete.
+        async function getAllServers() {
+            const response = await makeRequest('GET', '/api/servers/all');
+            showResponse('all-servers-response', response);
+        }
+
+        async function getAllChannels() {
+            const response = await makeRequest('GET', '/api/channels/all');
+            showResponse('all-channels-response', response);
         }
     </script>
 </body>

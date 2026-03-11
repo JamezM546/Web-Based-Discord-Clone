@@ -226,6 +226,69 @@ class ApiService {
       method: 'DELETE',
     });
   }
+
+  // Message Methods
+  async createMessage(messageData: { content: string; channelId?: string; dmId?: string; replyToId?: string; serverInviteId?: string }): Promise<any> {
+    return this.request<any>('/api/messages', {
+      method: 'POST',
+      body: JSON.stringify(messageData),
+    });
+  }
+
+  async getChannelMessages(channelId: string, limit?: number): Promise<any[]> {
+    const url = limit ? `/api/messages/channel/${channelId}?limit=${limit}` : `/api/messages/channel/${channelId}`;
+    const response = await this.request<{ messages: any[] }>(url);
+    return response.data?.messages || [];
+  }
+
+  async getDmMessages(dmId: string, limit?: number): Promise<any[]> {
+    const url = limit ? `/api/messages/dm/${dmId}?limit=${limit}` : `/api/messages/dm/${dmId}`;
+    const response = await this.request<{ messages: any[] }>(url);
+    return response.data?.messages || [];
+  }
+
+  async getMessage(messageId: string): Promise<any> {
+    return this.request<any>(`/api/messages/${messageId}`);
+  }
+
+  async updateMessage(messageId: string, content: string): Promise<any> {
+    return this.request<any>(`/api/messages/${messageId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ content }),
+    });
+  }
+
+  async deleteMessage(messageId: string): Promise<void> {
+    await this.request(`/api/messages/${messageId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async addReaction(messageId: string, emoji: string): Promise<any> {
+    return this.request<any>(`/api/messages/${messageId}/reactions`, {
+      method: 'POST',
+      body: JSON.stringify({ emoji }),
+    });
+  }
+
+  async removeReaction(messageId: string, emoji: string): Promise<void> {
+    await this.request(`/api/messages/${messageId}/reactions?emoji=${encodeURIComponent(emoji)}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getReactions(messageId: string): Promise<any[]> {
+    const response = await this.request<{ reactions: any[] }>(`/api/messages/${messageId}/reactions`);
+    return response.data?.reactions || [];
+  }
+
+  async searchMessages(channelId: string, query: string, limit?: number): Promise<any[]> {
+    const url = limit 
+      ? `/api/messages/search/channel/${channelId}?q=${encodeURIComponent(query)}&limit=${limit}`
+      : `/api/messages/search/channel/${channelId}?q=${encodeURIComponent(query)}`;
+    const response = await this.request<{ messages: any[] }>(url);
+    return response.data?.messages || [];
+  }
 }
 
 export const apiService = new ApiService();
