@@ -107,7 +107,6 @@ const createTables = async () => {
         id VARCHAR(255) PRIMARY KEY,
         name VARCHAR(100) NOT NULL,
         server_id VARCHAR(255) REFERENCES servers(id) ON DELETE CASCADE,
-        type VARCHAR(20) NOT NULL DEFAULT 'text' CHECK (type IN ('text', 'voice')),
         position INTEGER DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

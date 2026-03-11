@@ -44,7 +44,7 @@ router.post('/login', validate(loginSchema), async (req, res) => {
 // Get current user info (protected route)
 router.get('/me', authenticateToken, async (req, res) => {
   try {
-    const user = getUserById(req.user.id);
+    const user = await getUserById(req.user.id);
     
     if (!user) {
       return res.status(404).json({

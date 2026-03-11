@@ -20,6 +20,7 @@ cd Web-Based-Discord-Clone
 ```bash
 docker-compose up -d
 ```
+**For first time setup ^, use `docker-compose up --build` for every time after
 
 That's it! Docker will automatically:
 - ✅ Download and start PostgreSQL database

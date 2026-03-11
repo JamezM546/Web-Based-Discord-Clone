@@ -19,7 +19,6 @@ export interface Channel {
   id: string;
   name: string;
   serverId: string;
-  type: 'text' | 'voice';
 }
 
 export interface Message {

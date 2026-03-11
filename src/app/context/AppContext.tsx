@@ -72,13 +72,13 @@ const mockServers: Server[] = [
 ];
 
 const mockChannels: Channel[] = [
-  { id: 'c1', name: 'general', serverId: 's1', type: 'text' },
-  { id: 'c2', name: 'announcements', serverId: 's1', type: 'text' },
-  { id: 'c3', name: 'development', serverId: 's1', type: 'text' },
-  { id: 'c4', name: 'general', serverId: 's2', type: 'text' },
-  { id: 'c5', name: 'game-night', serverId: 's2', type: 'text' },
-  { id: 'c6', name: 'general', serverId: 's3', type: 'text' },
-  { id: 'c7', name: 'homework-help', serverId: 's3', type: 'text' },
+  { id: 'c1', name: 'general', serverId: 's1' },
+  { id: 'c2', name: 'announcements', serverId: 's1' },
+  { id: 'c3', name: 'development', serverId: 's1' },
+  { id: 'c4', name: 'general', serverId: 's2' },
+  { id: 'c5', name: 'game-night', serverId: 's2' },
+  { id: 'c6', name: 'general', serverId: 's3' },
+  { id: 'c7', name: 'homework-help', serverId: 's3' },
 ];
 
 const mockMessages: Message[] = [
@@ -324,6 +324,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   }, []);
 
   const createServer = (name: string, icon: string) => {
+    if (!currentUser) return;
     const newServer: Server = {
       id: `s${servers.length + 1}`,
       name,
@@ -338,7 +339,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       id: `c${channels.length + 1}`,
       name: 'general',
       serverId: newServer.id,
-      type: 'text',
     };
     setChannels([...channels, generalChannel]);
   };
@@ -436,7 +436,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       id: `c${channels.length + 1}`,
       name,
       serverId,
-      type: 'text',
     };
     setChannels([...channels, newChannel]);
   };
