@@ -6,6 +6,8 @@ const { initializeDatabase } = require('./config/database');
 
 // Import routes
 const authRoutes = require('./routes/auth');
+const serverRoutes = require('./routes/server');
+const channelRoutes = require('./routes/channel');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -39,6 +41,23 @@ app.get('/api', (req, res) => {
         'POST /api/auth/login': 'Login user',
         'GET /api/auth/me': 'Get current user (protected)',
         'GET /api/auth/test-protected': 'Test protected route'
+      },
+      servers: {
+        'POST /api/servers': 'Create new server (protected)',
+        'GET /api/servers': 'Get servers for current user (protected)',
+        'GET /api/servers/:serverId': 'Get server by ID with members and channels (protected)',
+        'PUT /api/servers/:serverId': 'Update server settings (protected)',
+        'DELETE /api/servers/:serverId': 'Delete server (protected)',
+        'POST /api/servers/:serverId/members': 'Add member to server (protected)',
+        'DELETE /api/servers/:serverId/members/:userId': 'Remove member from server (protected)'
+      },
+      channels: {
+        'POST /api/channels': 'Create new channel (protected)',
+        'GET /api/channels/server/:serverId': 'Get channels for a server (protected)',
+        'GET /api/channels/:channelId': 'Get channel by ID with messages (protected)',
+        'PUT /api/channels/:channelId': 'Update channel (protected)',
+        'DELETE /api/channels/:channelId': 'Delete channel (protected)',
+        'PUT /api/channels/server/:serverId/reorder': 'Reorder channels in server (protected)'
       }
     }
   });
@@ -58,6 +77,12 @@ app.get('/api/test', (req, res) => {
 
 // Auth routes
 app.use('/api/auth', authRoutes);
+
+// Server routes
+app.use('/api/servers', serverRoutes);
+
+// Channel routes
+app.use('/api/channels', channelRoutes);
 
 // API Documentation/Explorer
 app.get('/api/docs', (req, res) => {

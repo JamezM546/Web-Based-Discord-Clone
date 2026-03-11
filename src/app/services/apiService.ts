@@ -27,6 +27,28 @@ export interface RegisterResponse {
   token: string;
 }
 
+export interface Server {
+  id: string;
+  name: string;
+  icon?: string;
+  ownerId: string;
+  createdAt: string;
+  updatedAt: string;
+  members?: any[];
+  channels?: any[];
+}
+
+export interface Channel {
+  id: string;
+  name: string;
+  serverId: string;
+  type?: string;
+  position?: number;
+  createdAt: string;
+  updatedAt: string;
+  messages?: any[];
+}
+
 class ApiService {
   private token: string | null = null;
 
@@ -136,6 +158,73 @@ class ApiService {
   // Logout method
   logout() {
     this.clearToken();
+  }
+
+  // Server Management Methods
+  async createServer(name: string, icon?: string): Promise<Server> {
+    const response = await this.request<Server>('/api/servers', {
+      method: 'POST',
+      body: JSON.stringify({ name, icon }),
+    });
+    return response.data!;
+  }
+
+  async getServers(): Promise<Server[]> {
+    const response = await this.request<{ servers: Server[] }>('/api/servers');
+    return response.data?.servers || [];
+  }
+
+  async getServer(serverId: string): Promise<Server> {
+    const response = await this.request<{ server: Server }>(`/api/servers/${serverId}`);
+    return response.data!.server;
+  }
+
+  async updateServer(serverId: string, updates: { name?: string; icon?: string }): Promise<Server> {
+    const response = await this.request<Server>(`/api/servers/${serverId}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates),
+    });
+    return response.data!;
+  }
+
+  async deleteServer(serverId: string): Promise<void> {
+    await this.request(`/api/servers/${serverId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Channel Management Methods
+  async createChannel(name: string, serverId: string): Promise<Channel> {
+    const response = await this.request<Channel>('/api/channels', {
+      method: 'POST',
+      body: JSON.stringify({ name, serverId }),
+    });
+    return response.data!;
+  }
+
+  async getChannels(serverId: string): Promise<Channel[]> {
+    const response = await this.request<{ channels: Channel[] }>(`/api/channels/server/${serverId}`);
+    return response.data?.channels || [];
+  }
+
+  async getChannel(channelId: string, limit?: number): Promise<Channel> {
+    const url = limit ? `/api/channels/${channelId}?limit=${limit}` : `/api/channels/${channelId}`;
+    const response = await this.request<{ channel: Channel }>(url);
+    return response.data!.channel;
+  }
+
+  async updateChannel(channelId: string, updates: { name?: string; position?: number }): Promise<Channel> {
+    const response = await this.request<Channel>(`/api/channels/${channelId}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates),
+    });
+    return response.data!;
+  }
+
+  async deleteChannel(channelId: string): Promise<void> {
+    await this.request(`/api/channels/${channelId}`, {
+      method: 'DELETE',
+    });
   }
 }
 

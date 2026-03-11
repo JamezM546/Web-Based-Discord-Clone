@@ -12,6 +12,18 @@ const loginSchema = Joi.object({
   password: Joi.string().required()
 });
 
+// Server validation schemas
+const serverSchema = Joi.object({
+  name: Joi.string().min(1).max(100).required(),
+  icon: Joi.string().uri().optional()
+});
+
+// Channel validation schemas
+const channelSchema = Joi.object({
+  name: Joi.string().min(1).max(100).required(),
+  serverId: Joi.string().required()
+});
+
 // Generic validation middleware
 const validate = (schema) => {
   return (req, res, next) => {
@@ -30,5 +42,7 @@ const validate = (schema) => {
 module.exports = {
   registerSchema,
   loginSchema,
+  serverSchema,
+  channelSchema,
   validate
 };

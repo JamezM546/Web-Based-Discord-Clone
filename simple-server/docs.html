@@ -13,6 +13,8 @@
         .method { display: inline-block; padding: 4px 8px; border-radius: 3px; color: white; font-weight: bold; margin-right: 10px; }
         .get { background: #28a745; }
         .post { background: #007bff; }
+        .put { background: #ffc107; color: #212529; }
+        .delete { background: #dc3545; }
         .form-group { margin: 15px 0; }
         label { display: block; margin-bottom: 5px; font-weight: bold; }
         input, textarea, select { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
@@ -79,6 +81,121 @@
             <div id="protected-response" class="response"></div>
         </div>
 
+        <h2>🏢 Server Management Endpoints</h2>
+        
+        <div class="endpoint">
+            <span class="method post">POST</span>
+            <strong>/api/servers</strong> - Create new server
+            <div class="form-group">
+                <label>Server Name:</label>
+                <input type="text" id="create-server-name" placeholder="Enter server name">
+            </div>
+            <div class="form-group">
+                <label>Icon URL (optional):</label>
+                <input type="text" id="create-server-icon" placeholder="Enter icon URL">
+            </div>
+            <button onclick="createServer()">Create Server</button>
+            <div id="create-server-response" class="response"></div>
+        </div>
+
+        <div class="endpoint">
+            <span class="method get">GET</span>
+            <strong>/api/servers</strong> - Get servers for current user
+            <button onclick="getServers()">Get Servers</button>
+            <div id="get-servers-response" class="response"></div>
+        </div>
+
+        <div class="endpoint">
+            <span class="method get">GET</span>
+            <strong>/api/servers/:serverId</strong> - Get server by ID
+            <div class="form-group">
+                <label>Server ID:</label>
+                <input type="text" id="get-server-id" placeholder="Enter server ID">
+            </div>
+            <button onclick="getServer()">Get Server</button>
+            <div id="get-server-response" class="response"></div>
+        </div>
+
+        <div class="endpoint">
+            <span class="method put">PUT</span>
+            <strong>/api/servers/:serverId</strong> - Update server
+            <div class="form-group">
+                <label>Server ID:</label>
+                <input type="text" id="update-server-id" placeholder="Enter server ID">
+            </div>
+            <div class="form-group">
+                <label>New Name:</label>
+                <input type="text" id="update-server-name" placeholder="Enter new server name">
+            </div>
+            <div class="form-group">
+                <label>New Icon URL:</label>
+                <input type="text" id="update-server-icon" placeholder="Enter new icon URL">
+            </div>
+            <button onclick="updateServer()">Update Server</button>
+            <div id="update-server-response" class="response"></div>
+        </div>
+
+        <div class="endpoint">
+            <span class="method delete">DELETE</span>
+            <strong>/api/servers/:serverId</strong> - Delete server
+            <div class="form-group">
+                <label>Server ID:</label>
+                <input type="text" id="delete-server-id" placeholder="Enter server ID">
+            </div>
+            <button onclick="deleteServer()">Delete Server</button>
+            <div id="delete-server-response" class="response"></div>
+        </div>
+
+        <h2>📝 Channel Management Endpoints</h2>
+        
+        <div class="endpoint">
+            <span class="method post">POST</span>
+            <strong>/api/channels</strong> - Create new channel
+            <div class="form-group">
+                <label>Channel Name:</label>
+                <input type="text" id="create-channel-name" placeholder="Enter channel name">
+            </div>
+            <div class="form-group">
+                <label>Server ID:</label>
+                <input type="text" id="create-channel-server-id" placeholder="Enter server ID">
+            </div>
+            <button onclick="createChannel()">Create Channel</button>
+            <div id="create-channel-response" class="response"></div>
+        </div>
+
+        <div class="endpoint">
+            <span class="method get">GET</span>
+            <strong>/api/channels/server/:serverId</strong> - Get channels for a server
+            <div class="form-group">
+                <label>Server ID:</label>
+                <input type="text" id="get-channels-server-id" placeholder="Enter server ID">
+            </div>
+            <button onclick="getChannels()">Get Channels</button>
+            <div id="get-channels-response" class="response"></div>
+        </div>
+
+        <div class="endpoint">
+            <span class="method get">GET</span>
+            <strong>/api/channels/:channelId</strong> - Get channel with messages
+            <div class="form-group">
+                <label>Channel ID:</label>
+                <input type="text" id="get-channel-id" placeholder="Enter channel ID">
+            </div>
+            <button onclick="getChannel()">Get Channel</button>
+            <div id="get-channel-response" class="response"></div>
+        </div>
+
+        <div class="endpoint">
+            <span class="method delete">DELETE</span>
+            <strong>/api/channels/:channelId</strong> - Delete channel
+            <div class="form-group">
+                <label>Channel ID:</label>
+                <input type="text" id="delete-channel-id" placeholder="Enter channel ID">
+            </div>
+            <button onclick="deleteChannel()">Delete Channel</button>
+            <div id="delete-channel-response" class="response"></div>
+        </div>
+
         <h2>🔧 Utility Endpoints</h2>
         
         <div class="endpoint">
@@ -103,8 +220,18 @@
         <ol>
             <li>Register a new user or login to get a JWT token</li>
             <li>The token will be automatically stored and used for protected routes</li>
-            <li>Test the protected endpoints to verify authentication works</li>
-            <li>Check the responses for detailed API information</li>
+            <li>Test protected endpoints to verify authentication works</li>
+            <li>Create servers and channels to test the full functionality</li>
+            <li>Check responses for detailed API information</li>
+        </ol>
+        
+        <h2>🧪 Testing Workflow</h2>
+        <ol>
+            <li><strong>Authentication:</strong> Register/Login to get your token</li>
+            <li><strong>Create Server:</strong> Use the server management section to create a new server</li>
+            <li><strong>Create Channel:</strong> Use the server ID from step 2 to create channels</li>
+            <li><strong>Fetch Data:</strong> Test GET endpoints to retrieve your servers and channels</li>
+            <li><strong>Update/Delete:</strong> Test PUT and DELETE operations on your resources</li>
         </ol>
     </div>
 
@@ -220,6 +347,125 @@
         async function apiInfo() {
             const response = await makeRequest('GET', '/api');
             showResponse('api-response', response);
+        }
+
+        // Server Management Functions
+        async function createServer() {
+            const name = document.getElementById('create-server-name').value;
+            const icon = document.getElementById('create-server-icon').value;
+
+            if (!name) {
+                showResponse('create-server-response', { error: 'Server name is required' });
+                return;
+            }
+
+            const data = { name };
+            if (icon) data.icon = icon;
+
+            const response = await makeRequest('POST', '/api/servers', data);
+            showResponse('create-server-response', response);
+        }
+
+        async function getServers() {
+            const response = await makeRequest('GET', '/api/servers');
+            showResponse('get-servers-response', response);
+        }
+
+        async function getServer() {
+            const serverId = document.getElementById('get-server-id').value;
+
+            if (!serverId) {
+                showResponse('get-server-response', { error: 'Server ID is required' });
+                return;
+            }
+
+            const response = await makeRequest('GET', '/api/servers/' + serverId);
+            showResponse('get-server-response', response);
+        }
+
+        async function updateServer() {
+            const serverId = document.getElementById('update-server-id').value;
+            const name = document.getElementById('update-server-name').value;
+            const icon = document.getElementById('update-server-icon').value;
+
+            if (!serverId) {
+                showResponse('update-server-response', { error: 'Server ID is required' });
+                return;
+            }
+
+            const data = {};
+            if (name) data.name = name;
+            if (icon) data.icon = icon;
+
+            if (Object.keys(data).length === 0) {
+                showResponse('update-server-response', { error: 'At least one field to update is required' });
+                return;
+            }
+
+            const response = await makeRequest('PUT', '/api/servers/' + serverId, data);
+            showResponse('update-server-response', response);
+        }
+
+        async function deleteServer() {
+            const serverId = document.getElementById('delete-server-id').value;
+
+            if (!serverId) {
+                showResponse('delete-server-response', { error: 'Server ID is required' });
+                return;
+            }
+
+            const response = await makeRequest('DELETE', '/api/servers/' + serverId);
+            showResponse('delete-server-response', response);
+        }
+
+        // Channel Management Functions
+        async function createChannel() {
+            const name = document.getElementById('create-channel-name').value;
+            const serverId = document.getElementById('create-channel-server-id').value;
+
+            if (!name || !serverId) {
+                showResponse('create-channel-response', { error: 'Channel name and server ID are required' });
+                return;
+            }
+
+            const response = await makeRequest('POST', '/api/channels', { name, serverId });
+            showResponse('create-channel-response', response);
+        }
+
+        async function getChannels() {
+            const serverId = document.getElementById('get-channels-server-id').value;
+
+            if (!serverId) {
+                showResponse('get-channels-response', { error: 'Server ID is required' });
+                return;
+            }
+
+            const response = await makeRequest('GET', '/api/channels/server/' + serverId);
+            showResponse('get-channels-response', response);
+        }
+
+        async function getChannel() {
+            const channelId = document.getElementById('get-channel-id').value;
+
+            if (!channelId) {
+                showResponse('get-channel-response', { error: 'Channel ID is required' });
+                return;
+            }
+
+            const response = await makeRequest('GET', '/api/channels/' + channelId);
+            showResponse('get-channel-response', response);
+        }
+
+        async function deleteChannel() {
+            const channelId = document.getElementById('delete-channel-id').value;
+
+            if (!channelId) {
+                showResponse('delete-channel-response', { error: 'Channel ID is required' });
+                return;
+            }
+
+            const response = await makeRequest('DELETE', '/api/channels/' + channelId);
+            showResponse('delete-channel-response', response);
         }
     </script>
 </body>

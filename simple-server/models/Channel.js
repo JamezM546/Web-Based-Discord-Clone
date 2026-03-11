@@ -3,15 +3,15 @@ const { pool } = require('../config/database');
 class Channel {
   // Create a new channel
   static async create(channelData) {
-    const { id, name, serverId, type = 'text', position = 0 } = channelData;
+    const { id, name, serverId, position = 0 } = channelData;
     
     const query = `
-      INSERT INTO channels (id, name, server_id, type, position)
-      VALUES ($1, $2, $3, $4, $5)
+      INSERT INTO channels (id, name, server_id, position)
+      VALUES ($1, $2, $3, $4)
       RETURNING *
     `;
     
-    const values = [id, name, serverId, type, position];
+    const values = [id, name, serverId, position];
     
     try {
       const result = await pool.query(query, values);
@@ -51,7 +51,7 @@ class Channel {
 
   // Update channel
   static async update(id, updates) {
-    const allowedFields = ['name', 'type', 'position'];
+    const allowedFields = ['name', 'position'];
     const fields = [];
     const values = [];
     let paramIndex = 1;
