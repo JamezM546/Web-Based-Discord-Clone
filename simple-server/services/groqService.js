@@ -2,7 +2,7 @@ const https = require('https');
 
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const GROQ_BASE_URL = process.env.GROQ_BASE_URL || 'https://api.groq.com';
-const GROQ_SUMMARY_MODEL = process.env.GROQ_MODEL_SUMMARY || 'llama-3.1-70b-versatile';
+const GROQ_SUMMARY_MODEL = process.env.GROQ_MODEL_SUMMARY || 'llama-3.3-70b-versatile';
 const GROQ_PREVIEW_MODEL = process.env.GROQ_MODEL_PREVIEW || 'llama-3.1-8b-instant';
 
 if (!GROQ_API_KEY) {
