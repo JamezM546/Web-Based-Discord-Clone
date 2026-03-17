@@ -34,6 +34,16 @@ const messageSchema = Joi.object({
   serverInviteId: Joi.string().optional()
 }).or('channelId', 'dmId');
 
+// Summary request validation schema
+const summaryRequestSchema = Joi.object({
+  channelId: Joi.string().required(),
+  options: Joi.object({
+    maxMessages: Joi.number().integer().min(1).max(200).optional(),
+    timeWindow: Joi.number().integer().min(1).max(24 * 60).optional(),
+    format: Joi.string().valid('bullets', 'paragraph').optional()
+  }).optional()
+});
+
 // Generic validation middleware
 const validate = (schema) => {
   return (req, res, next) => {
@@ -55,5 +65,6 @@ module.exports = {
   serverSchema,
   channelSchema,
   messageSchema,
+  summaryRequestSchema,
   validate
 };
