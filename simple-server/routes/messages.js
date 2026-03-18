@@ -401,5 +401,134 @@ router.get('/:messageId/reactions', authenticateToken, async (req, res) => {
   }
 });
 
+// Search messages in a channel
+router.get('/search/channel/:channelId', authenticateToken, async (req, res) => {
+  try {
+    const { channelId } = req.params;
+    const userId = req.user.id;
+
+    const q = String(req.query.q || '').trim();
+    if (!q) {
+      return res.status(400).json({
+        success: false,
+        message: 'Query parameter `q` is required',
+      });
+    }
+
+    const access = await Channel.hasAccess(channelId, userId);
+    if (!access) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: No permission to view this channel',
+      });
+    }
+
+    const limit = parseInt(req.query.limit, 10) || 20;
+    const messages = await Message.searchInChannel(channelId, q, limit);
+    const messagesWithReactions = await attachReactionsToMessages(messages);
+
+    res.status(200).json({
+      success: true,
+      data: { messages: messagesWithReactions },
+    });
+  } catch (error) {
+    console.error('Error searching channel messages:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to search channel messages',
+    });
+  }
+});
+
+// Search messages in a DM
+router.get('/search/dm/:dmId', authenticateToken, async (req, res) => {
+  try {
+    const { dmId } = req.params;
+    const userId = req.user.id;
+
+    const q = String(req.query.q || '').trim();
+    if (!q) {
+      return res.status(400).json({
+        success: false,
+        message: 'Query parameter `q` is required',
+      });
+    }
+
+    const dmAccess = await pool.query(
+      'SELECT 1 FROM direct_messages WHERE id = $1 AND $2 = ANY(participants) LIMIT 1',
+      [dmId, userId]
+    );
+    if (dmAccess.rowCount === 0) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: No permission to view this DM',
+      });
+    }
+
+    const limit = parseInt(req.query.limit, 10) || 20;
+    const messages = await Message.searchInDm(dmId, q, limit);
+    const messagesWithReactions = await attachReactionsToMessages(messages);
+
+    res.status(200).json({
+      success: true,
+      data: { messages: messagesWithReactions },
+    });
+  } catch (error) {
+    console.error('Error searching DM messages:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to search DM messages',
+    });
+  }
+});
+
+// Get a single message by ID
+router.get('/:messageId', authenticateToken, async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const userId = req.user.id;
+
+    const accessRow = await Message.hasAccess(messageId, userId);
+    if (!accessRow) {
+      return res.status(404).json({
+        success: false,
+        message: 'Message not found',
+      });
+    }
+    if (!accessRow.has_access) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: No permission to view this message',
+      });
+    }
+
+    const message = await Message.findById(messageId);
+    if (!message) {
+      return res.status(404).json({
+        success: false,
+        message: 'Message not found',
+      });
+    }
+
+    // Include reactions so the frontend/docs can display them if needed.
+    const reactionsWithUsers = await Message.getReactions(messageId);
+    const reactions = reactionsWithUsers.map((r) => ({
+      emoji: r.emoji,
+      users: (r.users || []).map((u) => u.id),
+    }));
+
+    res.status(200).json({
+      success: true,
+      data: { message: { ...message, reactions } },
+    });
+  } catch (error) {
+    console.error('Error fetching single message:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to fetch message',
+    });
+  }
+});
+
 module.exports = router;
 
