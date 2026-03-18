@@ -346,13 +346,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       };
 
       setServers([...servers, newServer]);
-
-      const generalChannel: Channel = {
-        id: `c-temp-${Date.now()}`, 
-        name: 'general',
-        serverId: newServer.id,
-      };
-      setChannels(prevChannels => [...prevChannels, generalChannel]);
+      
+      // The backend already creates the default "general" channel.
+      // Fetch channels for this new server so UI matches the database state.
+      try {
+        await fetchChannels([newServer.id]);
+      } catch (channelError) {
+        console.error('Failed to fetch channels for new server:', channelError);
+      }
 
       setSelectedServer(newServer);
       
