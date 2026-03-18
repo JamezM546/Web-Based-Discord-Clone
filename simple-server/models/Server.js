@@ -77,7 +77,7 @@ class Server {
   static async findByIdWithChannels(id) {
     const query = `
       SELECT s.*, 
-             c.id as channel_id, c.name as channel_name, c.type, c.position
+             c.id as channel_id, c.name as channel_name, c.position
       FROM servers s
       LEFT JOIN channels c ON s.id = c.server_id
       WHERE s.id = $1
@@ -98,7 +98,6 @@ class Server {
         channels: result.rows.map(row => ({
           id: row.channel_id,
           name: row.channel_name,
-          type: row.type,
           position: row.position
         })).filter(channel => channel.id) // Filter out null channels
       };

@@ -200,6 +200,18 @@
         
         <div class="endpoint">
             <span class="method post">POST</span>
+            <strong>/api/messages/dms</strong> - Create a DM
+            <div class="form-group">
+                <label>Other User ID:</label>
+                <input type="text" id="create-dm-other-user-id" placeholder="Enter other user ID">
+            </div>
+            <button onclick="createDM()">Create DM</button>
+            <div id="create-dm-response" class="response"></div>
+        </div>
+
+
+        <div class="endpoint">
+            <span class="method post">POST</span>
             <strong>/api/messages</strong> - Send a message
             <div class="form-group">
                 <label>Content:</label>
@@ -207,7 +219,7 @@
             </div>
             <div class="form-group">
                 <label>Channel ID:</label>
-                <input type="text" id="message-channel-id" placeholder="Enter channel ID (or DM ID)">
+                <input type="text" id="message-channel-id" placeholder="Enter channel ID">
             </div>
             <div class="form-group">
                 <label>DM ID (optional):</label>
@@ -226,6 +238,24 @@
             </div>
             <button onclick="getChannelMessages()">Get Messages</button>
             <div id="get-messages-response" class="response"></div>
+        </div>
+
+        <div class="endpoint">
+            <span class="method get">GET</span>
+            <strong>/api/messages/dms</strong> - Get all DMs for current user
+            <button onclick="getDMs()">Get My DMs</button>
+            <div id="get-dms-response" class="response"></div>
+        </div>
+
+        <div class="endpoint">
+            <span class="method get">GET</span>
+            <strong>/api/messages/dm/:dmId</strong> - Get DM messages
+            <div class="form-group">
+                <label>DM ID:</label>
+                <input type="text" id="get-dm-messages-id" placeholder="Enter DM ID">
+            </div>
+            <button onclick="getDmMessages()">Get DM Messages</button>
+            <div id="get-dm-messages-response" class="response"></div>
         </div>
 
         <div class="endpoint">
@@ -267,6 +297,21 @@
             </div>
             <button onclick="searchMessages()">Search Messages</button>
             <div id="search-messages-response" class="response"></div>
+        </div>
+
+        <div class="endpoint">
+            <span class="method get">GET</span>
+            <strong>/api/messages/search/dm/:dmId</strong> - Search DM messages
+            <div class="form-group">
+                <label>DM ID:</label>
+                <input type="text" id="search-dm-id" placeholder="Enter DM ID">
+            </div>
+            <div class="form-group">
+                <label>Search Query:</label>
+                <input type="text" id="search-dm-query" placeholder="Enter search term">
+            </div>
+            <button onclick="searchDmMessages()">Search DM Messages</button>
+            <div id="search-dm-messages-response" class="response"></div>
         </div>
 
         <div class="endpoint">
@@ -363,7 +408,7 @@
             <li><strong>Fetch Data:</strong> Test GET endpoints to retrieve your servers, channels, and messages</li>
             <li><strong>Update/Delete:</strong>Test PUT and DELETE operations on your resources</li>
         </ol>
-
+    </div>
     <script>
         let currentToken = '';
 
@@ -628,6 +673,18 @@
             showResponse('get-messages-response', response);
         }
 
+        async function getDmMessages() {
+            const dmId = document.getElementById('get-dm-messages-id').value;
+
+            if (!dmId) {
+                showResponse('get-dm-messages-response', { error: 'DM ID is required' });
+                return;
+            }
+
+            const response = await makeRequest('GET', '/api/messages/dm/' + dmId);
+            showResponse('get-dm-messages-response', response);
+}
+
         async function getMessage() {
             const messageId = document.getElementById('get-message-id').value;
 
@@ -721,6 +778,45 @@
 
             const response = await makeRequest('GET', '/api/messages/search/channel/' + channelId + '?q=' + encodeURIComponent(q));
             showResponse('search-messages-response', response);
+        }
+
+        async function searchDmMessages() {
+            const dmId = document.getElementById('search-dm-id').value;
+            const q = document.getElementById('search-dm-query').value;
+
+            if (!dmId || !q) {
+                showResponse('search-dm-messages-response', {
+                    status: 400,
+                    data: { error: 'DM ID and search query are required' }
+                });
+                return;
+            }
+
+            const response = await makeRequest(
+                'GET',
+                '/api/messages/search/dm/' + dmId + '?q=' + encodeURIComponent(q)
+            );
+            showResponse('search-dm-messages-response', response);
+        }
+
+        async function createDM() {
+            const otherUserId = document.getElementById('create-dm-other-user-id').value;
+
+            if (!otherUserId) {
+                showResponse('create-dm-response', {
+                    status: 400,
+                    data: { error: 'Other user ID is required' }
+                });
+                return;
+            }
+
+            const response = await makeRequest('POST', '/api/messages/dms', { otherUserId });
+            showResponse('create-dm-response', response);
+        }
+
+        async function getDMs() {
+            const response = await makeRequest('GET', '/api/messages/dms');
+            showResponse('get-dms-response', response);
         }
 
         // Public endpoints (no auth required) Can delete.

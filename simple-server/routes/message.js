@@ -31,6 +31,22 @@ router.post('/', authenticateToken, validate(messageSchema), async (req, res) =>
       }
     }
 
+    if (dmId) {
+      const { pool } = require('../config/database');
+      const dmQuery = `
+        SELECT * FROM direct_messages
+        WHERE id = $1 AND $2 = ANY(participants)
+      `;
+      const dmResult = await pool.query(dmQuery, [dmId, authorId]);
+
+      if (dmResult.rows.length === 0) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied: Not a participant in this DM'
+    });
+  }
+}
+
     // Generate unique message ID
     const messageId = `m${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
@@ -101,6 +117,146 @@ router.get('/channel/:channelId', authenticateToken, async (req, res) => {
   }
 });
 
+// Get messages for a DM
+router.get('/dm/:dmId', authenticateToken, async (req, res) => {
+  try {
+    const { dmId } = req.params;
+    const userId = req.user.id;
+    const limit = parseInt(req.query.limit) || 50;
+    const before = req.query.before || null;
+
+    const { pool } = require('../config/database');
+    const dmQuery = `
+      SELECT * FROM direct_messages
+      WHERE id = $1 AND $2 = ANY(participants)
+    `;
+    const dmResult = await pool.query(dmQuery, [dmId, userId]);
+
+    if (dmResult.rows.length === 0) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: Not a participant in this DM'
+      });
+    }
+
+    const messages = await Message.findByDmId(dmId, limit, before);
+
+    res.status(200).json({
+      success: true,
+      data: { messages }
+    });
+  } catch (error) {
+    console.error('Error fetching DM messages:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch DM messages'
+    });
+  }
+});
+
+//Get DM ID's for current user
+router.get('/dms', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const { pool } = require('../config/database');
+    const query = `
+      SELECT *
+      FROM direct_messages
+      WHERE $1 = ANY(participants)
+    `;
+
+    const result = await pool.query(query, [userId]);
+
+    res.status(200).json({
+      success: true,
+      data: { dms: result.rows }
+    });
+  } catch (error) {
+    console.error('Error fetching DMs:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch DMs'
+    });
+  }
+});
+
+// Create a DM
+router.post('/dms', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { otherUserId } = req.body;
+
+    if (!otherUserId) {
+      return res.status(400).json({
+        success: false,
+        message: 'otherUserId is required'
+      });
+    }
+
+    if (otherUserId === userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'You cannot create a DM with yourself'
+      });
+    }
+
+    const { pool } = require('../config/database');
+
+    // Check other user exists
+    const userCheck = await pool.query(
+      'SELECT id, username FROM users WHERE id = $1',
+      [otherUserId]
+    );
+
+    if (userCheck.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Other user not found'
+      });
+    }
+
+    // Check if DM already exists between exactly these 2 users
+    const existingDmQuery = `
+      SELECT *
+      FROM direct_messages
+      WHERE participants @> ARRAY[$1, $2]::text[]
+        AND array_length(participants, 1) = 2
+      LIMIT 1
+    `;
+    const existingDm = await pool.query(existingDmQuery, [userId, otherUserId]);
+
+    if (existingDm.rows.length > 0) {
+      return res.status(200).json({
+        success: true,
+        message: 'DM already exists',
+        data: { dm: existingDm.rows[0] }
+      });
+    }
+
+    // Create DM
+    const dmId = `dm_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+
+    const createDmQuery = `
+      INSERT INTO direct_messages (id, participants)
+      VALUES ($1, $2)
+      RETURNING *
+    `;
+    const newDm = await pool.query(createDmQuery, [dmId, [userId, otherUserId]]);
+
+    res.status(201).json({
+      success: true,
+      message: 'DM created successfully',
+      data: { dm: newDm.rows[0] }
+    });
+  } catch (error) {
+    console.error('Error creating DM:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create DM'
+    });
+  }
+});
 
 // Get single message by ID
 router.get('/:messageId', authenticateToken, async (req, res) => {
