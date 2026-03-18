@@ -200,7 +200,7 @@
         
         <div class="endpoint">
             <span class="method post">POST</span>
-            <strong>/api/messages/dms</strong> - Create a DM
+            <strong>/api/direct-messages</strong> - Create a DM
             <div class="form-group">
                 <label>Other User ID:</label>
                 <input type="text" id="create-dm-other-user-id" placeholder="Enter other user ID">
@@ -231,7 +231,7 @@
 
         <div class="endpoint">
             <span class="method get">GET</span>
-            <strong>/api/messages/channel/:channelId</strong> - Get channel messages
+            <strong>/api/messages/channels/:channelId</strong> - Get channel messages
             <div class="form-group">
                 <label>Channel ID:</label>
                 <input type="text" id="get-channel-messages-id" placeholder="Enter channel ID">
@@ -242,7 +242,7 @@
 
         <div class="endpoint">
             <span class="method get">GET</span>
-            <strong>/api/messages/dms</strong> - Get all DMs for current user
+            <strong>/api/direct-messages</strong> - Get all DMs for current user
             <button onclick="getDMs()">Get My DMs</button>
             <div id="get-dms-response" class="response"></div>
         </div>
@@ -327,7 +327,7 @@
 
         <div class="endpoint">
             <span class="method post">POST</span>
-            <strong>/api/messages/:messageId/reactions</strong> - Add reaction
+            <strong>/api/messages/:messageId/reactions/toggle</strong> - Toggle reaction
             <div class="form-group">
                 <label>Message ID:</label>
                 <input type="text" id="reaction-message-id" placeholder="Enter message ID">
@@ -353,7 +353,7 @@
 
         <div class="endpoint">
             <span class="method delete">DELETE</span>
-            <strong>/api/messages/:messageId/reactions</strong> - Remove reaction
+            <strong>/api/messages/:messageId/reactions/toggle</strong> - Toggle reaction
             <div class="form-group">
                  <label>Message ID:</label>
                  <input type="text" id="remove-reaction-message-id" placeholder="Enter message ID">
@@ -669,7 +669,7 @@
                 return;
             }
 
-            const response = await makeRequest('GET', '/api/messages/channel/' + channelId);
+            const response = await makeRequest('GET', '/api/messages/channels/' + channelId);
             showResponse('get-messages-response', response);
         }
 
@@ -731,7 +731,7 @@
                 return;
             }
 
-            const response = await makeRequest('POST', '/api/messages/' + messageId + '/reactions', { emoji });
+            const response = await makeRequest('POST', '/api/messages/' + messageId + '/reactions/toggle', { emoji });
             showResponse('reaction-response', response);
         }
 
@@ -760,9 +760,10 @@
             }
 
             const response = await makeRequest(
-                'DELETE',
-                '/api/messages/' + messageId + '/reactions?emoji=' + encodeURIComponent(emoji)
-    );
+                'POST',
+                '/api/messages/' + messageId + '/reactions/toggle',
+                { emoji }
+            );
 
     showResponse('remove-reaction-response', response);
 }
@@ -810,12 +811,12 @@
                 return;
             }
 
-            const response = await makeRequest('POST', '/api/messages/dms', { otherUserId });
+            const response = await makeRequest('POST', '/api/direct-messages', { userId: otherUserId });
             showResponse('create-dm-response', response);
         }
 
         async function getDMs() {
-            const response = await makeRequest('GET', '/api/messages/dms');
+            const response = await makeRequest('GET', '/api/direct-messages');
             showResponse('get-dms-response', response);
         }
 

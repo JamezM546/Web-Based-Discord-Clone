@@ -228,34 +228,61 @@ class ApiService {
   }
 
   // Message Methods
-  async createMessage(messageData: { content: string; channelId?: string; dmId?: string; replyToId?: string; serverInviteId?: string }): Promise<any> {
-    return this.request<any>('/api/messages', {
+  async getChannelMessages(
+    channelId: string,
+    options?: { limit?: number; before?: string }
+  ): Promise<any[]> {
+    const limit = options?.limit ?? 50;
+    const before = options?.before;
+    const url = before
+      ? `/api/messages/channels/${channelId}?limit=${limit}&before=${encodeURIComponent(before)}`
+      : `/api/messages/channels/${channelId}?limit=${limit}`;
+
+    const response = await this.request<{ messages: any[] }>(url);
+    return response.data?.messages || [];
+  }
+
+  async getDmMessages(
+    dmId: string,
+    options?: { limit?: number; before?: string }
+  ): Promise<any[]> {
+    const limit = options?.limit ?? 50;
+    const before = options?.before;
+    const url = before
+      ? `/api/messages/dm/${dmId}?limit=${limit}&before=${encodeURIComponent(before)}`
+      : `/api/messages/dm/${dmId}?limit=${limit}`;
+
+    const response = await this.request<{ messages: any[] }>(url);
+    return response.data?.messages || [];
+  }
+
+  async createMessage(payload: {
+    content: string;
+    channelId?: string;
+    dmId?: string;
+    replyToId?: string;
+    serverInviteId?: string;
+  }): Promise<any> {
+    const response = await this.request<{ message: any }>('/api/messages', {
       method: 'POST',
-      body: JSON.stringify(messageData),
+      body: JSON.stringify({
+        content: payload.content,
+        channelId: payload.channelId,
+        dmId: payload.dmId,
+        replyToId: payload.replyToId,
+        serverInviteId: payload.serverInviteId,
+      }),
     });
+
+    return response.data?.message;
   }
 
-  async getChannelMessages(channelId: string, limit?: number): Promise<any[]> {
-    const url = limit ? `/api/messages/channel/${channelId}?limit=${limit}` : `/api/messages/channel/${channelId}`;
-    const response = await this.request<{ messages: any[] }>(url);
-    return response.data?.messages || [];
-  }
-
-  async getDmMessages(dmId: string, limit?: number): Promise<any[]> {
-    const url = limit ? `/api/messages/dm/${dmId}?limit=${limit}` : `/api/messages/dm/${dmId}`;
-    const response = await this.request<{ messages: any[] }>(url);
-    return response.data?.messages || [];
-  }
-
-  async getMessage(messageId: string): Promise<any> {
-    return this.request<any>(`/api/messages/${messageId}`);
-  }
-
-  async updateMessage(messageId: string, content: string): Promise<any> {
-    return this.request<any>(`/api/messages/${messageId}`, {
+  async editMessage(messageId: string, content: string): Promise<any> {
+    const response = await this.request<{ message: any }>(`/api/messages/${messageId}`, {
       method: 'PUT',
       body: JSON.stringify({ content }),
     });
+    return response.data?.message;
   }
 
   async deleteMessage(messageId: string): Promise<void> {
@@ -264,30 +291,32 @@ class ApiService {
     });
   }
 
-  async addReaction(messageId: string, emoji: string): Promise<any> {
-    return this.request<any>(`/api/messages/${messageId}/reactions`, {
+  async toggleReaction(messageId: string, emoji: string): Promise<{ reactions: any[] }> {
+    const response = await this.request<{ messageId: string; reactions: any[]; added: boolean }>(
+      `/api/messages/${messageId}/reactions/toggle`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ emoji }),
+      }
+    );
+
+    return { reactions: response.data?.reactions || [] };
+  }
+
+  // Direct Message Methods
+  async getDirectMessages(): Promise<any[]> {
+    const response = await this.request<{ directMessages: any[] }>('/api/direct-messages', {
+      method: 'GET',
+    });
+    return response.data?.directMessages || [];
+  }
+
+  async createDirectMessage(userId: string): Promise<any> {
+    const response = await this.request<{ directMessage: any }>('/api/direct-messages', {
       method: 'POST',
-      body: JSON.stringify({ emoji }),
+      body: JSON.stringify({ userId }),
     });
-  }
-
-  async removeReaction(messageId: string, emoji: string): Promise<void> {
-    await this.request(`/api/messages/${messageId}/reactions?emoji=${encodeURIComponent(emoji)}`, {
-      method: 'DELETE',
-    });
-  }
-
-  async getReactions(messageId: string): Promise<any[]> {
-    const response = await this.request<{ reactions: any[] }>(`/api/messages/${messageId}/reactions`);
-    return response.data?.reactions || [];
-  }
-
-  async searchMessages(channelId: string, query: string, limit?: number): Promise<any[]> {
-    const url = limit 
-      ? `/api/messages/search/channel/${channelId}?q=${encodeURIComponent(query)}&limit=${limit}`
-      : `/api/messages/search/channel/${channelId}?q=${encodeURIComponent(query)}`;
-    const response = await this.request<{ messages: any[] }>(url);
-    return response.data?.messages || [];
+    return response.data?.directMessage;
   }
 }
 

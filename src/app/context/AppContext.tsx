@@ -296,6 +296,46 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  const mapBackendMessageRowToFrontend = (row: any): Message => {
+    return {
+      id: row.id,
+      content: row.content,
+      authorId: row.author_id,
+      channelId: row.channel_id || undefined,
+      dmId: row.dm_id || undefined,
+      timestamp: new Date(row.timestamp),
+      edited: !!row.edited,
+      replyToId: row.reply_to_id || undefined,
+      serverInviteId: row.server_invite_id || undefined,
+      reactions: row.reactions || undefined,
+    };
+  };
+
+  const mergeUsersFromMessageRows = (rows: any[]) => {
+    if (!rows || rows.length === 0) return;
+
+    const authorUsers: User[] = rows
+      .filter((r) => r.author_id && r.username)
+      .map((r) => ({
+        id: r.author_id,
+        username: r.username,
+        displayName: r.display_name || undefined,
+        email: '',
+        avatar: r.avatar,
+        status: 'online',
+      }));
+
+    if (authorUsers.length === 0) return;
+
+    setUsers((prev) => {
+      const existingById = new Map(prev.map((u) => [u.id, u]));
+      for (const u of authorUsers) {
+        if (!existingById.has(u.id)) existingById.set(u.id, u);
+      }
+      return Array.from(existingById.values());
+    });
+  };
+
   // Check for existing authentication on app load
   useEffect(() => {
     const checkAuth = async () => {
@@ -314,6 +354,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             
             // Fetch user's servers from backend
             await fetchUserServers();
+            await fetchUserDirectMessages();
           }
         } catch (error) {
           console.error('Failed to restore authentication:', error);
@@ -325,6 +366,47 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     checkAuth();
   }, []);
+
+  // Fetch messages whenever you switch rooms/chats
+  useEffect(() => {
+    if (!currentUser) return;
+
+    let cancelled = false;
+    const run = async () => {
+      try {
+        if (selectedChannel?.id) {
+          const rows = await apiService.getChannelMessages(selectedChannel.id);
+          if (cancelled) return;
+          mergeUsersFromMessageRows(rows);
+          setMessages(rows.map(mapBackendMessageRowToFrontend));
+          setReplyingTo(null);
+          return;
+        }
+
+        if (selectedDM?.id) {
+          const rows = await apiService.getDmMessages(selectedDM.id);
+          if (cancelled) return;
+          mergeUsersFromMessageRows(rows);
+          setMessages(rows.map(mapBackendMessageRowToFrontend));
+          setReplyingTo(null);
+          return;
+        }
+
+        // No selection: clear the message list so the UI doesn't show stale messages.
+        setMessages([]);
+        setReplyingTo(null);
+      } catch (error) {
+        console.error('Failed to fetch messages:', error);
+        if (cancelled) return;
+        setMessages([]);
+      }
+    };
+
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedChannel?.id, selectedDM?.id, currentUser?.id]);
 
   const createServer = async (name: string, icon: string) => {
     if (!currentUser) return;
@@ -509,90 +591,82 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
-  const sendMessage = (content: string, channelId?: string, dmId?: string, replyToId?: string, serverInviteId?: string) => {
+  const sendMessage = (
+    content: string,
+    channelId?: string,
+    dmId?: string,
+    replyToId?: string,
+    serverInviteId?: string
+  ) => {
     if (!currentUser) return;
-    const newMessage: Message = {
-      id: `m${messages.length + 1}`,
-      content,
-      authorId: currentUser.id,
-      channelId,
-      dmId,
-      timestamp: new Date(),
-      replyToId,
-      serverInviteId,
-    };
-    setMessages([...messages, newMessage]);
 
-    // Update DM last message time
-    if (dmId) {
-      setDirectMessages(
-        directMessages.map((dm) =>
-          dm.id === dmId ? { ...dm, lastMessageTime: new Date() } : dm
-        )
-      );
-    }
+    void (async () => {
+      try {
+        const messageRow = await apiService.createMessage({
+          content,
+          channelId,
+          dmId,
+          replyToId,
+          serverInviteId,
+        });
+
+        // Update author info so MessageItem can render the author avatar/name.
+        mergeUsersFromMessageRows([messageRow]);
+        setMessages((prev) => [...prev, mapBackendMessageRowToFrontend(messageRow)]);
+
+        // Update DM last message time so the DM list sorts correctly.
+        if (dmId) {
+          setDirectMessages((prev) =>
+            prev.map((dm) => (dm.id === dmId ? { ...dm, lastMessageTime: new Date() } : dm))
+          );
+        }
+      } catch (error) {
+        console.error('Failed to send message:', error);
+      }
+    })();
   };
 
   const editMessage = (messageId: string, newContent: string) => {
-    setMessages(
-      messages.map((m) =>
-        m.id === messageId ? { ...m, content: newContent, edited: true } : m
-      )
-    );
+    if (!currentUser) return;
+
+    void (async () => {
+      try {
+        const messageRow = await apiService.editMessage(messageId, newContent);
+        mergeUsersFromMessageRows([messageRow]);
+        const mapped = mapBackendMessageRowToFrontend(messageRow);
+        setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, ...mapped } : m)));
+      } catch (error) {
+        console.error('Failed to edit message:', error);
+      }
+    })();
   };
 
   const deleteMessage = (messageId: string) => {
-    setMessages(messages.filter((m) => m.id !== messageId));
+    if (!currentUser) return;
+
+    void (async () => {
+      try {
+        await apiService.deleteMessage(messageId);
+        setMessages((prev) => prev.filter((m) => m.id !== messageId));
+      } catch (error) {
+        console.error('Failed to delete message:', error);
+      }
+    })();
   };
 
   const toggleReaction = (messageId: string, emoji: string) => {
     if (!currentUser) return;
-    
-    setMessages(
-      messages.map((m) => {
-        if (m.id !== messageId) return m;
-        
-        const reactions = m.reactions || [];
-        const existingReaction = reactions.find((r) => r.emoji === emoji);
-        
-        if (existingReaction) {
-          // If user already reacted with this emoji, remove their reaction
-          const userIndex = existingReaction.users.indexOf(currentUser.id);
-          if (userIndex > -1) {
-            const updatedUsers = existingReaction.users.filter((id) => id !== currentUser.id);
-            if (updatedUsers.length === 0) {
-              // Remove reaction entirely if no users left
-              return {
-                ...m,
-                reactions: reactions.filter((r) => r.emoji !== emoji),
-              };
-            } else {
-              // Update the reaction with remaining users
-              return {
-                ...m,
-                reactions: reactions.map((r) =>
-                  r.emoji === emoji ? { ...r, users: updatedUsers } : r
-                ),
-              };
-            }
-          } else {
-            // Add user to existing reaction
-            return {
-              ...m,
-              reactions: reactions.map((r) =>
-                r.emoji === emoji ? { ...r, users: [...r.users, currentUser.id] } : r
-              ),
-            };
-          }
-        } else {
-          // Add new reaction
-          return {
-            ...m,
-            reactions: [...reactions, { emoji, users: [currentUser.id] }],
-          };
-        }
-      })
-    );
+
+    void (async () => {
+      try {
+        const { reactions } = await apiService.toggleReaction(messageId, emoji);
+        setMessages((prev) =>
+          prev.map((m) => (m.id === messageId ? { ...m, reactions } : m))
+        );
+      } catch (error) {
+        console.error('Failed to toggle reaction:', error);
+      }
+    })();
   };
 
   const sendFriendRequest = (toUserId: string) => {
@@ -632,23 +706,61 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const createDirectMessage = (userId: string) => {
     if (!currentUser) return;
+
     const exists = directMessages.find(
       (dm) =>
         dm.participants.includes(currentUser.id) && dm.participants.includes(userId)
     );
-    if (!exists) {
-      const newDM: DirectMessage = {
-        id: `dm${directMessages.length + 1}`,
-        participants: [currentUser.id, userId],
-        lastMessageTime: new Date(),
-      };
-      setDirectMessages([...directMessages, newDM]);
-      setSelectedDM(newDM);
-    } else {
+
+    if (exists) {
       setSelectedDM(exists);
+      setSelectedServer(null);
+      setSelectedChannel(null);
+      setReplyingTo(null);
+      return;
     }
-    setSelectedServer(null);
-    setSelectedChannel(null);
+
+    void (async () => {
+      try {
+        const dmRow = await apiService.createDirectMessage(userId);
+
+        const newDM: DirectMessage = {
+          id: dmRow.id,
+          participants: dmRow.participants,
+          lastMessageTime: new Date(dmRow.last_message_time),
+        };
+
+        setDirectMessages((prev) => {
+          const alreadyThere = prev.some((d) => d.id === newDM.id);
+          if (alreadyThere) return prev;
+          return [...prev, newDM];
+        });
+
+        // Upsert the other user so DM list/header can render.
+        if (dmRow.other_user_id && dmRow.username) {
+          const otherUser: User = {
+            id: dmRow.other_user_id,
+            username: dmRow.username,
+            displayName: dmRow.display_name || undefined,
+            email: '',
+            avatar: dmRow.avatar,
+            status: (dmRow.status || 'online') as User['status'],
+          };
+
+          setUsers((prev) => {
+            if (prev.some((u) => u.id === otherUser.id)) return prev;
+            return [...prev, otherUser];
+          });
+        }
+
+        setSelectedDM(newDM);
+        setSelectedServer(null);
+        setSelectedChannel(null);
+        setReplyingTo(null);
+      } catch (error) {
+        console.error('Failed to create direct message:', error);
+      }
+    })();
   };
 
   const updateUserStatus = (status: User['status']) => {
@@ -770,6 +882,41 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       console.error('Failed to fetch channels. Detailed error:', error);
       // Keep only mock channels if the fetch fails
       setChannels(mockChannels);
+    }
+  };
+
+  const fetchUserDirectMessages = async () => {
+    try {
+      const dmRows = await apiService.getDirectMessages();
+      const mapped: DirectMessage[] = (dmRows || []).map((row: any) => ({
+        id: row.id,
+        participants: row.participants,
+        lastMessageTime: new Date(row.last_message_time),
+      }));
+
+      setDirectMessages(mapped);
+
+      // Upsert other user(s) so DM list/header can render.
+      const otherUsers: User[] = (dmRows || [])
+        .filter((r: any) => r.other_user_id && r.username)
+        .map((r: any) => ({
+          id: r.other_user_id,
+          username: r.username,
+          displayName: r.display_name || undefined,
+          email: '',
+          avatar: r.avatar,
+          status: (r.status || 'online') as User['status'],
+        }));
+
+      setUsers((prev) => {
+        const existingById = new Map(prev.map((u) => [u.id, u]));
+        for (const u of otherUsers) {
+          if (!existingById.has(u.id)) existingById.set(u.id, u);
+        }
+        return Array.from(existingById.values());
+      });
+    } catch (error) {
+      console.error('Failed to fetch direct messages. Keeping existing mock state:', error);
     }
   };
 
