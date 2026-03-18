@@ -15,7 +15,8 @@ const loginSchema = Joi.object({
 // Server validation schemas
 const serverSchema = Joi.object({
   name: Joi.string().min(1).max(100).required(),
-  icon: Joi.string().uri().optional()
+  // Removed .uri() and added .allow('', null) so empty icons don't crash it
+  icon: Joi.string().allow('', null).optional() 
 });
 
 // Channel validation schemas

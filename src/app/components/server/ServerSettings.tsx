@@ -18,20 +18,24 @@ const emojiOptions = ['🚀', '🎮', '📚', '💻', '🎨', '🎵', '⚽', '�
 export const ServerSettings: React.FC<ServerSettingsProps> = ({ server, open, onOpenChange }) => {
   const [name, setName] = useState(server.name);
   const [icon, setIcon] = useState(server.icon);
-  const { updateServerSettings, deleteServer, currentUser } = useApp();
+  const { updateServer, deleteServer, currentUser } = useApp();
 
   const isOwner = server.ownerId === currentUser?.id;
 
-  const handleSave = () => {
+ const handleSave = async () => {
     if (name.trim()) {
-      updateServerSettings(server.id, name, icon);
-      onOpenChange(false);
+      try {
+        await updateServer(server.id, name, icon);
+        onOpenChange(false);
+      } catch (error) {
+        console.error("Failed to save server settings:", error);
+      }
     }
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (window.confirm(`Are you sure you want to delete "${server.name}"? This cannot be undone.`)) {
-      deleteServer(server.id);
+      await deleteServer(server.id);
       onOpenChange(false);
     }
   };

@@ -236,7 +236,7 @@ interface AppContextType {
   setSelectedDM: (dm: DirectMessage | null) => void;
   createServer: (name: string, icon: string) => void;
   deleteServer: (serverId: string) => void;
-  updateServerSettings: (serverId: string, name: string, icon: string) => void;
+  updateServer: (serverId: string, name: string, icon: string) => void;
   sendServerInvite: (serverId: string, userId: string) => void;
   acceptServerInvite: (inviteId: string) => void;
   declineServerInvite: (inviteId: string) => void;
@@ -311,6 +311,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               status: 'online',
             };
             setCurrentUser(user);
+            
+            // Fetch user's servers from backend
+            await fetchUserServers();
           }
         } catch (error) {
           console.error('Failed to restore authentication:', error);
@@ -323,38 +326,86 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     checkAuth();
   }, []);
 
-  const createServer = (name: string, icon: string) => {
+  const createServer = async (name: string, icon: string) => {
     if (!currentUser) return;
-    const newServer: Server = {
-      id: `s${servers.length + 1}`,
-      name,
-      icon,
-      ownerId: currentUser.id,
-      members: [currentUser.id],
-    };
-    setServers([...servers, newServer]);
 
-    // Create default general channel
-    const generalChannel: Channel = {
-      id: `c${channels.length + 1}`,
-      name: 'general',
-      serverId: newServer.id,
-    };
-    setChannels([...channels, generalChannel]);
-  };
+    try {
+      const backendResponse = (await apiService.createServer(name, icon)) as any;
+      const serverData = backendResponse?.data || backendResponse?.server || backendResponse;
 
-  const deleteServer = (serverId: string) => {
-    setServers(servers.filter((s) => s.id !== serverId));
-    setChannels(channels.filter((c) => c.serverId !== serverId));
-    setMessages(messages.filter((m) => !channels.find((c) => c.id === m.channelId && c.serverId === serverId)));
-    if (selectedServer?.id === serverId) {
-      setSelectedServer(null);
-      setSelectedChannel(null);
+      if (!serverData || !serverData.id) {
+        throw new Error('Backend did not return a valid server object.');
+      }
+
+      const newServer: Server = {
+        id: serverData.id,
+        name: serverData.name,
+        icon: serverData.icon || icon || '📁',
+        ownerId: serverData.owner_id || currentUser.id, 
+        members: [currentUser.id],
+      };
+
+      setServers([...servers, newServer]);
+      
+      // The backend already creates the default "general" channel.
+      // Fetch channels for this new server so UI matches the database state.
+      try {
+        await fetchChannels([newServer.id]);
+      } catch (channelError) {
+        console.error('Failed to fetch channels for new server:', channelError);
+      }
+
+      setSelectedServer(newServer);
+      
+    } catch (error) {
+      console.error('Failed to create server:', error);
     }
   };
 
-  const updateServerSettings = (serverId: string, name: string, icon: string) => {
-    setServers(servers.map((s) => (s.id === serverId ? { ...s, name, icon } : s)));
+  const deleteServer = async (serverId: string) => {
+    try {
+      await apiService.deleteServer(serverId);
+
+      setServers(prevServers => prevServers.filter(server => server.id !== serverId));
+
+      if (selectedServer?.id === serverId) {
+        setSelectedServer(null);
+      }
+
+      setChannels(prevChannels => prevChannels.filter(channel => channel.serverId !== serverId));
+
+    } catch (error) {
+      console.error('Failed to delete server:', error);
+      throw error; 
+    }
+  };
+
+  const updateServer = async (serverId: string, name: string, icon: string) => {
+    try {
+      // 1. Tell the backend to update the server
+      // We wait for this to finish so we don't update the UI if the database fails
+      await apiService.updateServer(serverId, {name, icon});
+
+      // 2. Update the main servers list in the UI
+      setServers(prevServers => 
+        prevServers.map(server => 
+          server.id === serverId 
+            ? { ...server, name, icon } // Update the matching server
+            : server                    // Leave all other servers alone
+        )
+      );
+
+      // 3. If the user is currently looking at the server they just updated,
+      // we need to update the 'selectedServer' state too so the header changes instantly!
+      if (selectedServer?.id === serverId) {
+        setSelectedServer(prev => prev ? { ...prev, name, icon } : prev);
+      }
+
+    } catch (error) {
+      console.error('Failed to update server:', error);
+      // If this fails, the UI won't update, which is good! 
+      // It prevents the user from thinking it saved when it didn't.
+    }
   };
 
   const sendServerInvite = (serverId: string, userId: string) => {
@@ -431,13 +482,31 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     );
   };
 
-  const createChannel = (serverId: string, name: string) => {
-    const newChannel: Channel = {
-      id: `c${channels.length + 1}`,
-      name,
-      serverId,
-    };
-    setChannels([...channels, newChannel]);
+  const createChannel = async (serverId: string, name: string) => {
+    try {
+      const backendResponse = (await apiService.createChannel(serverId, name)) as any;
+      
+      const channelData = backendResponse?.data || backendResponse?.channel || backendResponse;
+
+      if (!channelData || !channelData.id) {
+        throw new Error('Backend did not return a valid channel object.');
+      }
+
+      const newChannel: Channel = {
+        id: channelData.id,
+        name: channelData.name,
+        serverId: channelData.server_id || channelData.serverId || serverId,
+      };
+
+      setChannels(prevChannels => [...prevChannels, newChannel]);
+
+      // 4. (Optional) Automatically switch the user's view to the new channel
+      // setSelectedChannel(newChannel); 
+      
+    } catch (error) {
+      console.error('Failed to create channel:', error);
+      throw error; 
+    }
   };
 
   const sendMessage = (content: string, channelId?: string, dmId?: string, replyToId?: string, serverInviteId?: string) => {
@@ -636,7 +705,74 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return unread;
   };
 
-  // Authentication functions
+  const fetchUserServers = async () => {
+    try {
+      const backendResponse = (await apiService.getServers()) as any;
+      
+      const serverArray = Array.isArray(backendResponse) 
+        ? backendResponse 
+        : backendResponse?.data || backendResponse?.servers || [];
+
+      if (!Array.isArray(serverArray)) {
+        throw new Error('Expected an array of servers.');
+      }
+
+      const transformedServers: Server[] = serverArray.map((server: any) => {
+        const serverMembers = server.members || [];
+        if (server.owner_id && !serverMembers.includes(server.owner_id)) {
+          serverMembers.push(server.owner_id);
+        }
+
+        // if (currentUser && !serverMembers.includes(currentUser.id)) {
+        //   serverMembers.push(currentUser.id);
+        // }
+
+        return {
+          id: server.id, 
+          name: server.name,
+          icon: server.icon || '📁',
+          ownerId: server.owner_id, 
+          members: serverMembers, 
+        };
+      });
+
+      setServers([...mockServers, ...transformedServers]);
+
+      const backendServerIds = transformedServers.map(server => server.id);
+      if (backendServerIds.length > 0) {
+        await fetchChannels(backendServerIds);
+      }
+
+    } catch (error) {
+      console.error('Failed to fetch user servers. Detailed error:', error);
+      setServers(mockServers);
+    }
+  };
+
+  const fetchChannels = async (serverIds: string[]) => {
+    try {
+      // Fetch channels for all the backend servers we just found
+      const channelPromises = serverIds.map(id => apiService.getChannels(id));
+      const backendResponses = await Promise.all(channelPromises);
+      
+      // Flatten the array of arrays into a single list of channels
+      const allBackendChannels = backendResponses.flat() as any[];
+
+      const transformedChannels: Channel[] = allBackendChannels.map((channel: any) => ({
+        id: channel.id,
+        name: channel.name,
+        serverId: channel.server_id || channel.serverId, 
+      }));
+
+      // Merge mock channels with the real backend channels
+      setChannels([...mockChannels, ...transformedChannels]);
+    } catch (error) {
+      console.error('Failed to fetch channels. Detailed error:', error);
+      // Keep only mock channels if the fetch fails
+      setChannels(mockChannels);
+    }
+  };
+
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
       const response = await apiService.login(email, password);
@@ -706,7 +842,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setSelectedDM,
       createServer,
       deleteServer,
-      updateServerSettings,
+      updateServer,
       sendServerInvite,
       acceptServerInvite,
       declineServerInvite,

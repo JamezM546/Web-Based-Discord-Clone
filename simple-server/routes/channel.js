@@ -12,7 +12,7 @@ router.post('/', authenticateToken, validate(channelSchema), async (req, res) =>
     const { name, serverId } = req.body;
     const userId = req.user.id;
     
-    // Check if user is member of the server and has permission
+    // Check if user has permission to create channels in this server
     const membership = await Server.isMember(serverId, userId);
     if (!membership || (membership.role !== 'owner' && membership.role !== 'admin')) {
       return res.status(403).json({
@@ -54,17 +54,19 @@ router.get('/server/:serverId', authenticateToken, async (req, res) => {
   try {
     const { serverId } = req.params;
     const userId = req.user.id;
-    
-    // Check if user has access to the server
-    const channels = await Channel.getAccessibleChannels(serverId, userId);
-    
-    if (channels.length === 0) {
+
+    // First verify the user is a member of this server
+    const membership = await Server.isMember(serverId, userId);
+    if (!membership) {
       return res.status(403).json({
         success: false,
         message: 'Access denied: Not a member of this server'
       });
     }
-    
+
+    // User is a member; return whatever channels exist (possibly empty)
+    const channels = await Channel.getAccessibleChannels(serverId, userId);
+
     res.status(200).json({
       success: true,
       data: { channels }

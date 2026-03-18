@@ -194,7 +194,7 @@ class ApiService {
   }
 
   // Channel Management Methods
-  async createChannel(name: string, serverId: string): Promise<Channel> {
+  async createChannel(serverId: string, name: string): Promise<Channel> {
     const response = await this.request<Channel>('/api/channels', {
       method: 'POST',
       body: JSON.stringify({ name, serverId }),

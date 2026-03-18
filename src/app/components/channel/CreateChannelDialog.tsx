@@ -12,19 +12,24 @@ interface CreateChannelDialogProps {
   serverId: string;
 }
 
-export const CreateChannelDialog: React.FC<CreateChannelDialogProps> = ({
-  open,
-  onOpenChange,
-  serverId,
-}) => {
-  const [name, setName] = useState('');
-  const { createChannel } = useApp();
+  export const CreateChannelDialog: React.FC<CreateChannelDialogProps> = ({
+    open,
+    onOpenChange,
+    serverId,
+  }) => {
+    const [name, setName] = useState('');
+    const { createChannel} = useApp();
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (name.trim()) {
-      createChannel(serverId, name.toLowerCase().replace(/\s+/g, '-'));
-      setName('');
-      onOpenChange(false);
+      try {
+        const formattedName = name.toLowerCase().replace(/\s+/g, '-');
+        await createChannel(serverId, formattedName);
+        setName('');
+        onOpenChange(false);
+      } catch (error) {
+        console.error("Failed to create channel:", error);
+      }
     }
   };
 
