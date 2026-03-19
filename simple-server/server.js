@@ -8,7 +8,8 @@ const { initializeDatabase } = require('./config/database');
 const authRoutes = require('./routes/auth');
 const serverRoutes = require('./routes/server');
 const channelRoutes = require('./routes/channel');
-const messageRoutes = require('./routes/message');
+const messageRoutes = require('./routes/messages');
+const directMessageRoutes = require('./routes/directMessages');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -61,17 +62,17 @@ app.get('/api', (req, res) => {
         'PUT /api/channels/server/:serverId/reorder': 'Reorder channels in server (protected)'
       },
       messages: {
-        'POST /api/messages': 'Create new message (protected)',
-        'GET /api/messages/channel/:channelId': 'Get messages for a channel (protected)',
-        'GET /api/messages/dm/:dmId': 'Get messages for a DM (protected)',
-        'GET /api/messages/:messageId': 'Get single message by ID (protected)',
-        'PUT /api/messages/:messageId': 'Update message (protected)',
-        'DELETE /api/messages/:messageId': 'Delete message (protected)',
-        'POST /api/messages/:messageId/reactions': 'Add reaction to message (protected)',
-        'DELETE /api/messages/:messageId/reactions': 'Remove reaction from message (protected)',
-        'GET /api/messages/:messageId/reactions': 'Get message reactions (protected)',
-        'GET /api/messages/search/channel/:channelId': 'Search messages in channel (protected)',
-        'GET /api/messages/search/dm/:dmId': 'Search messages in DM (protected)'
+        'GET /api/messages/channels/:channelId': 'Get messages for a channel (protected)',
+        'GET /api/messages/dm/:dmId': 'Get messages for a direct message (protected)',
+        'POST /api/messages': 'Create a new message (protected)',
+        'PUT /api/messages/:messageId': 'Edit a message (protected)',
+        'DELETE /api/messages/:messageId': 'Delete a message (protected)',
+        'GET /api/messages/:messageId/reactions': 'Get reactions for a message (protected)',
+        'POST /api/messages/:messageId/reactions/toggle': 'Toggle message reaction (protected)'
+      },
+      directMessages: {
+        'GET /api/direct-messages': 'Get direct messages for current user (protected)',
+        'POST /api/direct-messages': 'Create or get a direct message (protected)'
       }
     }
   });
@@ -100,6 +101,9 @@ app.use('/api/channels', channelRoutes);
 
 // Message routes
 app.use('/api/messages', messageRoutes);
+
+// Direct message routes
+app.use('/api/direct-messages', directMessageRoutes);
 
 // API Documentation/Explorer
 app.get('/api/docs', (req, res) => {
