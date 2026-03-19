@@ -23,6 +23,35 @@ const formatTimestamp = (date: Date) => {
   return `${days}d ago`;
 };
 
+const highlightsToSummary = (highlights: any): string | null => {
+  if (!highlights) return null;
+  let arr: any[] | null = null;
+  if (Array.isArray(highlights)) arr = highlights;
+  else if (typeof highlights === 'string') {
+    try {
+      const parsed = JSON.parse(highlights);
+      if (Array.isArray(parsed)) arr = parsed;
+    } catch {
+      // ignore
+    }
+  }
+  if (!arr || arr.length === 0) return null;
+
+  const text = arr
+    .map((h) => {
+      if (!h) return null;
+      if (typeof h === 'string') return h.trim();
+      if (typeof h.text === 'string') return h.text.trim();
+      if (typeof h.summary === 'string') return h.summary.trim();
+      if (typeof h.highlight === 'string') return h.highlight.trim();
+      return null;
+    })
+    .filter(Boolean)
+    .slice(0, 5) as string[];
+
+  return text.length ? text.join(' · ') : null;
+};
+
 export const WhatYouMissed: React.FC<WhatYouMissedProps> = ({
   unreadMessages,
   onDismiss,
