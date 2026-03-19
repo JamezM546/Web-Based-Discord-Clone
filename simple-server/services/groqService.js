@@ -1,5 +1,8 @@
 const https = require('https');
 
+const { buildDiscordSummaryPrompts } = require('../prompts/summaryPromptTemplates');
+const { buildDiscordPreviewPrompts } = require('../prompts/previewPromptTemplates');
+
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const GROQ_BASE_URL = process.env.GROQ_BASE_URL || 'https://api.groq.com';
 const GROQ_SUMMARY_MODEL = process.env.GROQ_MODEL_SUMMARY || 'llama-3.3-70b-versatile';
@@ -75,23 +78,11 @@ const generateChannelSummary = async ({ channelName, messages, options = {} }) =
 
   const conversation = buildConversationSnippet(messages, maxMessages);
 
-  const systemPrompt = `
-You are an assistant summarizing Discord-style chat conversations for users who were away.
-Provide accurate, concise summaries that are easy to skim.
-If the requested format is "bullets", use 3-7 bullet points.
-If the format is "paragraph", use 1-3 short paragraphs.
-`;
-
-  const userPrompt = `
-Channel: ${channelName || 'Unnamed channel'}
-Format: ${format}
-
-Here is the recent conversation history the user missed:
-
-${conversation}
-
-Summarize what happened so the user can quickly catch up.
-`;
+  const { systemPrompt, userPrompt } = buildDiscordSummaryPrompts({
+    channelName,
+    format,
+    conversation,
+  });
 
   const response = await callGroqChat({
     model: GROQ_SUMMARY_MODEL,
@@ -122,23 +113,11 @@ Summarize what happened so the user can quickly catch up.
 const generateChannelPreview = async ({ channelName, messages, unreadCount, maxHighlights = 5 }) => {
   const conversation = buildConversationSnippet(messages, maxHighlights * 10);
 
-  const systemPrompt = `
-You are an assistant generating very short "what you missed" previews for a Discord-style chat channel.
-Output 3-5 concise bullet points highlighting only the most important events, decisions, or threads.
-Each highlight should be a single sentence.
-Avoid redundant or trivial chatter.
-`;
-
-  const userPrompt = `
-Channel: ${channelName || 'Unnamed channel'}
-Unread messages: ${unreadCount}
-
-Here is a sample of the unread conversation:
-
-${conversation}
-
-Generate 3-5 bullet point highlights summarizing what the user missed.
-`;
+  const { systemPrompt, userPrompt } = buildDiscordPreviewPrompts({
+    channelName,
+    unreadCount,
+    conversation,
+  });
 
   const response = await callGroqChat({
     model: GROQ_PREVIEW_MODEL,
