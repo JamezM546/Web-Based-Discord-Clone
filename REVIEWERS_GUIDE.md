@@ -118,10 +118,26 @@ Wait for:
 
 ## Automated Tests
 
+**Recommended (works even if `localhost:5432` is wrong or busy):** run tests inside Docker Compose so the app uses hostname `postgres`:
+
 ```powershell
-cd simple-server
+cd Web-Based-Discord-Clone
+npm run test:backend
+```
+
+Or from `simple-server`:
+
+```powershell
+cd Web-Based-Discord-Clone\simple-server
+npm run test:docker
+```
+
+**Host-only** (needs Docker Postgres published on `localhost:5432` and no conflicting local PostgreSQL):
+
+```powershell
+cd Web-Based-Discord-Clone\simple-server
 npm install
-npx jest --runInBand --forceExit --detectOpenHandles
+npm test
 ```
 
 Expected: 10 suites, 65 tests, all passing.
@@ -144,10 +160,11 @@ To run a single suite:
 npx jest --runInBand --forceExit tests/summaries.test.js
 ```
 
-To run tests inside Docker:
+To run tests inside Docker (same as `npm run test:backend`):
 ```powershell
-docker exec discord_clone_backend npx jest --runInBand --forceExit --detectOpenHandles
+docker compose run --rm backend sh -c "npm install && npm test"
 ```
+(`npm install` is required inside the container because `/app/node_modules` is a Docker volume and may not contain Jest.)
 
 ---
 

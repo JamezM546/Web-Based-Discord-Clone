@@ -1,5 +1,10 @@
-// Load test-specific environment variables before anything else
-require('dotenv').config({ path: require('path').resolve(__dirname, '../.env.test') });
+// Load test-specific env for host-side `npm test` (localhost DB).
+// When tests run via `docker compose run backend npm test`, Compose already sets
+// DATABASE_* / DATABASE_URL; dotenv does not override existing env vars.
+require('dotenv').config({
+  path: require('path').resolve(__dirname, '../.env.test'),
+  override: false,
+});
 
 const { app, initAll } = require('../server');
 const { pool } = require('../config/database');

@@ -22,6 +22,25 @@ describe('Friends — GET /api/friends', () => {
 });
 
 describe('Friends — GET /api/friends/requests', () => {
+  // Do not rely on seed row fr4 (Elvis→Nafisa): it may be accepted/removed after UI or old DBs.
+  beforeAll(async () => {
+    const meRes = await request
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${getToken()}`);
+    const nafisaId = meRes.body.data.user.id;
+    const u = `frpend${Date.now()}`;
+    const reg = await request.post('/api/auth/register').send({
+      username: u,
+      email: `${u}@test.com`,
+      password: 'pass1234',
+    });
+    const outsiderToken = reg.body.data.token;
+    await request
+      .post('/api/friends/requests')
+      .set('Authorization', `Bearer ${outsiderToken}`)
+      .send({ toUserId: nafisaId });
+  });
+
   test('returns pending friend requests', async () => {
     const res = await request
       .get('/api/friends/requests')

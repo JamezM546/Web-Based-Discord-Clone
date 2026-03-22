@@ -140,18 +140,53 @@ Seed data is idempotent — running startup multiple times will not create dupli
 
 Tests are **integration tests** that run against a live PostgreSQL database.
 
+### Recommended: Docker (no backend dev server; works out of the box after `git clone`)
+
+From the **repository root** (parent of `simple-server/`, where `docker-compose.yml` lives):
+
 ```bash
-# Inside Docker (recommended — no extra setup)
-docker exec discord_clone_backend npx jest --runInBand --forceExit --verbose
+docker compose up -d postgres
+docker compose run --rm backend sh -c "npm install && npm test"
+```
 
-# Or using the npm script from the host
+- **`npm install`** runs **inside** the container so `node_modules` (including Jest) exists on the anonymous `/app/node_modules` volume (avoids `jest: not found`).
+- **`DATABASE_HOST=postgres`** is set by Compose, so you avoid host `localhost:5432` / port-conflict issues.
+- Compose starts **postgres** automatically if needed when you `docker compose run …`.
+
+Use **`docker-compose`** (hyphen) instead of **`docker compose`** if your machine only has Compose V1.
+
+### Shortcut (requires Node.js on your machine)
+
+From the **repository root**:
+
+```bash
+docker compose up -d postgres
+npm run test:backend
+```
+
+This runs the same Docker command as above. If you see **`Missing script: "test:backend"`**, your checkout may not include the root `package.json` script — use the **raw** `docker compose run …` block in the previous section.
+
+From **`simple-server/`** you can also run:
+
+```bash
 npm run test:docker
+```
 
-# Locally (requires running PostgreSQL with Docker credentials)
+That invokes `docker compose -f ../docker-compose.yml run --rm backend sh -c "npm install && npm test"`.
+
+### Alternative — tests on your host only
+
+Requires Postgres reachable at **`localhost:5432`** with credentials matching **`.env.test`** (a local PostgreSQL install on 5432 often breaks this):
+
+```bash
+cd simple-server
+npm install
 npm test
 ```
 
-**Test suites:** 10 files, **62 tests** covering auth, servers, channels, messages, DMs, friends, invites, users, server search (US3), and summaries (US1 + US2).
+If connection fails, the server logs a multi-line error with troubleshooting hints.
+
+**Test suites:** 10 files, **65 tests** covering auth, servers, channels, messages, DMs, friends, invites, users, server search (US3), and summaries (US1 + US2).
 
 ---
 
