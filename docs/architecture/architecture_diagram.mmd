@@ -4,9 +4,8 @@ graph TB
     end
 
     subgraph "API Gateway"
-        GATEWAY[Express.js Server<br/>CORS · JSON · Static]
+        GATEWAY[Express.js Server<br/>CORS · JSON]
         AUTH_MW[Auth Middleware<br/>JWT Verification]
-        VALID[Joi Validation<br/>Request Schemas]
     end
 
     subgraph "Core Modules"
@@ -14,14 +13,18 @@ graph TB
         USER_SVC[User Routes<br/>Search · Profile · Status]
         SERVER_SVC[Server Routes<br/>CRUD · Members · Search]
         CHANNEL_SVC[Channel Routes<br/>CRUD · Access Control]
-        MSG_SVC[Message Routes<br/>CRUD · Reactions]
+        MESSAGES_SVC[Messages Routes<br/>List · Channel/DM Fetch]
+        MESSAGE_SVC[Message Route<br/>Create · Edit · Delete · Reactions]
         DM_SVC[DM Routes<br/>List · Create]
     end
 
     subgraph "Feature Modules"
         SUMMARY_SVC[Summary Routes<br/>Manual Summary · Preview]
         FRIEND_SVC[Friend Routes<br/>Requests · Accept · Reject]
-        INVITE_SVC[Invite Routes<br/>Send · Accept · Decline]
+    end
+
+    subgraph "Route Validation"
+        VALID[Joi Validation<br/>Per-route via `utils/validation.js`]
     end
 
     subgraph "Services"
@@ -52,13 +55,13 @@ graph TB
     AUTH_MW --> USER_SVC
     AUTH_MW --> SERVER_SVC
     AUTH_MW --> CHANNEL_SVC
-    AUTH_MW --> MSG_SVC
+    AUTH_MW --> MESSAGES_SVC
+    AUTH_MW --> MESSAGE_SVC
     AUTH_MW --> DM_SVC
 
     %% Gateway to Features
     AUTH_MW --> SUMMARY_SVC
     AUTH_MW --> FRIEND_SVC
-    AUTH_MW --> INVITE_SVC
 
     %% Feature dependencies
     SUMMARY_SVC --> SUMMARY_LOGIC
@@ -69,7 +72,16 @@ graph TB
     USER_SVC --> USER_MODEL
     SERVER_SVC --> SERVER_MODEL
     CHANNEL_SVC --> CHANNEL_MODEL
-    MSG_SVC --> MSG_MODEL
+    MESSAGES_SVC --> MSG_MODEL
+    MESSAGE_SVC --> MSG_MODEL
+
+    %% Validation links (applied per-route)
+    AUTH_SVC --> VALID
+    USER_SVC --> VALID
+    SERVER_SVC --> VALID
+    CHANNEL_SVC --> VALID
+    MESSAGES_SVC --> VALID
+    MESSAGE_SVC --> VALID
 
     %% Models to DB
     USER_MODEL --> DB
@@ -88,9 +100,9 @@ graph TB
     classDef infra fill:#efebe9,stroke:#3e2723,stroke-width:2px
 
     class WEB client
-    class GATEWAY,AUTH_MW,VALID gateway
-    class AUTH_SVC,USER_SVC,SERVER_SVC,CHANNEL_SVC,MSG_SVC,DM_SVC core
-    class SUMMARY_SVC,FRIEND_SVC,INVITE_SVC feature
+    class GATEWAY,AUTH_MW gateway
+    class AUTH_SVC,USER_SVC,SERVER_SVC,CHANNEL_SVC,MESSAGES_SVC,MESSAGE_SVC,DM_SVC core
+    class SUMMARY_SVC,FRIEND_SVC feature
     class SUMMARY_LOGIC,LLM_MOCK,USER_LOGIC,SEED service
     class USER_MODEL,SERVER_MODEL,CHANNEL_MODEL,MSG_MODEL model
     class DB infra
