@@ -12,13 +12,7 @@ A web-based Discord-inspired communication app. Ready to run with Docker - no se
    cd Web-Based-Discord-Clone
    ```
 
-2. **(Optional) Use the P4 / backend branch** — if you are grading or collaborating on the backend + tests, check out the branch your team uses (example name below; confirm on GitHub):
-   ```bash
-   git fetch origin
-   git checkout p4-docker-tests-and-docs
-   ```
-
-3. **Start the application** from the repository root (same folder as `docker-compose.yml`):
+2. **Start the application** from the repository root (same folder as `docker-compose.yml`):
 
    **Docker Compose V2** (Docker Desktop — recommended):
    ```bash
@@ -30,12 +24,12 @@ A web-based Discord-inspired communication app. Ready to run with Docker - no se
    docker-compose up --build
    ```
 
-4. **Open your browser:**
+3. **Open your browser:**
    - **Frontend:** http://localhost:5173  
    - **Backend health:** http://localhost:3001/health  
    - **Interactive API docs:** http://localhost:3001/api/docs  
 
-5. **Log in with seeded demo data** (created automatically on first DB startup):
+4. **Log in with seeded demo data** (created automatically on first DB startup):
 
    | Email | Password |
    |-------|----------|
