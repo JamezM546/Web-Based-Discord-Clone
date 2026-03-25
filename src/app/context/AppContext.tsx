@@ -410,6 +410,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }));
         setChannels((prev) => [...prev, ...mapped]);
       } catch (_) { /* ignored */ }
+      setSelectedDM(null);
+      setSelectedChannel(null);
       setSelectedServer(newServer);
     } catch (error) {
       console.error('Failed to create server:', error);
