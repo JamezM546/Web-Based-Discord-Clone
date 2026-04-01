@@ -1,6 +1,8 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const User = require('../models/User');
+const { pool } = require('../config/database');
 
 // Hash password
 const hashPassword = async (password) => {
@@ -90,6 +92,76 @@ const verifyPassword = async (password, hashedPassword) => {
   return await bcrypt.compare(password, hashedPassword);
 };
 
+const getResetTokenExpiryMinutes = () => {
+  const raw = parseInt(process.env.PASSWORD_RESET_TOKEN_EXPIRES_MINUTES || '60', 10);
+  return Number.isFinite(raw) && raw > 0 ? raw : 60;
+};
+
+const hashResetToken = (token) => crypto.createHash('sha256').update(token).digest('hex');
+
+const clearExpiredResetTokens = async () => {
+  await pool.query('DELETE FROM password_reset_tokens WHERE used_at IS NOT NULL OR expires_at < CURRENT_TIMESTAMP');
+};
+
+const issuePasswordResetToken = async (email) => {
+  await clearExpiredResetTokens();
+
+  const user = await User.findByEmail(email, true);
+  if (!user) {
+    return {
+      issued: false,
+      message: 'If an account exists for that email, a reset link has been generated.',
+    };
+  }
+
+  const rawToken = crypto.randomBytes(32).toString('hex');
+  const tokenHash = hashResetToken(rawToken);
+  const expiresAt = new Date(Date.now() + getResetTokenExpiryMinutes() * 60 * 1000);
+
+  await pool.query('DELETE FROM password_reset_tokens WHERE user_id = $1', [user.id]);
+  await pool.query(
+    `
+      INSERT INTO password_reset_tokens (id, user_id, token_hash, expires_at)
+      VALUES ($1, $2, $3, $4)
+    `,
+    [`prt_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`, user.id, tokenHash, expiresAt.toISOString()]
+  );
+
+  const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+  return {
+    issued: true,
+    message: 'If an account exists for that email, a reset link has been generated.',
+    resetToken: rawToken,
+    resetUrl: `${baseUrl}/reset-password?token=${encodeURIComponent(rawToken)}`,
+    expiresAt: expiresAt.toISOString(),
+    email: user.email,
+  };
+};
+
+const validatePasswordResetToken = async (token) => {
+  await clearExpiredResetTokens();
+
+  const tokenHash = hashResetToken(token);
+  const result = await pool.query(
+    `
+      SELECT prt.id, prt.user_id, prt.expires_at, u.email
+      FROM password_reset_tokens prt
+      JOIN users u ON u.id = prt.user_id
+      WHERE prt.token_hash = $1
+        AND prt.used_at IS NULL
+        AND prt.expires_at > CURRENT_TIMESTAMP
+      LIMIT 1
+    `,
+    [tokenHash]
+  );
+
+  if (result.rowCount === 0) {
+    throw new Error('Reset token is invalid or expired');
+  }
+
+  return result.rows[0];
+};
+
 // Reset password for an authenticated user
 const resetPassword = async ({ userId, currentPassword, newPassword }) => {
   const userWithPassword = await User.findByIdWithPassword(userId);
@@ -109,6 +181,27 @@ const resetPassword = async ({ userId, currentPassword, newPassword }) => {
 
   const passwordHash = await hashPassword(newPassword);
   return await User.updatePassword(userId, passwordHash);
+};
+
+const resetPasswordWithToken = async ({ token, newPassword }) => {
+  const tokenRow = await validatePasswordResetToken(token);
+  const userWithPassword = await User.findByIdWithPassword(tokenRow.user_id);
+  if (!userWithPassword) {
+    throw new Error('User not found');
+  }
+
+  const isSamePassword = await verifyPassword(newPassword, userWithPassword.password_hash);
+  if (isSamePassword) {
+    throw new Error('New password must be different from the current password');
+  }
+
+  const passwordHash = await hashPassword(newPassword);
+  const user = await User.updatePassword(tokenRow.user_id, passwordHash);
+
+  await pool.query('UPDATE password_reset_tokens SET used_at = CURRENT_TIMESTAMP WHERE id = $1', [tokenRow.id]);
+  await pool.query('DELETE FROM password_reset_tokens WHERE user_id = $1 AND id <> $2', [tokenRow.user_id, tokenRow.id]);
+
+  return user;
 };
 
 // Register new user
@@ -180,6 +273,9 @@ module.exports = {
   registerUser,
   loginUser,
   resetPassword,
+  issuePasswordResetToken,
+  validatePasswordResetToken,
+  resetPasswordWithToken,
   getUserById,
   getAllUsers,
   initializeDemoAccounts

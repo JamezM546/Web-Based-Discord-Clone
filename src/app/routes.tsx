@@ -1,6 +1,8 @@
 import { createBrowserRouter, Outlet } from 'react-router';
 import { LoginForm } from './components/auth/LoginForm';
 import { RegisterForm } from './components/auth/RegisterForm';
+import { ForgotPasswordForm } from './components/auth/ForgotPasswordForm';
+import { ResetPasswordForm } from './components/auth/ResetPasswordForm';
 import { MainLayout } from './pages/MainLayout';
 import MockupsPage from './pages/MockupsPage';
 import { AppProvider, useApp } from './context/AppContext';
@@ -75,6 +77,14 @@ export const router = createBrowserRouter([
       {
         path: '/register',
         element: <RegisterForm />,
+      },
+      {
+        path: '/forgot-password',
+        element: <ForgotPasswordForm />,
+      },
+      {
+        path: '/reset-password',
+        element: <ResetPasswordForm />,
       },
       {
         path: '/channels',

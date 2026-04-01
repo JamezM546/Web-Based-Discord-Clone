@@ -45,6 +45,9 @@ app.get('/api', (req, res) => {
       auth: {
         'POST /api/auth/register': 'Register new user',
         'POST /api/auth/login': 'Login user',
+        'POST /api/auth/forgot-password': 'Issue a password reset token',
+        'GET /api/auth/reset-password/validate?token=': 'Validate a password reset token',
+        'POST /api/auth/reset-password': 'Reset password using a valid token',
         'GET /api/auth/me': 'Get current user (protected)',
         'GET /api/auth/test-protected': 'Test protected route'
       },

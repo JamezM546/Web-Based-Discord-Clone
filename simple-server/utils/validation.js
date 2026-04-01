@@ -17,6 +17,15 @@ const resetPasswordSchema = Joi.object({
   newPassword: Joi.string().min(6).required().invalid(Joi.ref('currentPassword')),
 });
 
+const forgotPasswordSchema = Joi.object({
+  email: Joi.string().email().required(),
+});
+
+const tokenResetPasswordSchema = Joi.object({
+  token: Joi.string().min(20).required(),
+  newPassword: Joi.string().min(6).required(),
+});
+
 // Server validation schemas
 const serverSchema = Joi.object({
   name: Joi.string().min(1).max(100).required(),
@@ -58,6 +67,8 @@ module.exports = {
   registerSchema,
   loginSchema,
   resetPasswordSchema,
+  forgotPasswordSchema,
+  tokenResetPasswordSchema,
   serverSchema,
   channelSchema,
   messageSchema,

@@ -5,6 +5,7 @@
  * These endpoints are prerequisites for every user story.
  */
 const { request, getToken, ensureInit } = require('./setup');
+const { pool } = require('../config/database');
 
 beforeAll(() => ensureInit(), 30000);
 
@@ -142,5 +143,145 @@ describe('Auth - PUT /api/users/me/password', () => {
 
     expect(res.status).toBe(400);
     expect(res.body.success).toBe(false);
+  });
+});
+
+describe('Auth - forgot/reset password token flow', () => {
+  test('issues a reset token and resets the password while logged out', async () => {
+    const unique = `forgotuser${Date.now()}`;
+    const email = `${unique}@test.com`;
+    const originalPassword = 'pass1234';
+    const newPassword = 'resetpass123';
+
+    const registerRes = await request
+      .post('/api/auth/register')
+      .send({ username: unique, email, password: originalPassword });
+
+    expect(registerRes.status).toBe(201);
+
+    const forgotRes = await request
+      .post('/api/auth/forgot-password')
+      .send({ email });
+
+    expect(forgotRes.status).toBe(200);
+    expect(forgotRes.body.success).toBe(true);
+    expect(forgotRes.body.data.resetToken).toBeDefined();
+    expect(forgotRes.body.data.resetUrl).toContain('/reset-password?token=');
+
+    const token = forgotRes.body.data.resetToken;
+
+    const validateRes = await request
+      .get('/api/auth/reset-password/validate')
+      .query({ token });
+
+    expect(validateRes.status).toBe(200);
+    expect(validateRes.body.success).toBe(true);
+    expect(validateRes.body.data.email).toBe(email);
+
+    const resetRes = await request
+      .post('/api/auth/reset-password')
+      .send({ token, newPassword });
+
+    expect(resetRes.status).toBe(200);
+    expect(resetRes.body.success).toBe(true);
+
+    const oldLoginRes = await request
+      .post('/api/auth/login')
+      .send({ email, password: originalPassword });
+
+    expect(oldLoginRes.status).toBe(401);
+
+    const newLoginRes = await request
+      .post('/api/auth/login')
+      .send({ email, password: newPassword });
+
+    expect(newLoginRes.status).toBe(200);
+    expect(newLoginRes.body.success).toBe(true);
+  });
+
+  test('returns a generic success response for an unknown forgot-password email', async () => {
+    const res = await request
+      .post('/api/auth/forgot-password')
+      .send({ email: `unknown_${Date.now()}@test.com` });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.resetToken).toBeUndefined();
+  });
+
+  test('rejects invalid reset tokens', async () => {
+    const validateRes = await request
+      .get('/api/auth/reset-password/validate')
+      .query({ token: 'invalid-token-value-that-is-long-enough' });
+
+    expect(validateRes.status).toBe(400);
+    expect(validateRes.body.success).toBe(false);
+
+    const resetRes = await request
+      .post('/api/auth/reset-password')
+      .send({ token: 'invalid-token-value-that-is-long-enough', newPassword: 'anotherpass123' });
+
+    expect(resetRes.status).toBe(400);
+    expect(resetRes.body.success).toBe(false);
+  });
+
+  test('rejects expired reset tokens', async () => {
+    const unique = `expireduser${Date.now()}`;
+    const email = `${unique}@test.com`;
+    const originalPassword = 'pass1234';
+
+    const registerRes = await request
+      .post('/api/auth/register')
+      .send({ username: unique, email, password: originalPassword });
+
+    expect(registerRes.status).toBe(201);
+
+    const forgotRes = await request
+      .post('/api/auth/forgot-password')
+      .send({ email });
+
+    const token = forgotRes.body.data.resetToken;
+    await pool.query(
+      'UPDATE password_reset_tokens SET expires_at = CURRENT_TIMESTAMP - INTERVAL \'1 minute\' WHERE user_id = $1',
+      [registerRes.body.data.user.id]
+    );
+
+    const resetRes = await request
+      .post('/api/auth/reset-password')
+      .send({ token, newPassword: 'updatedpass123' });
+
+    expect(resetRes.status).toBe(400);
+    expect(resetRes.body.success).toBe(false);
+  });
+
+  test('rejects reuse of a previously consumed token', async () => {
+    const unique = `reuseuser${Date.now()}`;
+    const email = `${unique}@test.com`;
+    const originalPassword = 'pass1234';
+
+    const registerRes = await request
+      .post('/api/auth/register')
+      .send({ username: unique, email, password: originalPassword });
+
+    expect(registerRes.status).toBe(201);
+
+    const forgotRes = await request
+      .post('/api/auth/forgot-password')
+      .send({ email });
+
+    const token = forgotRes.body.data.resetToken;
+
+    const firstResetRes = await request
+      .post('/api/auth/reset-password')
+      .send({ token, newPassword: 'firstreset123' });
+
+    expect(firstResetRes.status).toBe(200);
+
+    const secondResetRes = await request
+      .post('/api/auth/reset-password')
+      .send({ token, newPassword: 'secondreset123' });
+
+    expect(secondResetRes.status).toBe(400);
+    expect(secondResetRes.body.success).toBe(false);
   });
 });

@@ -27,6 +27,12 @@ export interface RegisterResponse {
   token: string;
 }
 
+export interface ForgotPasswordResponse {
+  resetToken?: string;
+  resetUrl?: string;
+  expiresAt?: string;
+}
+
 export interface Server {
   id: string;
   name: string;
@@ -134,6 +140,27 @@ class ApiService {
 
   async getCurrentUser(): Promise<any> {
     return this.request<any>('/api/auth/me');
+  }
+
+  async forgotPassword(email: string): Promise<ForgotPasswordResponse> {
+    const response = await this.request<ForgotPasswordResponse>('/api/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+    return response.data || {};
+  }
+
+  async validateResetPasswordToken(token: string): Promise<any> {
+    const qs = new URLSearchParams({ token });
+    return this.request<any>(`/api/auth/reset-password/validate?${qs.toString()}`);
+  }
+
+  async resetPasswordWithToken(token: string, newPassword: string): Promise<any> {
+    const response = await this.request<any>('/api/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ token, newPassword }),
+    });
+    return response.data;
   }
 
   async testProtected(): Promise<any> {
