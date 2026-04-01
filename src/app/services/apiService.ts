@@ -380,6 +380,14 @@ class ApiService {
     return response.data?.user;
   }
 
+  async resetPassword(currentPassword: string, newPassword: string): Promise<any> {
+    const response = await this.request<{ user: any }>('/api/users/me/password', {
+      method: 'PUT',
+      body: JSON.stringify({ currentPassword, newPassword }),
+    });
+    return response.data?.user;
+  }
+
   // Friend endpoints
 
   async getFriends(): Promise<any[]> {

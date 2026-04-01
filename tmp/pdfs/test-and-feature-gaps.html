@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Discord Clone Test and Feature Gaps</title>
+  <style>
+    @page {
+      size: Letter;
+      margin: 0.38in;
+    }
+
+    :root {
+      --ink: #132030;
+      --muted: #566476;
+      --accent: #d9485f;
+      --accent-soft: #fff0f2;
+      --line: #d8e0ea;
+      --panel: #f8fafc;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Arial, sans-serif;
+      color: var(--ink);
+      background: #fff;
+      font-size: 10pt;
+      line-height: 1.24;
+    }
+
+    .page {
+      height: 9.74in;
+      display: grid;
+      grid-template-rows: auto auto 1fr auto;
+      gap: 0.12in;
+    }
+
+    .hero {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 0.18in 0.22in 0.16in;
+      background: linear-gradient(135deg, #fff8f8 0%, #fff1f4 100%);
+    }
+
+    h1 {
+      margin: 0 0 0.04in;
+      font-size: 18.5pt;
+      line-height: 1.06;
+      letter-spacing: -0.02em;
+    }
+
+    .subhead {
+      margin: 0;
+      color: var(--muted);
+      font-size: 9.7pt;
+    }
+
+    .top-grid,
+    .mid-grid {
+      display: grid;
+      gap: 0.12in;
+    }
+
+    .top-grid {
+      grid-template-columns: 1fr 0.9fr;
+    }
+
+    .mid-grid {
+      grid-template-columns: 1.08fr 0.92fr;
+      align-items: start;
+    }
+
+    .section {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 0.14in 0.17in;
+      background: #fff;
+    }
+
+    .section.arch {
+      background: var(--panel);
+    }
+
+    .section h2 {
+      margin: 0 0 0.08in;
+      font-size: 9.8pt;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--accent);
+    }
+
+    .section p {
+      margin: 0;
+    }
+
+    .arch p + p {
+      margin-top: 0.06in;
+    }
+
+    ul {
+      margin: 0;
+      padding-left: 0.16in;
+    }
+
+    li { margin: 0 0 0.045in; }
+    li:last-child { margin-bottom: 0; }
+
+    .bottom-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.1in;
+    }
+
+    .chip {
+      display: inline-block;
+      padding: 0.01in 0.05in;
+      background: var(--accent-soft);
+      border: 1px solid #f6c9d0;
+      border-radius: 999px;
+      color: var(--accent);
+      font-size: 8.5pt;
+      font-weight: 600;
+      margin-bottom: 0.04in;
+    }
+
+    code {
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 8.8pt;
+      background: #eef2f7;
+      padding: 0.01in 0.03in;
+      border-radius: 5px;
+    }
+
+    .footer {
+      border-top: 1px solid var(--line);
+      padding-top: 0.08in;
+      color: var(--muted);
+      font-size: 8.3pt;
+      display: flex;
+      justify-content: space-between;
+      gap: 0.1in;
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <h1>Outdated Tests and Unimplemented Features</h1>
+      <p class="subhead">
+        Repo-backed review of where automated coverage lags current behavior and where visible product capabilities are partial, local-only, or not wired through.
+      </p>
+    </section>
+
+    <section class="top-grid">
+      <div class="section">
+        <h2>What It Is</h2>
+        <p>
+          This is a one-page status snapshot of test coverage drift and incomplete features in the Discord-clone repo. It focuses on evidence visible in current source, test files, reviewer guidance, and backend route wiring.
+        </p>
+      </div>
+      <div class="section">
+        <h2>Who It’s For</h2>
+        <p>
+          The development team seeking to strengthen automated tests, close feature gaps, and align the UI, API surface, and reviewer expectations.
+        </p>
+      </div>
+    </section>
+
+    <section class="mid-grid">
+      <div class="section">
+        <h2>What It Does</h2>
+        <ul>
+          <li><span class="chip">Test gap</span> Backend integration tests exist, but no frontend automated tests were found in repo.</li>
+          <li><span class="chip">Test gap</span> Reviewer guidance expects reply-to-message behavior, yet <code>messages.test.js</code> does not verify reply creation or reply rendering.</li>
+          <li><span class="chip">Test gap</span> Channel reorder and message search routes exist, but matching automated tests were not found.</li>
+          <li><span class="chip">Feature gap</span> Mobile “Search direct chats...” state is defined in <code>MainLayout.tsx</code>, but no filtering hook-up beyond input state was found.</li>
+          <li><span class="chip">Feature gap</span> Unread/read tracking is marked “local for now” in <code>AppContext.tsx</code>, so read state is not persisted server-side.</li>
+          <li><span class="chip">Feature gap</span> Real-time socket sync was not found in repo; reviewer docs also note navigation/refresh is needed to observe others’ new messages.</li>
+        </ul>
+      </div>
+
+      <div class="section arch">
+        <h2>How It Works</h2>
+        <p>
+          Frontend: React + React Router uses <code>AppContext</code> for auth, selected server/channel/DM, messages, invites, and local unread state.
+        </p>
+        <p>
+          UI flow: components such as <code>MessageArea</code>, <code>MessageInput</code>, <code>MessageItem</code>, and <code>ServerSearch</code> call <code>apiService.ts</code> for REST reads/writes and also contain some local fallbacks.
+        </p>
+        <p>
+          Backend: Express mounts routes for auth, servers, channels, messages, DMs, summaries, users, friends, and invites on top of PostgreSQL tables created at startup.
+        </p>
+        <p>
+          Data flow: browser state drives REST requests to port 3001, backend validates access, persists rows in PostgreSQL, then returns normalized payloads consumed by the frontend context. Socket transport was not found in repo.
+        </p>
+      </div>
+    </section>
+
+    <section class="bottom-grid">
+      <div class="section">
+        <h2>Highest-Value Test Updates</h2>
+        <ul>
+          <li>Add API tests for replies, message search, channel reorder, and invite-message rendering side effects.</li>
+          <li>Add frontend or E2E coverage for manual summary modal, “What You Missed,” mention picker, and DM search behavior.</li>
+          <li>Reconcile reviewer checklist items with what the current automated suites actually assert.</li>
+        </ul>
+      </div>
+      <div class="section">
+        <h2>Not Found In Repo</h2>
+        <ul>
+          <li>Frontend unit/component test files.</li>
+          <li>Browser E2E test suite.</li>
+          <li>Persistent server-side unread/read receipts.</li>
+          <li>Dedicated real-time WebSocket or Socket.IO layer.</li>
+        </ul>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <span>Evidence sources: REVIEWERS_GUIDE.md, simple-server/tests/*.test.js, src/app/pages/MainLayout.tsx, src/app/context/AppContext.tsx, src/app/components/messaging/*.tsx, src/app/components/search/ServerSearch.tsx, simple-server/routes/channel.js, simple-server/routes/messages.js.</span>
+      <span>Scope: repo evidence only.</span>
+    </footer>
+  </main>
+</body>
+</html>

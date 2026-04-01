@@ -69,6 +69,18 @@ class User {
     }
   }
 
+  // Find user by ID including password hash for auth-sensitive updates
+  static async findByIdWithPassword(id) {
+    const query = 'SELECT * FROM users WHERE id = $1';
+
+    try {
+      const result = await pool.query(query, [id]);
+      return result.rows[0];
+    } catch (error) {
+      throw error;
+    }
+  }
+
   // Update user status
   static async updateStatus(id, status) {
     const query = `
@@ -117,6 +129,23 @@ class User {
 
     try {
       const result = await pool.query(query, values);
+      return result.rows[0];
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Update the user's password hash
+  static async updatePassword(id, passwordHash) {
+    const query = `
+      UPDATE users
+      SET password_hash = $1, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $2
+      RETURNING id, username, email, display_name, avatar, status, created_at, updated_at
+    `;
+
+    try {
+      const result = await pool.query(query, [passwordHash, id]);
       return result.rows[0];
     } catch (error) {
       throw error;

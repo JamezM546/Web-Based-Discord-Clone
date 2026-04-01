@@ -2,6 +2,8 @@ const express = require('express');
 const User = require('../models/User');
 const { pool } = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
+const { validate, resetPasswordSchema } = require('../utils/validation');
+const { resetPassword } = require('../services/userService');
 
 const router = express.Router();
 
@@ -75,6 +77,29 @@ router.put('/me/status', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Error updating status:', error);
     res.status(400).json({ success: false, message: error.message || 'Failed to update status' });
+  }
+});
+
+// PUT /api/users/me/password  — reset password for authenticated user
+router.put('/me/password', authenticateToken, validate(resetPasswordSchema), async (req, res) => {
+  try {
+    const user = await resetPassword({
+      userId: req.user.id,
+      currentPassword: req.body.currentPassword,
+      newPassword: req.body.newPassword,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Password updated successfully',
+      data: { user },
+    });
+  } catch (error) {
+    console.error('Error resetting password:', error);
+    res.status(400).json({
+      success: false,
+      message: error.message || 'Failed to reset password',
+    });
   }
 });
 

@@ -9,8 +9,9 @@ import {
 } from '../ui/sheet';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
-import { Camera, X } from 'lucide-react';
+import { Camera } from 'lucide-react';
 import { Label } from '../ui/label';
+import { apiService } from '../../services/apiService';
 
 interface UserSettingsProps {
   open: boolean;
@@ -22,6 +23,12 @@ export const UserSettings: React.FC<UserSettingsProps> = ({ open, onOpenChange }
   const [displayName, setDisplayName] = useState(currentUser?.displayName || '');
   const [avatarUrl, setAvatarUrl] = useState(currentUser?.avatar || '');
   const [previewAvatar, setPreviewAvatar] = useState(currentUser?.avatar || '');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordSuccess, setPasswordSuccess] = useState('');
+  const [isSavingPassword, setIsSavingPassword] = useState(false);
 
   if (!currentUser) return null;
 
@@ -49,7 +56,51 @@ export const UserSettings: React.FC<UserSettingsProps> = ({ open, onOpenChange }
     setDisplayName(currentUser.displayName || '');
     setAvatarUrl(currentUser.avatar);
     setPreviewAvatar(currentUser.avatar);
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setPasswordError('');
+    setPasswordSuccess('');
     onOpenChange(false);
+  };
+
+  const handlePasswordReset = async () => {
+    setPasswordError('');
+    setPasswordSuccess('');
+
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      setPasswordError('Fill in all password fields.');
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      setPasswordError('New password must be at least 6 characters.');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPasswordError('New password and confirmation must match.');
+      return;
+    }
+
+    if (currentPassword === newPassword) {
+      setPasswordError('New password must be different from the current password.');
+      return;
+    }
+
+    setIsSavingPassword(true);
+    try {
+      await apiService.resetPassword(currentPassword, newPassword);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setPasswordSuccess('Password updated successfully.');
+    } catch (error) {
+      console.error('Password reset failed:', error);
+      setPasswordError(error instanceof Error ? error.message : 'Failed to update password.');
+    } finally {
+      setIsSavingPassword(false);
+    }
   };
 
   return (
@@ -145,6 +196,83 @@ export const UserSettings: React.FC<UserSettingsProps> = ({ open, onOpenChange }
                   {currentUser.email}
                 </div>
                 <p className="text-xs text-[#475569]">Your email is private and cannot be changed.</p>
+              </div>
+
+              {/* Password Reset */}
+              <div className="space-y-4 rounded-2xl border border-[#1e3248] bg-[#091322] p-4">
+                <div>
+                  <Label className="text-xs font-semibold text-[#64748b] uppercase tracking-wider">
+                    Reset Password
+                  </Label>
+                  <p className="mt-1 text-xs text-[#475569]">
+                    Enter your current password and choose a new one.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="currentPassword" className="text-xs font-semibold text-[#64748b] uppercase tracking-wider">
+                    Current Password
+                  </Label>
+                  <Input
+                    id="currentPassword"
+                    type="password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    className="bg-[#060c18] border border-[#1e3248] text-[#e2e8f0] placeholder:text-[#475569] focus-visible:ring-[#06b6d4]/50"
+                    placeholder="Current password"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="newPassword" className="text-xs font-semibold text-[#64748b] uppercase tracking-wider">
+                    New Password
+                  </Label>
+                  <Input
+                    id="newPassword"
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="bg-[#060c18] border border-[#1e3248] text-[#e2e8f0] placeholder:text-[#475569] focus-visible:ring-[#06b6d4]/50"
+                    placeholder="At least 6 characters"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="confirmPassword" className="text-xs font-semibold text-[#64748b] uppercase tracking-wider">
+                    Confirm New Password
+                  </Label>
+                  <Input
+                    id="confirmPassword"
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="bg-[#060c18] border border-[#1e3248] text-[#e2e8f0] placeholder:text-[#475569] focus-visible:ring-[#06b6d4]/50"
+                    placeholder="Repeat new password"
+                  />
+                </div>
+
+                {passwordError && (
+                  <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400" role="alert">
+                    {passwordError}
+                  </div>
+                )}
+
+                {passwordSuccess && (
+                  <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-400" role="status">
+                    {passwordSuccess}
+                  </div>
+                )}
+
+                <div className="flex justify-end">
+                  <Button
+                    type="button"
+                    onClick={handlePasswordReset}
+                    disabled={isSavingPassword}
+                    className="bg-[#1e5eff] hover:bg-[#1b4fd9] text-white border-none"
+                  >
+                    {isSavingPassword ? 'Updating Password...' : 'Update Password'}
+                  </Button>
+                </div>
               </div>
             </div>
 

@@ -90,6 +90,27 @@ const verifyPassword = async (password, hashedPassword) => {
   return await bcrypt.compare(password, hashedPassword);
 };
 
+// Reset password for an authenticated user
+const resetPassword = async ({ userId, currentPassword, newPassword }) => {
+  const userWithPassword = await User.findByIdWithPassword(userId);
+  if (!userWithPassword) {
+    throw new Error('User not found');
+  }
+
+  const isValidPassword = await verifyPassword(currentPassword, userWithPassword.password_hash);
+  if (!isValidPassword) {
+    throw new Error('Current password is incorrect');
+  }
+
+  const isSamePassword = await verifyPassword(newPassword, userWithPassword.password_hash);
+  if (isSamePassword) {
+    throw new Error('New password must be different from the current password');
+  }
+
+  const passwordHash = await hashPassword(newPassword);
+  return await User.updatePassword(userId, passwordHash);
+};
+
 // Register new user
 const registerUser = async (userData) => {
   const { username, email, password } = userData;
@@ -158,6 +179,7 @@ const getAllUsers = async () => {
 module.exports = {
   registerUser,
   loginUser,
+  resetPassword,
   getUserById,
   getAllUsers,
   initializeDemoAccounts

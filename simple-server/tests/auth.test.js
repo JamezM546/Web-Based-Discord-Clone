@@ -86,3 +86,61 @@ describe('Auth — GET /api/auth/me', () => {
     expect(res.status).toBe(403);
   });
 });
+
+describe('Auth - PUT /api/users/me/password', () => {
+  test('resets the password for an authenticated user and allows login with the new password', async () => {
+    const unique = `resetuser${Date.now()}`;
+    const email = `${unique}@test.com`;
+    const originalPassword = 'pass1234';
+    const newPassword = 'newpass5678';
+
+    const registerRes = await request
+      .post('/api/auth/register')
+      .send({ username: unique, email, password: originalPassword });
+
+    expect(registerRes.status).toBe(201);
+
+    const token = registerRes.body.data.token;
+    const resetRes = await request
+      .put('/api/users/me/password')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ currentPassword: originalPassword, newPassword });
+
+    expect(resetRes.status).toBe(200);
+    expect(resetRes.body.success).toBe(true);
+
+    const oldLoginRes = await request
+      .post('/api/auth/login')
+      .send({ email, password: originalPassword });
+
+    expect(oldLoginRes.status).toBe(401);
+
+    const newLoginRes = await request
+      .post('/api/auth/login')
+      .send({ email, password: newPassword });
+
+    expect(newLoginRes.status).toBe(200);
+    expect(newLoginRes.body.success).toBe(true);
+    expect(newLoginRes.body.data.token).toBeDefined();
+  });
+
+  test('rejects reset when the current password is incorrect', async () => {
+    const res = await request
+      .put('/api/users/me/password')
+      .set('Authorization', `Bearer ${getToken()}`)
+      .send({ currentPassword: 'wrong-password', newPassword: 'betterpass123' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.success).toBe(false);
+  });
+
+  test('rejects reset when the new password matches the current password', async () => {
+    const res = await request
+      .put('/api/users/me/password')
+      .set('Authorization', `Bearer ${getToken()}`)
+      .send({ currentPassword: 'password123', newPassword: 'password123' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.success).toBe(false);
+  });
+});

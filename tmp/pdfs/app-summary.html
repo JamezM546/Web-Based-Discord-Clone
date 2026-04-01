@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Web-Based Discord Clone Summary</title>
+  <style>
+    @page {
+      size: Letter;
+      margin: 0.38in;
+    }
+
+    :root {
+      --ink: #102033;
+      --muted: #516173;
+      --accent: #1e5eff;
+      --accent-soft: #e9f0ff;
+      --line: #d7e1ee;
+      --panel: #f7f9fc;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Arial, sans-serif;
+      color: var(--ink);
+      background: white;
+      font-size: 10.2pt;
+      line-height: 1.26;
+    }
+
+    .page {
+      height: 9.74in;
+      display: grid;
+      grid-template-rows: auto auto 1fr auto;
+      gap: 0.12in;
+    }
+
+    .hero {
+      border: 1px solid var(--line);
+      background: linear-gradient(135deg, #f8fbff 0%, #eef4ff 100%);
+      border-radius: 16px;
+      padding: 0.18in 0.22in 0.16in;
+    }
+
+    h1 {
+      margin: 0 0 0.05in;
+      font-size: 20pt;
+      line-height: 1.05;
+      letter-spacing: -0.02em;
+    }
+
+    .subhead {
+      margin: 0;
+      color: var(--muted);
+      font-size: 10.2pt;
+    }
+
+    .top-grid {
+      display: grid;
+      grid-template-columns: 1fr 0.88fr;
+      gap: 0.12in;
+    }
+
+    .section {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: white;
+      padding: 0.14in 0.17in;
+    }
+
+    .section h2 {
+      margin: 0 0 0.08in;
+      font-size: 10pt;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--accent);
+    }
+
+    .section p {
+      margin: 0;
+    }
+
+    .middle-grid {
+      display: grid;
+      grid-template-columns: 1.06fr 0.94fr;
+      gap: 0.12in;
+      align-items: start;
+    }
+
+    ul {
+      margin: 0;
+      padding-left: 0.17in;
+    }
+
+    li {
+      margin: 0 0 0.05in;
+    }
+
+    li:last-child {
+      margin-bottom: 0;
+    }
+
+    .arch {
+      background: var(--panel);
+    }
+
+    .arch p + p {
+      margin-top: 0.07in;
+    }
+
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.08in;
+    }
+
+    .step {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 0.11in 0.12in;
+      background: white;
+    }
+
+    .step strong {
+      display: block;
+      color: var(--accent);
+      margin-bottom: 0.04in;
+      font-size: 9.7pt;
+    }
+
+    code {
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 8.9pt;
+      background: var(--accent-soft);
+      padding: 0.01in 0.03in;
+      border-radius: 5px;
+    }
+
+    .footer {
+      color: var(--muted);
+      font-size: 8.5pt;
+      display: flex;
+      justify-content: space-between;
+      gap: 0.1in;
+      border-top: 1px solid var(--line);
+      padding-top: 0.08in;
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <h1>Web-Based Discord Clone</h1>
+      <p class="subhead">
+        Repo summary based on README, frontend source, backend routes, Docker config, and database setup.
+      </p>
+    </section>
+
+    <section class="top-grid">
+      <div class="section">
+        <h2>What It Is</h2>
+        <p>
+          A browser-based communication app modeled after Discord, with a React frontend, Express backend,
+          and PostgreSQL data store. The repo includes chat, servers/channels, direct messaging, friend
+          workflows, and summary features packaged to run with Docker Compose.
+        </p>
+      </div>
+      <div class="section">
+        <h2>Who It’s For</h2>
+        <p>
+          People who want Discord-style communities and private chats in the browser, including users who need
+          spaces, topic-based channels, DMs, and lightweight catch-up tools.
+        </p>
+      </div>
+    </section>
+
+    <section class="middle-grid">
+      <div class="section">
+        <h2>What It Does</h2>
+        <ul>
+          <li>Authenticates users with login, registration, JWT-backed sessions, and profile/status updates.</li>
+          <li>Lets users create and manage servers plus text channels.</li>
+          <li>Supports channel messaging, direct messages, replies, edit/delete, and emoji reactions.</li>
+          <li>Handles friend discovery, requests, acceptance/rejection, and DM creation.</li>
+          <li>Supports server invites with pending, accept, and decline flows.</li>
+          <li>Provides message summaries through Manual Summary and “What You Missed” preview features.</li>
+        </ul>
+      </div>
+
+      <div class="section arch">
+        <h2>How It Works</h2>
+        <p>
+          Frontend: Vite + React app with React Router routes and a shared <code>AppContext</code> that manages
+          auth, selected server/channel/DM, message state, and unread tracking.
+        </p>
+        <p>
+          Service layer: <code>apiService.ts</code> calls REST endpoints on <code>http://localhost:3001</code>,
+          attaching the stored JWT for protected requests.
+        </p>
+        <p>
+          Backend: Express mounts auth, servers, channels, messages, direct messages, summaries, users, friends,
+          and invites routes; startup also initializes tables and seeds demo data.
+        </p>
+        <p>
+          Data: PostgreSQL stores users, servers, memberships, channels, messages, reactions, DMs, friend requests,
+          and server invites. Summary generation uses an in-repo mocked summarization provider; real-time socket
+          transport was not found in repo.
+        </p>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>How To Run</h2>
+      <div class="steps">
+        <div class="step">
+          <strong>1. Open repo root</strong>
+          Run commands from the folder containing <code>docker-compose.yml</code>.
+        </div>
+        <div class="step">
+          <strong>2. Start services</strong>
+          Use <code>docker compose up --build</code>.<br />
+          Legacy fallback: <code>docker-compose up --build</code>.
+        </div>
+        <div class="step">
+          <strong>3. Open app</strong>
+          Frontend: <code>http://localhost:5173</code><br />
+          API docs: <code>http://localhost:3001/api/docs</code>
+        </div>
+        <div class="step">
+          <strong>4. Log in</strong>
+          Demo account in README: <code>nafisa@example.com</code> / <code>password123</code>
+        </div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <span>Evidence sources: README, docker-compose.yml, src/app/context/AppContext.tsx, src/app/services/apiService.ts, simple-server/server.js, simple-server/config/database.js, simple-server/services/summaryService.js.</span>
+      <span>Not found in repo: dedicated real-time socket layer.</span>
+    </footer>
+  </main>
+</body>
+</html>
