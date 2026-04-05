@@ -7,7 +7,12 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test:backend": "docker compose run --rm backend sh -c \"npm install && npm test\""
+    "test:backend": "docker compose run --rm backend sh -c \"npm install && npm test\"",
+    "test": "jest",
+    "test:frontend": "jest --testPathPatterns=tests/",
+    "test:appcontext": "jest --testPathPatterns=tests/appcontext.unit.test.tsx",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
   },
   "dependencies": {
     "@emotion/react": "11.14.0",
@@ -67,10 +72,25 @@
     "vaul": "1.1.2"
   },
   "devDependencies": {
+    "@babel/core": "^7.29.0",
+    "@babel/preset-env": "^7.29.2",
+    "@babel/preset-react": "^7.28.5",
+    "@babel/preset-typescript": "^7.28.5",
     "@tailwindcss/vite": "4.1.12",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/jest": "^30.0.0",
+    "@types/supertest": "^7.2.0",
     "@vitejs/plugin-react": "4.7.0",
+    "babel-jest": "^30.3.0",
+    "babel-plugin-transform-import-meta": "^2.3.3",
+    "babel-plugin-transform-vite-meta-env": "^1.0.3",
+    "jest": "^30.3.0",
+    "jest-environment-jsdom": "^30.3.0",
     "tailwindcss": "4.1.12",
-    "vite": "6.3.5"
+    "ts-jest": "^29.4.9",
+    "vite": "6.3.5",
+    "vitest": "^4.1.2"
   },
   "peerDependencies": {
     "react": "18.3.1",
