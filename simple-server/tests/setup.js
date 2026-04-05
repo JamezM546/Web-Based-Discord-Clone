@@ -1,3 +1,7 @@
+const { TextEncoder, TextDecoder } = require('util');
+global.TextEncoder = TextEncoder;
+global.TextDecoder = TextDecoder;
+
 // Load test-specific env for host-side `npm test` (localhost DB).
 // When tests run via `docker compose run backend npm test`, Compose already sets
 // DATABASE_* / DATABASE_URL; dotenv does not override existing env vars.
