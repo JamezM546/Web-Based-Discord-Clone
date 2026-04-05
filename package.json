@@ -8,6 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "test:backend": "docker compose run --rm backend sh -c \"npm install && npm test\"",
+    "test:api-service": "vitest run src/tests/apiService.test.ts",
     "test:frontend": "vitest run",
     "test:frontend:watch": "vitest",
     "test:frontend:coverage": "vitest run --coverage"

@@ -406,7 +406,7 @@ describe('ApiService', () => {
       expect(await apiService.createChannel('s1', 'general')).toEqual(ch);
     });
 
-    it('getChannels returns channels array when empty', async () => {
+    it('getChannels returns empty array when channels is empty', async () => {
       await setup();
       fetchMock.mockResolvedValueOnce(
         jsonRes({ success: true, data: { channels: [] } })
@@ -763,7 +763,7 @@ describe('ApiService', () => {
   });
 
   describe('friends', () => {
-    it('getFriends returns friends array when empty', async () => {
+    it('getFriends returns empty array when friends is empty', async () => {
       await setup();
       fetchMock.mockResolvedValueOnce(
         jsonRes({ success: true, data: { friends: [] } })
