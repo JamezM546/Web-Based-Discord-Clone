@@ -10,9 +10,12 @@ jest.mock('../src/app/services/apiService', () => ({
     getServers: jest.fn(),
     getChannels: jest.fn(),
     getDirectMessages: jest.fn(),
+    getChannelMessages: jest.fn(),
+    getDmMessages: jest.fn(),
     getFriends: jest.fn(),
     getFriendRequests: jest.fn(),
     getPendingInvites: jest.fn(),
+    getServerDetails: jest.fn(),
     login: jest.fn(),
     register: jest.fn(),
     logout: jest.fn(),
@@ -32,24 +35,118 @@ jest.mock('../src/app/services/apiService', () => ({
     acceptFriendRequest: jest.fn(),
     rejectFriendRequest: jest.fn(),
     createDirectMessage: jest.fn(),
-    updateUserStatus: jest.fn(),
-    updateUserProfile: jest.fn(),
+    updateStatus: jest.fn(),
+    updateProfile: jest.fn(),
   },
 }));
+
+const mockApi = apiService as jest.Mocked<typeof apiService>;
+
+const baseCurrentUser = {
+  id: 'u1',
+  username: 'test_user',
+  email: 'test@example.com',
+  status: 'online',
+  display_name: 'Test User',
+  avatar: 'avatar.png',
+};
+
+const createAuthResponse = (user: Partial<typeof baseCurrentUser> = {}) => ({
+  success: true,
+  data: {
+    user: {
+      ...baseCurrentUser,
+      ...user,
+    },
+  },
+});
+
+const resetApiMocks = () => {
+  jest.resetAllMocks();
+  mockApi.isAuthenticated.mockReturnValue(false);
+  mockApi.getCurrentUser.mockResolvedValue(createAuthResponse());
+  mockApi.getServers.mockResolvedValue([]);
+  mockApi.getChannels.mockResolvedValue([]);
+  mockApi.getDirectMessages.mockResolvedValue([]);
+  mockApi.getChannelMessages.mockResolvedValue([]);
+  mockApi.getDmMessages.mockResolvedValue([]);
+  mockApi.getFriends.mockResolvedValue([]);
+  mockApi.getFriendRequests.mockResolvedValue([]);
+  mockApi.getPendingInvites.mockResolvedValue([]);
+  mockApi.getServerDetails.mockResolvedValue({ members: [] });
+  mockApi.login.mockResolvedValue({
+    user: {
+      ...baseCurrentUser,
+    },
+    token: 'token',
+  } as any);
+  mockApi.register.mockResolvedValue({
+    user: {
+      ...baseCurrentUser,
+    },
+    token: 'token',
+  } as any);
+  mockApi.logout.mockImplementation(() => {});
+  mockApi.createServer.mockResolvedValue({ id: 's-new', name: 'New Server', icon: '🚀', owner_id: 'u1' } as any);
+  mockApi.deleteServer.mockResolvedValue(undefined as any);
+  mockApi.updateServer.mockResolvedValue({ id: 's1', name: 'Updated Server', icon: '✨', owner_id: 'u1' } as any);
+  mockApi.sendServerInvite.mockResolvedValue(undefined as any);
+  mockApi.acceptServerInvite.mockResolvedValue(undefined as any);
+  mockApi.declineServerInvite.mockResolvedValue(undefined as any);
+  mockApi.createChannel.mockResolvedValue({ id: 'c-new', server_id: 's1', name: 'general' } as any);
+  mockApi.createMessage.mockResolvedValue({
+    id: 'm-default',
+    content: 'message',
+    author_id: 'u1',
+    channel_id: 'c1',
+    timestamp: new Date().toISOString(),
+    edited: false,
+  } as any);
+  mockApi.editMessage.mockResolvedValue({
+    id: 'm-default',
+    content: 'edited',
+    author_id: 'u1',
+    channel_id: 'c1',
+    timestamp: new Date().toISOString(),
+    edited: true,
+  } as any);
+  mockApi.deleteMessage.mockResolvedValue(undefined as any);
+  mockApi.toggleReaction.mockResolvedValue({ reactions: [] } as any);
+  mockApi.sendFriendRequest.mockResolvedValue(undefined as any);
+  mockApi.acceptFriendRequest.mockResolvedValue(undefined as any);
+  mockApi.rejectFriendRequest.mockResolvedValue(undefined as any);
+  mockApi.createDirectMessage.mockResolvedValue({
+    id: 'dm-default',
+    participants: ['u1', 'u2'],
+    last_message_time: new Date().toISOString(),
+    other_user_id: 'u2',
+    username: 'friend_user',
+  } as any);
+  mockApi.updateStatus.mockResolvedValue(baseCurrentUser as any);
+  mockApi.updateProfile.mockResolvedValue(baseCurrentUser as any);
+};
 
 const wrapper = ({ children }: { children: React.ReactNode }) => (
   <AppProvider>{children}</AppProvider>
 );
 
 describe('AppContext Unit Tests', () => {
+  let consoleErrorSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    resetApiMocks();
+    consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    expect(consoleErrorSpy).not.toHaveBeenCalled();
+    consoleErrorSpy.mockRestore();
+  });
   
   describe('Helper Functions (Indirect Tests)', () => {
     test('mapBackendMessageRowToFrontend: should transform backend message row to frontend format', async () => {
-      (apiService.isAuthenticated as jest.Mock).mockReturnValue(true);
-      (apiService.getCurrentUser as jest.Mock).mockResolvedValue({
-        success: true,
-        data: { user: { id: "currentUser", username: "current" } }
-      });
+      mockApi.isAuthenticated.mockReturnValue(true);
+      mockApi.getCurrentUser.mockResolvedValue(createAuthResponse({ id: 'currentUser', username: 'current' }));
 
       const mockBackendRow = {
         id: "msg1",
@@ -59,7 +156,7 @@ describe('AppContext Unit Tests', () => {
         timestamp: "2023-01-01T00:00:00Z",
         edited: false
       };
-      (apiService.createMessage as jest.Mock).mockResolvedValue(mockBackendRow);
+      mockApi.createMessage.mockResolvedValue(mockBackendRow);
 
       const { result } = renderHook(() => useApp(), { wrapper });
 
@@ -86,11 +183,8 @@ describe('AppContext Unit Tests', () => {
     });
 
     test('mergeUsersFromMessageRows: should merge users from message rows into state', async () => {
-      (apiService.isAuthenticated as jest.Mock).mockReturnValue(true);
-      (apiService.getCurrentUser as jest.Mock).mockResolvedValue({
-        success: true,
-        data: { user: { id: "currentUser", username: "current" } }
-      });
+      mockApi.isAuthenticated.mockReturnValue(true);
+      mockApi.getCurrentUser.mockResolvedValue(createAuthResponse({ id: 'currentUser', username: 'current' }));
 
       // The presence of author_id and username will trigger mergeUsersFromMessageRows inside sendMessage
       const mockBackendRowWithUser = {
@@ -100,7 +194,7 @@ describe('AppContext Unit Tests', () => {
         username: "jane", 
         timestamp: "2023-01-01T00:00:00Z"
       };
-      (apiService.createMessage as jest.Mock).mockResolvedValue(mockBackendRowWithUser);
+      mockApi.createMessage.mockResolvedValue(mockBackendRowWithUser);
 
       const { result } = renderHook(() => useApp(), { wrapper });
 
@@ -120,11 +214,8 @@ describe('AppContext Unit Tests', () => {
     });
 
     test('upsertUsers: should add new users and update existing ones without duplicates', async () => {
-      (apiService.isAuthenticated as jest.Mock).mockReturnValue(true);
-      (apiService.getCurrentUser as jest.Mock).mockResolvedValue({
-        success: true,
-        data: { user: { id: "currentUser", username: "current" } }
-      });
+      mockApi.isAuthenticated.mockReturnValue(true);
+      mockApi.getCurrentUser.mockResolvedValue(createAuthResponse({ id: 'currentUser', username: 'current' }));
 
       const { result } = renderHook(() => useApp(), { wrapper });
 
@@ -133,7 +224,7 @@ describe('AppContext Unit Tests', () => {
       });
 
       // 1. Add new user via refreshFriends (which calls upsertUsers internally)
-      (apiService.getFriends as jest.Mock).mockResolvedValue([
+      mockApi.getFriends.mockResolvedValue([
         { id: "user3", username: "bob", status: "online" }
       ]);
 
@@ -148,7 +239,7 @@ describe('AppContext Unit Tests', () => {
       });
 
       // 2. Update existing user (same ID, new username)
-      (apiService.getFriends as jest.Mock).mockResolvedValue([
+      mockApi.getFriends.mockResolvedValue([
         { id: "user3", username: "bob_updated", status: "online" }
       ]);
 
@@ -381,19 +472,16 @@ describe('AppContext Unit Tests', () => {
     });
 
     test('11. login: should authenticate user, update state, and return true on success', async () => {
-      (apiService.isAuthenticated as jest.Mock).mockReturnValue(false);
-      
-      // Providing a comprehensive mock in case your code expects token/user at specific levels
-      const mockAuthResponse = {
-        success: true,
-        token: "fake-token",
-        user: { id: "u2", username: "login_user" },
-        data: { token: "fake-token", user: { id: "u2", username: "login_user" } }
-      };
-      (apiService.login as jest.Mock).mockResolvedValue(mockAuthResponse);
-      
-      // Mock getCurrentUser just in case login triggers it internally after succeeding
-      (apiService.getCurrentUser as jest.Mock).mockResolvedValue(mockAuthResponse);
+      mockApi.isAuthenticated.mockReturnValue(false);
+      mockApi.login.mockResolvedValue({
+        user: {
+          ...baseCurrentUser,
+          id: 'u2',
+          username: 'login_user',
+          email: 'login@example.com',
+        },
+        token: 'fake-token',
+      } as any);
 
       const { result } = renderHook(() => useApp(), { wrapper });
 
@@ -403,8 +491,6 @@ describe('AppContext Unit Tests', () => {
 
       let loginResult;
       await act(async () => {
-        // Pretend authentication succeeds dynamically during the act phase
-        (apiService.isAuthenticated as jest.Mock).mockReturnValue(true);
         loginResult = await result.current.login("test@test.com", "password123");
       });
 
@@ -414,16 +500,16 @@ describe('AppContext Unit Tests', () => {
     });
 
     test('12. register: should create account, update state, and return true on success', async () => {
-      (apiService.isAuthenticated as jest.Mock).mockReturnValue(false);
-      
-      const mockAuthResponse = {
-        success: true,
-        token: "fake-token",
-        user: { id: "u3", username: "new_user" },
-        data: { token: "fake-token", user: { id: "u3", username: "new_user" } }
-      };
-      (apiService.register as jest.Mock).mockResolvedValue(mockAuthResponse);
-      (apiService.getCurrentUser as jest.Mock).mockResolvedValue(mockAuthResponse);
+      mockApi.isAuthenticated.mockReturnValue(false);
+      mockApi.register.mockResolvedValue({
+        user: {
+          ...baseCurrentUser,
+          id: 'u3',
+          username: 'new_user',
+          email: 'new@example.com',
+        },
+        token: 'fake-token',
+      } as any);
 
       const { result } = renderHook(() => useApp(), { wrapper });
 
@@ -433,7 +519,6 @@ describe('AppContext Unit Tests', () => {
 
       let registerResult;
       await act(async () => {
-        (apiService.isAuthenticated as jest.Mock).mockReturnValue(true);
         registerResult = await result.current.register("new_user", "test@test.com", "password123");
       });
 
@@ -719,12 +804,13 @@ describe('AppContext Unit Tests', () => {
       const mockBackendMessage = {
         id: "m1",
         content: "Hello world!",
-        user_id: "u1",
+        author_id: "u1",
         channel_id: "c1",
-        created_at: new Date().toISOString(),
+        timestamp: new Date().toISOString(),
+        edited: false,
       };
       
-      (apiService.createMessage as jest.Mock).mockResolvedValue(mockBackendMessage);
+      mockApi.createMessage.mockResolvedValue(mockBackendMessage);
 
       const { result } = renderHook(() => useApp(), { wrapper });
 
@@ -786,10 +872,9 @@ describe('AppContext Unit Tests', () => {
 
     test('24. toggleReaction: should call API to add or remove an emoji reaction', async () => {
       const mockReactionResponse = {
-        message_id: "m1",
         reactions: [{ emoji: "👍", count: 1, users: ["u1"] }]
       };
-      (apiService.toggleReaction as jest.Mock).mockResolvedValue(mockReactionResponse);
+      mockApi.toggleReaction.mockResolvedValue(mockReactionResponse as any);
 
       const { result } = renderHook(() => useApp(), { wrapper });
 
@@ -922,12 +1007,13 @@ describe('AppContext Unit Tests', () => {
     test('28. createDirectMessage: should call API and add the new DM to state', async () => {
       const mockNewDM = {
         id: "dm1",
-        user_id_1: "u1",
-        user_id_2: "u2",
-        created_at: new Date().toISOString()
+        participants: ["u1", "u2"],
+        last_message_time: new Date().toISOString(),
+        other_user_id: "u2",
+        username: "dm_friend"
       };
       
-      (apiService.createDirectMessage as jest.Mock).mockResolvedValue(mockNewDM);
+      mockApi.createDirectMessage.mockResolvedValue(mockNewDM as any);
 
       const { result } = renderHook(() => useApp(), { wrapper });
 
@@ -935,9 +1021,6 @@ describe('AppContext Unit Tests', () => {
       await waitFor(() => {
         expect(result.current.directMessages).toHaveLength(0);
       });
-
-      // Update the mock just in case your context triggers a refetch after creation
-      (apiService.getDirectMessages as jest.Mock).mockResolvedValue([mockNewDM]);
 
       await act(async () => {
         await result.current.createDirectMessage("u2");
@@ -949,7 +1032,8 @@ describe('AppContext Unit Tests', () => {
       await waitFor(() => {
         expect(result.current.directMessages).toHaveLength(1);
         expect(result.current.directMessages[0]).toMatchObject({
-          id: "dm1"
+          id: "dm1",
+          participants: ["u1", "u2"]
         });
       });
     });
@@ -957,27 +1041,17 @@ describe('AppContext Unit Tests', () => {
 
   describe('User Profile Functions', () => {
     beforeEach(() => {
-      jest.clearAllMocks();
-      
-      // Mock the background API functions triggered by these updates
-      // Using (apiService as any) in case these weren't defined in your top-level mock setup
-      (apiService as any).updateStatus = jest.fn().mockResolvedValue({ success: true });
-      (apiService as any).updateProfile = jest.fn().mockResolvedValue({ success: true });
-
       // Setup authenticated state using snake_case backend formatting
-      (apiService.isAuthenticated as jest.Mock).mockReturnValue(true);
-      (apiService.getCurrentUser as jest.Mock).mockResolvedValue({
-        success: true,
-        data: { 
-          user: { 
-            id: "u1", 
-            username: "test_user",
-            status: "online",
-            display_name: "Original Name", // Backend snake_case
-            avatar: "original.png"
-          } 
-        }
-      });
+      mockApi.isAuthenticated.mockReturnValue(true);
+      mockApi.getCurrentUser.mockResolvedValue(
+        createAuthResponse({
+          id: "u1",
+          username: "test_user",
+          status: "online",
+          display_name: "Original Name",
+          avatar: "original.png",
+        })
+      );
 
       // Default safe resolves for the rest
       (apiService.getServers as jest.Mock).mockResolvedValue([]);
@@ -1001,7 +1075,7 @@ describe('AppContext Unit Tests', () => {
       });
 
       // Verify the background API call was made
-      expect((apiService as any).updateStatus).toHaveBeenCalledWith("dnd");
+      expect(mockApi.updateStatus).toHaveBeenCalledWith("dnd");
 
       // Verify the local state reflects the new status synchronously
       await waitFor(() => {

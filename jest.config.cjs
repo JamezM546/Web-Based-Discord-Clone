@@ -8,7 +8,8 @@ module.exports = {
     '**/tests/**/*.test.tsx'
   ],
   testPathIgnorePatterns: [
-    'simple-server/tests/'
+    'simple-server/tests/',
+    '<rootDir>/src/tests/',
   ],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
