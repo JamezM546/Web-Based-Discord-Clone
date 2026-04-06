@@ -30,10 +30,10 @@ jobs:
         run: npm ci
 
       - name: Run linting
-        run: npm run lint || echo "No lint script found"
+        run: npm run lint --if-present
 
       - name: Run type checking
-        run: npm run type-check || echo "No type-check script found"
+        run: npm run type-check --if-present
 
       - name: Run Jest (tests/)
         run: npm run test:frontend
