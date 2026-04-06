@@ -49,6 +49,13 @@ export interface Channel {
   messages?: any[];
 }
 
+class HttpResponseError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'HttpResponseError';
+  }
+}
+
 class ApiService {
   private token: string | null = null;
 
@@ -95,12 +102,14 @@ class ApiService {
       const data = await response.json();
       
       if (!response.ok) {
-        throw new Error(data.message || 'Request failed');
+        throw new HttpResponseError(data.message || 'Request failed');
       }
-      
+
       return data;
     } catch (error) {
-      console.error('API Error:', error);
+      if (!(error instanceof HttpResponseError)) {
+        console.error('API Error:', error);
+      }
       throw error;
     }
   }
