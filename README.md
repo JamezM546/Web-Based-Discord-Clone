@@ -279,3 +279,5 @@ The app is designed to be a drop-in replacement for Discord, with a focus on sim
 - Docker Compose
 
 **Total setup time: Less than 5 minutes**
+
+_CI trigger note: README updated to verify workflows run on all branch commits._
