@@ -3,9 +3,11 @@ name: Run Frontend Tests
 
 on:
   push:
-    branches: [main, master, develop]
+    branches:
+      - '**'
   pull_request:
-    branches: [main, master, develop]
+    branches:
+      - '**'
 
 jobs:
   test-frontend:

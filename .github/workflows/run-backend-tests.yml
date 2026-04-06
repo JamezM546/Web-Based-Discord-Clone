@@ -2,13 +2,11 @@ name: Run backend tests
 
 on:
   push:
-    paths:
-      - 'simple-server/**'
-      - '.github/workflows/run-backend-tests.yml'
+    branches:
+      - '**'
   pull_request:
-    paths:
-      - 'simple-server/**'
-      - '.github/workflows/run-backend-tests.yml'
+    branches:
+      - '**'
 
 jobs:
   test:
