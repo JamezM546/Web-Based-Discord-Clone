@@ -168,7 +168,6 @@ npm run test:coverage
 npx vitest run src/tests/apiService.test.ts --coverage
 ```
 
-**CI:** Pushes and pull requests to `main`, `master`, or `develop` run **Run Frontend Tests** in GitHub Actions: `npm ci`, optional `lint` / `type-check` if those scripts exist, then `npm run test:frontend:all`. See [`.github/workflows/run-frontend-tests.yml`](.github/workflows/run-frontend-tests.yml).
 
 ---
 
