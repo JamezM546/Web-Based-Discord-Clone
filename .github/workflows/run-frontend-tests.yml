@@ -1,6 +1,6 @@
 # Continuous integration for src/app/services/apiService.ts (Vitest: src/tests/apiService.test.ts).
 # Separate from teammates' broader frontend/backend workflows to avoid duplicate runs.
-name: API service unit tests
+name: Run Frontend Tests
 
 on:
   push:
