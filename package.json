@@ -15,6 +15,7 @@
     "test:coverage": "jest --coverage",
     "test:api-service": "vitest run src/tests/apiService.test.ts",
     "test:api-service:watch": "vitest src/tests/apiService.test.ts",
+    "test:api-service:mutation": "stryker run",
     "test:frontend:all": "npm run test:frontend && npm run test:api-service"
   },
   "dependencies": {
@@ -79,6 +80,8 @@
     "@babel/preset-env": "^7.29.2",
     "@babel/preset-react": "^7.28.5",
     "@babel/preset-typescript": "^7.28.5",
+    "@stryker-mutator/core": "^9.6.0",
+    "@stryker-mutator/vitest-runner": "^9.6.0",
     "@tailwindcss/vite": "4.1.12",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",

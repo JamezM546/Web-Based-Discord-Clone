@@ -1,0 +1,21 @@
+{
+  "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "packageManager": "npm",
+  "testRunner": "vitest",
+  "vitest": {
+    "configFile": "vite.config.ts"
+  },
+  "mutate": ["src/app/services/apiService.ts"],
+  "ignorePatterns": ["**/coverage/**", "**/reports/**", "**/dist/**"],
+  "reporters": ["progress", "clear-text", "html"],
+  "htmlReporter": {
+    "fileName": "reports/mutation/html/index.html"
+  },
+  "disableTypeChecks": true,
+  "concurrency": 4,
+  "thresholds": {
+    "high": 85,
+    "low": 70,
+    "break": null
+  }
+}
