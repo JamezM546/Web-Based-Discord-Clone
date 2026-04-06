@@ -108,6 +108,9 @@
       "optional": true
     }
   },
+  "optionalDependencies": {
+    "@rollup/rollup-linux-x64-gnu": "4.59.0"
+  },
   "pnpm": {
     "overrides": {
       "vite": "6.3.5"
