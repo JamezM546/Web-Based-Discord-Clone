@@ -1,7 +1,7 @@
-import { defineConfig } from 'vite'
 import path from 'path'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
+import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
   plugins: [
@@ -35,6 +35,19 @@ export default defineConfig({
     port: 5173,
     watch: {
       usePolling: true,
+    },
+  },
+
+  test: {
+    environment: 'happy-dom',
+    include: ['src/**/*.test.ts'],
+    restoreMocks: true,
+    clearMocks: true,
+    mockReset: true,
+    coverage: {
+      provider: 'v8',
+      include: ['src/app/services/apiService.ts'],
+      reporter: ['text', 'html'],
     },
   },
 })

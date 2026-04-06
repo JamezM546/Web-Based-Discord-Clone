@@ -109,6 +109,57 @@ cd simple-server
 npx jest userService.unit.test.js User.model.unit.test.js --coverage
 ```
 
+### P5 — frontend unit tests and coverage (repo root, Node.js required)
+
+The frontend uses **two test runners**:
+
+- **Jest** (with Babel) — React and `AppContext` tests under [`tests/`](tests/), mainly [`tests/appcontext.unit.test.tsx`](tests/appcontext.unit.test.tsx). Configuration lives in [`jest.config.cjs`](jest.config.cjs). Files under [`src/tests/`](src/tests/) are **ignored by Jest** so they only run under Vitest.
+- **Vitest** (via the same Vite config as the app) — API client tests for [`src/app/services/apiService.ts`](src/app/services/apiService.ts) in [`src/tests/apiService.test.ts`](src/tests/apiService.test.ts). Test options and Vitest coverage scope are in [`vite.config.ts`](vite.config.ts).
+
+English specifications: [`tests/appContext-test-spec.md`](tests/appContext-test-spec.md) and [`docs/testing/apiService-test-spec.md`](docs/testing/apiService-test-spec.md).
+
+From the **repository root** (next to the root `package.json`, **Node.js 18+** recommended — match CI, which also runs **20.x**):
+
+```bash
+npm ci
+```
+
+*(Use `npm install` if you are not reproducing a clean lockfile install.)*
+
+**Run all Jest frontend tests** (everything under `tests/`):
+
+```bash
+npm run test:frontend
+```
+
+**Run only the AppContext suite:**
+
+```bash
+npm run test:appcontext
+```
+
+**Run the apiService Vitest suite:**
+
+```bash
+npm run test:api-service
+```
+
+**Expected:** Jest finishes the `tests/` suite successfully; Vitest finishes `src/tests/apiService.test.ts` successfully. Exact test counts change over time; you should see on the order of tens of Jest tests and a larger Vitest count for `apiService` (or similar).
+
+**Jest coverage** (paths under `collectCoverageFrom` in `jest.config.cjs`, e.g. `src/**/*.{ts,tsx}` with a few excludes):
+
+```bash
+npm run test:coverage
+```
+
+**Vitest coverage** for `apiService` only (v8 provider; `include` is scoped to `src/app/services/apiService.ts` in `vite.config.ts`):
+
+```bash
+npx vitest run src/tests/apiService.test.ts --coverage
+```
+
+**CI:** Pushes and pull requests to `main`, `master`, or `develop` run **Run Frontend Tests** in GitHub Actions: `npm ci`, optional `lint` / `type-check` if those scripts exist, then `npm run test:frontend` and `npm run test:api-service`. See [`.github/workflows/run-frontend-tests.yml`](.github/workflows/run-frontend-tests.yml).
+
 ---
 
 ## **How to Stop**
