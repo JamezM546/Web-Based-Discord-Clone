@@ -35,11 +35,8 @@ jobs:
       - name: Run type checking
         run: npm run type-check --if-present
 
-      - name: Run Jest (tests/)
-        run: npm run test:frontend
-
-      - name: Run Vitest (apiService)
-        run: npm run test:api-service
+      - name: Run frontend tests (Jest + Vitest)
+        run: npm run test:frontend:all
 
       - name: Upload coverage reports
         if: matrix.node-version == '20.x'

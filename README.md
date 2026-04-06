@@ -126,7 +126,15 @@ npm ci
 
 *(Use `npm install` if you are not reproducing a clean lockfile install.)*
 
-**Run all Jest frontend tests** (everything under `tests/`):
+**Run all frontend automated tests** (Jest for `tests/`, then Vitest for `apiService`) — **recommended**:
+
+```bash
+npm run test:frontend:all
+```
+
+That runs `test:frontend` and `test:api-service` in sequence. The terminal prints each command and its output (Jest first, then Vitest), so you can still see which runner is which.
+
+**Run only Jest** (everything under `tests/`):
 
 ```bash
 npm run test:frontend
@@ -138,13 +146,15 @@ npm run test:frontend
 npm run test:appcontext
 ```
 
-**Run the apiService Vitest suite:**
+**Run only the apiService Vitest suite:**
 
 ```bash
 npm run test:api-service
 ```
 
 **Expected:** Jest finishes the `tests/` suite successfully; Vitest finishes `src/tests/apiService.test.ts` successfully. Exact test counts change over time; you should see on the order of tens of Jest tests and a larger Vitest count for `apiService` (or similar).
+
+**Coverage** stays **two commands** on purpose: Jest and Vitest use different tooling, and both default to writing under `coverage/`—chaining them without extra config would overwrite the first run. Run each when you need that report.
 
 **Jest coverage** (paths under `collectCoverageFrom` in `jest.config.cjs`, e.g. `src/**/*.{ts,tsx}` with a few excludes):
 
@@ -158,7 +168,7 @@ npm run test:coverage
 npx vitest run src/tests/apiService.test.ts --coverage
 ```
 
-**CI:** Pushes and pull requests to `main`, `master`, or `develop` run **Run Frontend Tests** in GitHub Actions: `npm ci`, optional `lint` / `type-check` if those scripts exist, then `npm run test:frontend` and `npm run test:api-service`. See [`.github/workflows/run-frontend-tests.yml`](.github/workflows/run-frontend-tests.yml).
+**CI:** Pushes and pull requests to `main`, `master`, or `develop` run **Run Frontend Tests** in GitHub Actions: `npm ci`, optional `lint` / `type-check` if those scripts exist, then `npm run test:frontend:all`. See [`.github/workflows/run-frontend-tests.yml`](.github/workflows/run-frontend-tests.yml).
 
 ---
 

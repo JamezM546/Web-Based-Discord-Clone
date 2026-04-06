@@ -14,7 +14,8 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "test:api-service": "vitest run src/tests/apiService.test.ts",
-    "test:api-service:watch": "vitest src/tests/apiService.test.ts"
+    "test:api-service:watch": "vitest src/tests/apiService.test.ts",
+    "test:frontend:all": "npm run test:frontend && npm run test:api-service"
   },
   "dependencies": {
     "@emotion/react": "11.14.0",
