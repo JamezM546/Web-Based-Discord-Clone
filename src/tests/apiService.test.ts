@@ -101,8 +101,16 @@ describe('ApiService', () => {
 
     it('throws with server message when response is not ok', async () => {
       await setup();
+      const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       fetchMock.mockResolvedValueOnce(jsonRes({ message: 'Nope' }, false, 400));
-      await expect(apiService.healthCheck()).rejects.toThrow('Nope');
+      await expect(apiService.healthCheck()).rejects.toSatisfy(
+        (e: unknown) =>
+          e instanceof Error &&
+          e.name === 'HttpResponseError' &&
+          (e as Error).message === 'Nope'
+      );
+      expect(errSpy).not.toHaveBeenCalled();
+      errSpy.mockRestore();
     });
 
     it('throws Request failed when not ok and no message', async () => {
@@ -114,9 +122,10 @@ describe('ApiService', () => {
     it('rethrows when fetch rejects and logs to console', async () => {
       await setup();
       const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      fetchMock.mockRejectedValueOnce(new Error('network down'));
+      const netErr = new Error('network down');
+      fetchMock.mockRejectedValueOnce(netErr);
       await expect(apiService.healthCheck()).rejects.toThrow('network down');
-      expect(errSpy).toHaveBeenCalled();
+      expect(errSpy).toHaveBeenCalledWith('API Error:', netErr);
       errSpy.mockRestore();
     });
 
@@ -196,6 +205,21 @@ describe('ApiService', () => {
       await apiService.login('a@b.com', 'secret');
       expect(apiService.getToken()).toBeNull();
     });
+
+    it('does not set token when success is true but body omits data (optional chaining on data.token)', async () => {
+      await setup();
+      fetchMock.mockResolvedValueOnce(jsonRes({ success: true, message: 'ok' }));
+      const out = await apiService.login('a@b.com', 'secret');
+      expect(out).toBeUndefined();
+      expect(apiService.getToken()).toBeNull();
+      expect(fetchMock).toHaveBeenCalledWith(
+        `${BASE}/api/auth/login`,
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ email: 'a@b.com', password: 'secret' }),
+        })
+      );
+    });
   });
 
   describe('register', () => {
@@ -238,6 +262,25 @@ describe('ApiService', () => {
       await apiService.register('new', 'n@b.com', 'pass1234');
       expect(apiService.getToken()).toBeNull();
     });
+
+    it('sends register payload and does not set token when body omits data', async () => {
+      await setup();
+      fetchMock.mockResolvedValueOnce(jsonRes({ success: true, message: 'ok' }));
+      const out = await apiService.register('u', 'a@b.com', 'p');
+      expect(out).toBeUndefined();
+      expect(apiService.getToken()).toBeNull();
+      expect(fetchMock).toHaveBeenCalledWith(
+        `${BASE}/api/auth/register`,
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({
+            username: 'u',
+            email: 'a@b.com',
+            password: 'p',
+          }),
+        })
+      );
+    });
   });
 
   describe('getCurrentUser, testProtected, healthCheck, getApiInfo', () => {
@@ -247,6 +290,7 @@ describe('ApiService', () => {
       fetchMock.mockResolvedValueOnce(jsonRes(body));
       const out = await apiService.getCurrentUser();
       expect(out).toEqual(body);
+      expect(fetchMock).toHaveBeenCalledWith(`${BASE}/api/auth/me`, expect.anything());
     });
 
     it('testProtected returns full ApiResponse body', async () => {
@@ -255,6 +299,10 @@ describe('ApiService', () => {
       fetchMock.mockResolvedValueOnce(jsonRes(body));
       const out = await apiService.testProtected();
       expect(out).toEqual(body);
+      expect(fetchMock).toHaveBeenCalledWith(
+        `${BASE}/api/auth/test-protected`,
+        expect.anything()
+      );
     });
 
     it('healthCheck returns full ApiResponse body', async () => {
@@ -263,6 +311,7 @@ describe('ApiService', () => {
       fetchMock.mockResolvedValueOnce(jsonRes(body));
       const out = await apiService.healthCheck();
       expect(out).toEqual(body);
+      expect(fetchMock).toHaveBeenCalledWith(`${BASE}/health`, expect.anything());
     });
 
     it('getApiInfo returns full ApiResponse body', async () => {
@@ -271,6 +320,7 @@ describe('ApiService', () => {
       fetchMock.mockResolvedValueOnce(jsonRes(body));
       const out = await apiService.getApiInfo();
       expect(out).toEqual(body);
+      expect(fetchMock).toHaveBeenCalledWith(`${BASE}/api`, expect.anything());
     });
   });
 
@@ -356,6 +406,13 @@ describe('ApiService', () => {
       fetchMock.mockResolvedValueOnce(jsonRes({ success: true, data: server }));
       const out = await apiService.updateServer('s1', { name: 'New' });
       expect(out).toEqual(server);
+      expect(fetchMock).toHaveBeenCalledWith(
+        `${BASE}/api/servers/s1`,
+        expect.objectContaining({
+          method: 'PUT',
+          body: JSON.stringify({ name: 'New' }),
+        })
+      );
     });
 
     it('deleteServer', async () => {
@@ -404,6 +461,13 @@ describe('ApiService', () => {
       const ch = { id: 'c1', name: 'general', serverId: 's1' };
       fetchMock.mockResolvedValueOnce(jsonRes({ success: true, data: ch }));
       expect(await apiService.createChannel('s1', 'general')).toEqual(ch);
+      expect(fetchMock).toHaveBeenCalledWith(
+        `${BASE}/api/channels`,
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ name: 'general', serverId: 's1' }),
+        })
+      );
     });
 
     it('getChannels returns empty array when channels is empty', async () => {
@@ -450,6 +514,13 @@ describe('ApiService', () => {
       const ch = { id: 'c1', name: 'x', serverId: 's1' };
       fetchMock.mockResolvedValueOnce(jsonRes({ success: true, data: ch }));
       expect(await apiService.updateChannel('c1', { name: 'x' })).toEqual(ch);
+      expect(fetchMock).toHaveBeenCalledWith(
+        `${BASE}/api/channels/c1`,
+        expect.objectContaining({
+          method: 'PUT',
+          body: JSON.stringify({ name: 'x' }),
+        })
+      );
     });
 
     it('deleteChannel', async () => {
@@ -706,6 +777,10 @@ describe('ApiService', () => {
         jsonRes({ success: true, data: { users: [{ id: '1' }] } })
       );
       expect(await apiService.searchUsers('a', 3)).toEqual([{ id: '1' }]);
+      expect(fetchMock).toHaveBeenCalledWith(
+        `${BASE}/api/users/search?q=a&limit=3`,
+        expect.anything()
+      );
     });
 
     it('searchUsers returns empty array when users is undefined', async () => {
@@ -891,6 +966,280 @@ describe('ApiService', () => {
         `${BASE}/api/invites/i1/decline`,
         expect.objectContaining({ method: 'POST' })
       );
+    });
+  });
+
+  describe('when JSON body omits data (optional chaining / safe access)', () => {
+    const noData = { success: true, message: 'ok' };
+
+    it('getServers returns empty array', async () => {
+      await setup();
+      fetchMock.mockResolvedValueOnce(jsonRes(noData));
+      expect(await apiService.getServers()).toEqual([]);
+      expect(fetchMock).toHaveBeenCalledWith(`${BASE}/api/servers`, expect.anything());
+    });
+
+    it('getFriends returns empty array', async () => {
+      await setup();
+      fetchMock.mockResolvedValueOnce(jsonRes(noData));
+      expect(await apiService.getFriends()).toEqual([]);
+      expect(fetchMock).toHaveBeenCalledWith(`${BASE}/api/friends`, expect.anything());
+    });
+
+    it('getFriendRequests returns empty array', async () => {
+      await setup();
+      fetchMock.mockResolvedValueOnce(jsonRes(noData));
+      expect(await apiService.getFriendRequests()).toEqual([]);
+      expect(fetchMock).toHaveBeenCalledWith(
+        `${BASE}/api/friends/requests`,
+        expect.anything()
+      );
+    });
+
+    it('getPendingInvites returns empty array', async () => {
+      await setup();
+      fetchMock.mockResolvedValueOnce(jsonRes(noData));
+      expect(await apiService.getPendingInvites()).toEqual([]);
+      expect(fetchMock).toHaveBeenCalledWith(
+        `${BASE}/api/invites/pending`,
+        expect.anything()
+      );
+    });
+
+    it('searchUsers returns empty array', async () => {
+      await setup();
+      fetchMock.mockResolvedValueOnce(jsonRes(noData));
+      expect(await apiService.searchUsers('q')).toEqual([]);
+      expect(fetchMock).toHaveBeenCalledWith(
+        `${BASE}/api/users/search?q=q`,
+        expect.anything()
+      );
+    });
+
+    it('searchServers returns empty array', async () => {
+      await setup();
+      fetchMock.mockResolvedValueOnce(jsonRes(noData));
+      expect(await apiService.searchServers('q')).toEqual([]);
+      expect(fetchMock).toHaveBeenCalledWith(
+        `${BASE}/api/servers/search?q=q`,
+        expect.anything()
+      );
+    });
+
+    it('getChannels returns empty array', async () => {
+      await setup();
+      fetchMock.mockResolvedValueOnce(jsonRes(noData));
+      expect(await apiService.getChannels('s1')).toEqual([]);
+      expect(fetchMock).toHaveBeenCalledWith(
+        `${BASE}/api/channels/server/s1`,
+        expect.anything()
+      );
+    });
+
+    it('getChannelMessages returns empty array', async () => {
+      await setup();
+      fetchMock.mockResolvedValueOnce(jsonRes(noData));
+      expect(await apiService.getChannelMessages('c1')).toEqual([]);
+      expect(fetchMock).toHaveBeenCalledWith(
+        `${BASE}/api/messages/channels/c1?limit=50`,
+        expect.anything()
+      );
+    });
+
+    it('getDmMessages returns empty array', async () => {
+      await setup();
+      fetchMock.mockResolvedValueOnce(jsonRes(noData));
+      expect(await apiService.getDmMessages('dm1')).toEqual([]);
+      expect(fetchMock).toHaveBeenCalledWith(
+        `${BASE}/api/messages/dm/dm1?limit=50`,
+        expect.anything()
+      );
+    });
+
+    it('getDirectMessages returns empty array', async () => {
+      await setup();
+      fetchMock.mockResolvedValueOnce(jsonRes(noData));
+      expect(await apiService.getDirectMessages()).toEqual([]);
+      expect(fetchMock).toHaveBeenCalledWith(
+        `${BASE}/api/direct-messages`,
+        expect.objectContaining({ method: 'GET' })
+      );
+    });
+
+    it('getUserProfile returns undefined', async () => {
+      await setup();
+      fetchMock.mockResolvedValueOnce(jsonRes(noData));
+      expect(await apiService.getUserProfile()).toBeUndefined();
+      expect(fetchMock).toHaveBeenCalledWith(`${BASE}/api/users/me`, expect.anything());
+    });
+
+    it('updateProfile returns undefined', async () => {
+      await setup();
+      fetchMock.mockResolvedValueOnce(jsonRes(noData));
+      expect(await apiService.updateProfile({ displayName: 'x' })).toBeUndefined();
+      expect(fetchMock).toHaveBeenCalledWith(
+        `${BASE}/api/users/me/profile`,
+        expect.objectContaining({
+          method: 'PUT',
+          body: JSON.stringify({ displayName: 'x' }),
+        })
+      );
+    });
+
+    it('updateStatus returns undefined', async () => {
+      await setup();
+      fetchMock.mockResolvedValueOnce(jsonRes(noData));
+      expect(await apiService.updateStatus('online')).toBeUndefined();
+      expect(fetchMock).toHaveBeenCalledWith(
+        `${BASE}/api/users/me/status`,
+        expect.objectContaining({
+          method: 'PUT',
+          body: JSON.stringify({ status: 'online' }),
+        })
+      );
+    });
+
+    it('createMessage returns undefined', async () => {
+      await setup();
+      fetchMock.mockResolvedValueOnce(jsonRes(noData));
+      expect(
+        await apiService.createMessage({ content: 'x', channelId: 'c1' })
+      ).toBeUndefined();
+      expect(fetchMock).toHaveBeenCalledWith(
+        `${BASE}/api/messages`,
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({
+            content: 'x',
+            channelId: 'c1',
+            dmId: undefined,
+            replyToId: undefined,
+            serverInviteId: undefined,
+          }),
+        })
+      );
+    });
+
+    it('editMessage returns undefined', async () => {
+      await setup();
+      fetchMock.mockResolvedValueOnce(jsonRes(noData));
+      expect(await apiService.editMessage('m1', 'x')).toBeUndefined();
+      expect(fetchMock).toHaveBeenCalledWith(
+        `${BASE}/api/messages/m1`,
+        expect.objectContaining({
+          method: 'PUT',
+          body: JSON.stringify({ content: 'x' }),
+        })
+      );
+    });
+
+    it('createDirectMessage returns undefined', async () => {
+      await setup();
+      fetchMock.mockResolvedValueOnce(jsonRes(noData));
+      expect(await apiService.createDirectMessage('u2')).toBeUndefined();
+      expect(fetchMock).toHaveBeenCalledWith(
+        `${BASE}/api/direct-messages`,
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ userId: 'u2' }),
+        })
+      );
+    });
+
+    it('getManualSummary returns undefined', async () => {
+      await setup();
+      fetchMock.mockResolvedValueOnce(jsonRes(noData));
+      expect(await apiService.getManualSummary({ channelId: 'c1' })).toBeUndefined();
+      expect(fetchMock).toHaveBeenCalledWith(
+        `${BASE}/api/summaries/manual`,
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ channelId: 'c1' }),
+        })
+      );
+    });
+
+    it('getPreviewSummary returns undefined', async () => {
+      await setup();
+      fetchMock.mockResolvedValueOnce(jsonRes(noData));
+      expect(await apiService.getPreviewSummary({ dmId: 'd1' })).toBeUndefined();
+      expect(fetchMock).toHaveBeenCalledWith(
+        `${BASE}/api/summaries/preview?dmId=d1`,
+        expect.anything()
+      );
+    });
+
+    it('sendFriendRequest returns undefined', async () => {
+      await setup();
+      fetchMock.mockResolvedValueOnce(jsonRes(noData));
+      expect(await apiService.sendFriendRequest('u2')).toBeUndefined();
+      expect(fetchMock).toHaveBeenCalledWith(
+        `${BASE}/api/friends/requests`,
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ toUserId: 'u2' }),
+        })
+      );
+    });
+
+    it('acceptFriendRequest returns undefined', async () => {
+      await setup();
+      fetchMock.mockResolvedValueOnce(jsonRes(noData));
+      expect(await apiService.acceptFriendRequest('r1')).toBeUndefined();
+      expect(fetchMock).toHaveBeenCalledWith(
+        `${BASE}/api/friends/requests/r1/accept`,
+        expect.objectContaining({ method: 'POST' })
+      );
+    });
+
+    it('rejectFriendRequest returns undefined', async () => {
+      await setup();
+      fetchMock.mockResolvedValueOnce(jsonRes(noData));
+      expect(await apiService.rejectFriendRequest('r1')).toBeUndefined();
+      expect(fetchMock).toHaveBeenCalledWith(
+        `${BASE}/api/friends/requests/r1/reject`,
+        expect.objectContaining({ method: 'POST' })
+      );
+    });
+
+    it('sendServerInvite returns undefined', async () => {
+      await setup();
+      fetchMock.mockResolvedValueOnce(jsonRes(noData));
+      expect(await apiService.sendServerInvite('s1', 'u2')).toBeUndefined();
+      expect(fetchMock).toHaveBeenCalledWith(
+        `${BASE}/api/invites`,
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ serverId: 's1', toUserId: 'u2' }),
+        })
+      );
+    });
+
+    it('toggleReaction returns empty reactions', async () => {
+      await setup();
+      fetchMock.mockResolvedValueOnce(jsonRes(noData));
+      expect(await apiService.toggleReaction('m1', '👍')).toEqual({ reactions: [] });
+      expect(fetchMock).toHaveBeenCalledWith(
+        `${BASE}/api/messages/m1/reactions/toggle`,
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ emoji: '👍' }),
+        })
+      );
+    });
+
+    it('getServerDetails returns undefined when data is missing', async () => {
+      await setup();
+      fetchMock.mockResolvedValueOnce(jsonRes(noData));
+      expect(await apiService.getServerDetails('s1')).toBeUndefined();
+      expect(fetchMock).toHaveBeenCalledWith(`${BASE}/api/servers/s1`, expect.anything());
+    });
+
+    it('getServer throws when data is missing (non-null assertion on nested server)', async () => {
+      await setup();
+      fetchMock.mockResolvedValueOnce(jsonRes(noData));
+      await expect(apiService.getServer('s1')).rejects.toThrow();
+      expect(fetchMock).toHaveBeenCalledWith(`${BASE}/api/servers/s1`, expect.anything());
     });
   });
 });
