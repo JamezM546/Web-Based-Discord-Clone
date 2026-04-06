@@ -1,57 +1,60 @@
-name: Run Backend Tests
+name: Run backend tests
 
 on:
   push:
-    branches: [ main, master, develop ]
+    paths:
+      - 'simple-server/**'
+      - '.github/workflows/run-backend-tests.yml'
   pull_request:
-    branches: [ main, master, develop ]
+    paths:
+      - 'simple-server/**'
+      - '.github/workflows/run-backend-tests.yml'
 
 jobs:
-  test-backend:
+  test:
     runs-on: ubuntu-latest
 
     services:
       postgres:
         image: postgres:15
         env:
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: test_db
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres123
+          POSTGRES_DB: discord_clone
         ports:
           - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      NODE_ENV: test
+      JWT_SECRET: your-super-secret-jwt-key-change-this-in-production
+      JWT_EXPIRES_IN: 7d
+      DATABASE_HOST: localhost
+      DATABASE_PORT: '5432'
+      DATABASE_NAME: discord_clone
+      DATABASE_USER: postgres
+      DATABASE_PASSWORD: postgres123
+      DATABASE_URL: postgresql://postgres:postgres123@localhost:5432/discord_clone
+
+    defaults:
+      run:
+        working-directory: simple-server
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20.x'
-        cache: 'npm'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: npm
+          cache-dependency-path: simple-server/package-lock.json
 
-    - name: Install dependencies
-      run: npm ci
+      - name: Install dependencies
+        run: npm ci
 
-    - name: Setup test environment
-      run: |
-        cd simple-server
-        npm ci
-
-    - name: Run backend tests
-      run: |
-        cd simple-server
-        npm test
-      env:
-        NODE_ENV: test
-
-    - name: Run API integration tests
-      run: |
-        cd simple-server
-        npm test || echo "Integration tests not available"
-      env:
-        NODE_ENV: test
+      - name: Run Jest (integration + unit) with coverage
+        run: npm run test:coverage

@@ -83,6 +83,32 @@ npm test
 
 More detail: [`simple-server/README.md`](simple-server/README.md).
 
+### P5 — backend unit tests and coverage (no Docker required for this part)
+
+Core auth logic is covered by **isolated Jest tests** that mock the database (`simple-server/tests/userService.unit.test.js`, `simple-server/tests/User.model.unit.test.js`). English test specifications live in [`docs/testing/userService-test-spec.md`](docs/testing/userService-test-spec.md) and [`docs/testing/User-model-test-spec.md`](docs/testing/User-model-test-spec.md).
+
+From the **`simple-server`** directory (Node.js 18+ and `npm install` required):
+
+```bash
+cd simple-server
+npm install
+npx jest userService.unit.test.js User.model.unit.test.js
+```
+
+**Coverage** for `services/userService.js` and `models/User.js` (threshold 80% per file, enforced when coverage is enabled):
+
+```bash
+cd simple-server
+npm run test:coverage
+```
+
+That last command runs **all** backend tests, including integration suites that need PostgreSQL (same rules as above: start Postgres or use Docker). To run **only** the two unit files with coverage:
+
+```bash
+cd simple-server
+npx jest userService.unit.test.js User.model.unit.test.js --coverage
+```
+
 ---
 
 ## **How to Stop**
