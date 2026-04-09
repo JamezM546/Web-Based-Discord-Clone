@@ -42,7 +42,7 @@ export const ChannelList: React.FC<ChannelListProps> = ({ onChannelSelect }) => 
 
   return (
     <>
-      <div className="w-full bg-[#0d1a2e] flex flex-col h-full">
+      <div className="w-full bg-[#0d1a2e] flex flex-col h-full min-h-0">
         {/* Space name header / dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger className="h-12 px-4 flex items-center justify-between hover:bg-[#1a2d45] border-b border-[#1e3248] text-[#e2e8f0] transition-colors">

@@ -175,7 +175,7 @@ export const MemberList: React.FC = () => {
   };
 
   return (
-    <div className="w-52 bg-[#0d1a2e] border-l border-[#1e3248] flex flex-col relative flex-shrink-0">
+    <div className="w-52 bg-[#0d1a2e] border-l border-[#1e3248] flex flex-col relative flex-shrink-0 min-h-0">
       {/* Notification Toast — announced to screen readers */}
       <div
         role="status"
