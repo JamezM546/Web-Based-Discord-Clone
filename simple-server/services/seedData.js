@@ -6,9 +6,9 @@ const seedDatabase = async () => {
   const client = await pool.connect();
 
   try {
-    // Idempotent check — skip if servers already exist
-    const existing = await client.query("SELECT id FROM servers WHERE id = 's1' LIMIT 1");
-    if (existing.rows.length > 0) {
+    // Idempotent check — skip if any servers already exist
+    const { rows } = await client.query('SELECT COUNT(*)::int AS cnt FROM servers');
+    if (rows[0] && rows[0].cnt > 0) {
       console.log('Seed data already present — skipping.');
       return;
     }
@@ -21,6 +21,7 @@ const seedDatabase = async () => {
         ('s1', 'Team Project',  '🚀', '1'),
         ('s2', 'Gaming Squad',  '🎮', '2'),
         ('s3', 'Study Group',   '📚', '3')
+      ON CONFLICT (id) DO NOTHING
     `);
 
     // ── Server members ──────────────────────────────────────────────────
@@ -38,6 +39,7 @@ const seedDatabase = async () => {
         ('sm10', 's3', '1', 'member'),
         ('sm11', 's3', '4', 'member'),
         ('sm12', 's3', '5', 'member')
+      ON CONFLICT (id) DO NOTHING
     `);
 
     // ── Channels ────────────────────────────────────────────────────────
@@ -50,6 +52,7 @@ const seedDatabase = async () => {
         ('c5', 'game-night',    's2', 1),
         ('c6', 'general',       's3', 0),
         ('c7', 'homework-help', 's3', 1)
+      ON CONFLICT (id) DO NOTHING
     `);
 
     // ── Channel messages ────────────────────────────────────────────────
@@ -66,16 +69,19 @@ const seedDatabase = async () => {
         ('m8',  'The emoji picker is working great! 😄',                                    '5', 'c1', $8),
         ('m9',  'Should we have a meeting tomorrow to discuss the deadline?',               '2', 'c1', $9),
         ('m10', 'Yes, let''s meet at 10 AM. I''ll prepare the agenda.',                     '1', 'c1', $10)
+      ON CONFLICT (id) DO NOTHING
     `, [
       minutesAgo(50), minutesAgo(45), minutesAgo(40), minutesAgo(35), minutesAgo(30),
       minutesAgo(25), minutesAgo(20), minutesAgo(15), minutesAgo(10), minutesAgo(5),
     ]);
+    // Make sure duplicates won't error if re-run
 
     // Team Project → #announcements
     await client.query(`
       INSERT INTO messages (id, content, author_id, channel_id, timestamp) VALUES
         ('m11', '📢 Important: Please review the project roadmap in the development channel.', '1', 'c2', $1),
         ('m12', '🎯 Milestone: We''ve completed 60% of the core features!',                   '2', 'c2', $2)
+      ON CONFLICT (id) DO NOTHING
     `, [minutesAgo(30), minutesAgo(10)]);
 
     // Team Project → #development
@@ -84,6 +90,7 @@ const seedDatabase = async () => {
         ('m13', 'Just pushed the new authentication flow. Please test it!',         '1', 'c3', $1),
         ('m14', 'Found a bug in the server settings modal. Working on a fix.',      '2', 'c3', $2),
         ('m15', 'The channel permissions system is ready for review 🚀',             '3', 'c3', $3)
+      ON CONFLICT (id) DO NOTHING
     `, [minutesAgo(35), minutesAgo(20), minutesAgo(8)]);
 
     // Gaming Squad → #general
@@ -92,6 +99,7 @@ const seedDatabase = async () => {
         ('m16', 'Who''s up for a game tonight?',                  '2', 'c4', $1),
         ('m17', 'I''m in! What are we playing?',                  '1', 'c4', $2),
         ('m18', 'Let''s try that new co-op game everyone''s talking about', '3', 'c4', $3)
+      ON CONFLICT (id) DO NOTHING
     `, [minutesAgo(120), minutesAgo(115), minutesAgo(110)]);
 
     // Study Group → #general
@@ -100,6 +108,7 @@ const seedDatabase = async () => {
         ('m19', 'Has anyone started the assignment yet?',             '3', 'c6', $1),
         ('m20', 'I started it last night. The second question is tricky.', '4', 'c6', $2),
         ('m21', 'I can help with that one — let''s go over it together',   '5', 'c6', $3)
+      ON CONFLICT (id) DO NOTHING
     `, [minutesAgo(90), minutesAgo(85), minutesAgo(80)]);
 
     // ── Direct messages ─────────────────────────────────────────────────
@@ -107,6 +116,7 @@ const seedDatabase = async () => {
       INSERT INTO direct_messages (id, participants, last_message_time) VALUES
         ('dm1', ARRAY['1','2'], $1),
         ('dm2', ARRAY['1','3'], $2)
+      ON CONFLICT (id) DO NOTHING
     `, [minutesAgo(5), minutesAgo(60)]);
 
     // DM messages: Nafisa ↔ Ashraf
@@ -115,6 +125,7 @@ const seedDatabase = async () => {
         ('m22', 'Hey! Want to grab coffee after the meeting?', '2', 'dm1', $1),
         ('m23', 'Sure! How about the place downtown?',         '1', 'dm1', $2),
         ('m24', 'Perfect! See you at 2 PM ☕',                  '2', 'dm1', $3)
+      ON CONFLICT (id) DO NOTHING
     `, [minutesAgo(40), minutesAgo(25), minutesAgo(5)]);
 
     // DM messages: Nafisa ↔ James
@@ -122,6 +133,7 @@ const seedDatabase = async () => {
       INSERT INTO messages (id, content, author_id, dm_id, timestamp) VALUES
         ('m25', 'Hey James, did you finish the backend spec?', '1', 'dm2', $1),
         ('m26', 'Almost done — just wrapping up the API docs.', '3', 'dm2', $2)
+      ON CONFLICT (id) DO NOTHING
     `, [minutesAgo(70), minutesAgo(60)]);
 
     // ── Friend requests ─────────────────────────────────────────────────
@@ -131,6 +143,7 @@ const seedDatabase = async () => {
         ('fr2', '3', '1', 'accepted'),
         ('fr3', '1', '5', 'accepted'),
         ('fr4', '4', '1', 'pending')
+      ON CONFLICT (id) DO NOTHING
     `);
 
     await client.query('COMMIT');

@@ -178,7 +178,13 @@ if (require.main === module) {
       await initAll();
     } catch (error) {
       console.error('Failed to initialize database:', error);
-      process.exit(1);
+      // Don't unconditionally exit when imported (e.g., running in Lambda).
+      if (!process.env.AWS_LAMBDA_FUNCTION_NAME) {
+        process.exit(1);
+      } else {
+        // Re-throw so the caller (lambda wrapper) can handle the failure
+        throw error;
+      }
     }
   });
 }

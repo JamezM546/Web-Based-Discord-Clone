@@ -6,14 +6,17 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon --legacy-watch server.js",
+    "package:lambda": "node ./scripts/package-lambda.js",
     "test": "jest --runInBand --forceExit --detectOpenHandles",
     "test:coverage": "jest --runInBand --forceExit --detectOpenHandles --coverage",
     "test:docker": "docker compose -f ../docker-compose.yml run --rm backend sh -c \"npm install && npm test\""
   },
   "devDependencies": {
+    "happy-dom": "^20.8.9",
     "jest": "^29.7.0",
     "nodemon": "^3.0.1",
-    "supertest": "^6.3.4"
+    "supertest": "^6.3.4",
+    "archiver": "^5.3.1"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -22,6 +25,7 @@
     "express": "^4.18.2",
     "joi": "^17.11.0",
     "jsonwebtoken": "^9.0.2",
-    "pg": "^8.11.3"
+    "pg": "^8.11.3",
+    "serverless-http": "^3.1.0"
   }
 }

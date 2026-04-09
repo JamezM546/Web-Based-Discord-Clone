@@ -1,0 +1,38 @@
+service: discord-clone-backend
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  stage: dev
+  region: us-east-1
+  environment:
+    NODE_ENV: ${opt:stage, 'dev'}
+    DATABASE_URL: ${env:DATABASE_URL}
+    DATABASE_HOST: ${env:DATABASE_HOST}
+    DATABASE_PORT: ${env:DATABASE_PORT}
+    DATABASE_NAME: ${env:DATABASE_NAME}
+    DATABASE_USER: ${env:DATABASE_USER}
+    DATABASE_PASSWORD: ${env:DATABASE_PASSWORD}
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - secretsmanager:GetSecretValue
+        - ssm:GetParameter
+      Resource: '*'
+
+functions:
+  api:
+    handler: simple-server/lambda.handler
+    events:
+      - httpApi: '*'
+    timeout: 30
+    memorySize: 512
+
+package:
+  exclude:
+    - node_modules/**
+  include:
+    - simple-server/**
+    - serverless.yml
+
+plugins: []

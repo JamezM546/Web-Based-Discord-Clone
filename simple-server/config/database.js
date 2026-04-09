@@ -1,7 +1,7 @@
 const { Pool } = require('pg');
 
-// Database connection pool
-const pool = new Pool({
+// Create a Pool factory so we can cache it on the global object
+const makePool = () => new Pool({
   connectionString: process.env.DATABASE_URL,
   host: process.env.DATABASE_HOST || 'localhost',
   port: process.env.DATABASE_PORT || 5432,
@@ -13,14 +13,23 @@ const pool = new Pool({
   connectionTimeoutMillis: 2000, // How long to wait when connecting a new client
 });
 
+// Reuse pool across warm Lambda invocations / app restarts
+if (!global.__PG_POOL) {
+  global.__PG_POOL = makePool();
+}
+
+const pool = global.__PG_POOL;
+
 // Test database connection
 pool.on('connect', () => {
   console.log('Connected to PostgreSQL database');
 });
 
+// Log pool errors; do NOT call process.exit() in serverless environments
 pool.on('error', (err) => {
   console.error('Unexpected error on idle client', err);
-  process.exit(-1);
+  // Optionally set a global flag so callers can check pool health
+  global.__PG_POOL_ERROR = true;
 });
 
 // Initialize database tables
