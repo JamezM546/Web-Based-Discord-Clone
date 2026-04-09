@@ -244,3 +244,16 @@
     border-width: 0;
   }
 }
+
+/* Ensure the spaces ScrollArea allows horizontal scrolling (fixes overflow-x being hidden) */
+.spaces-scroll-area [data-slot="scroll-area-viewport"] {
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  -webkit-overflow-scrolling: touch;
+}
+
+.spaces-scroll-area [data-slot="scroll-area-viewport"] > div {
+  display: flex !important;
+  align-items: center;
+  gap: 0.25rem;
+}
