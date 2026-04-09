@@ -44,7 +44,7 @@ export const MainLayout: React.FC = () => {
       // convert mostly-vertical wheel motion into horizontal scroll for the spaces strip
       if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
       e.preventDefault();
-      const vp = (spacesViewportRef.current as HTMLElement) || document.querySelector(spacesViewportSelector) as HTMLElement | null;
+      const vp = getVisibleSpacesViewport();
       if (vp) vp.scrollBy({ left: e.deltaY, behavior: 'auto' });
     };
     document.addEventListener('wheel', handler, { passive: false });
@@ -52,9 +52,23 @@ export const MainLayout: React.FC = () => {
   }, []);
 
   const scrollViewportBy = (delta: number) => {
-    const vp = (spacesViewportRef.current as HTMLElement) || document.querySelector(spacesViewportSelector) as HTMLElement | null;
+    const vp = getVisibleSpacesViewport();
     if (!vp) return;
     vp.scrollBy({ left: delta, behavior: 'smooth' });
+  };
+
+  const getVisibleSpacesViewport = (): HTMLElement | null => {
+    // prefer ref
+    const refVp = spacesViewportRef.current as HTMLElement | null;
+    if (refVp && refVp.offsetParent !== null && (refVp.clientWidth || refVp.clientHeight)) return refVp;
+    // otherwise search all matching viewports and pick the first visible one
+    const nodes = Array.from(document.querySelectorAll(spacesViewportSelector)) as HTMLElement[];
+    for (const n of nodes) {
+      if (n.offsetParent !== null && (n.clientWidth || n.clientHeight)) return n;
+      const s = getComputedStyle(n);
+      if (s.display !== 'none' && s.visibility !== 'hidden' && (n.clientWidth || n.clientHeight)) return n;
+    }
+    return null;
   };
 
   if (!currentUser) {
@@ -85,7 +99,7 @@ export const MainLayout: React.FC = () => {
     // After changing the selected view, ensure the corresponding tab (or the Add button)
     // is visible inside the spaces ScrollArea viewport.
     requestAnimationFrame(() => {
-      const vp = (spacesViewportRef.current as HTMLElement) || document.querySelector(spacesViewportSelector) as HTMLElement | null;
+      const vp = getVisibleSpacesViewport();
       if (!vp) return;
       const target = view.type === 'home'
         ? vp.querySelector('[aria-label="Direct Chats"]') as HTMLElement | null
@@ -157,7 +171,7 @@ export const MainLayout: React.FC = () => {
 
           {/* Direct Chats section */}
           <div
-            className="flex items-center flex-shrink-0 px-2"
+            className="flex items-center flex-shrink-0 px-2 overflow-y-auto h-full min-h-0"
             style={{ borderRight: '1px solid rgba(30,50,72,0.8)' }}
           >
             <div className="flex flex-col mr-3 flex-shrink-0">
@@ -472,7 +486,7 @@ export const MainLayout: React.FC = () => {
       >
         {/* Left Sidebar — Desktop only */}
         <div className="hidden md:flex flex-col w-64 bg-[#0d1a2e] border-r border-[#1e3248] flex-shrink-0">
-          <div className="flex-1 overflow-hidden">
+          <div className="flex-1 overflow-hidden min-h-0">
             {selectedServer && (
               <div className="relative">
                 <ServerSearchInput value={serverSearchQuery} onChange={setServerSearchQuery} />

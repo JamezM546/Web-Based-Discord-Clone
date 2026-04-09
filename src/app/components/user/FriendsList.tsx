@@ -17,7 +17,7 @@ export const FriendsList: React.FC<FriendsListProps> = ({ searchQuery }) => {
   );
 
   return (
-    <ScrollArea className="h-full">
+    <ScrollArea className="h-full flex-1 min-h-0 overflow-y-auto">
       <div className="px-2 py-2">
         <div
           className="text-xs text-[#475569] uppercase font-semibold tracking-wider px-2 mb-2"

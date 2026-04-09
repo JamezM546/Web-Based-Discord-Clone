@@ -43,7 +43,7 @@ export const DMList: React.FC<DMListProps> = ({ searchQuery, onDMSelect }) => {
   };
 
   return (
-    <ScrollArea className="h-full">
+    <ScrollArea className="h-full flex-1 min-h-0 overflow-y-auto">
       <nav aria-label="Direct chats">
         <div className="px-2 py-2">
           {filteredDMs.length === 0 ? (
