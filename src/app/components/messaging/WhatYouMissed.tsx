@@ -59,9 +59,9 @@ export const WhatYouMissed: React.FC<WhatYouMissedProps> = ({
   channelId,
   dmId,
 }) => {
-  const { users, lastReadMessages } = useApp();
+  const { users } = useApp();
   const [isExpanded, setIsExpanded] = useState(false);
-  const [summary, setSummary] = useState<string>('');
+  const [highlights, setHighlights] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -70,25 +70,22 @@ export const WhatYouMissed: React.FC<WhatYouMissedProps> = ({
     const fetchPreview = async () => {
       setIsLoading(true);
       try {
-        const sinceKey = channelId || dmId || '';
-        const since = lastReadMessages[sinceKey]
-          ? new Date(lastReadMessages[sinceKey]).toISOString()
-          : undefined;
-
-        const preview = await apiService.getPreviewSummary({
-          channelId: channelId || undefined,
-          dmId: dmId || undefined,
-          since,
-        });
+        let result;
+        if (channelId) {
+          result = await apiService.getChannelPreview(channelId);
+        } else if (dmId) {
+          result = await apiService.getDmPreview(dmId);
+        }
 
         if (!cancelled) {
-          setSummary(preview.summary || `${unreadMessages.length} new messages`);
+          const items: string[] = Array.isArray(result?.highlights) && result.highlights.length > 0
+            ? result.highlights
+            : [];
+          setHighlights(items);
         }
       } catch (err) {
-        console.error('Preview fetch failed, falling back to local count:', err);
-        if (!cancelled) {
-          setSummary(`${unreadMessages.length} new message${unreadMessages.length !== 1 ? 's' : ''}`);
-        }
+        console.error('Preview fetch failed:', err);
+        if (!cancelled) setHighlights([]);
       } finally {
         if (!cancelled) setIsLoading(false);
       }
@@ -97,7 +94,7 @@ export const WhatYouMissed: React.FC<WhatYouMissedProps> = ({
     if (unreadMessages.length > 0 && (channelId || dmId)) {
       fetchPreview();
     } else {
-      setSummary('No recent messages.');
+      setHighlights([]);
       setIsLoading(false);
     }
 
@@ -181,8 +178,19 @@ export const WhatYouMissed: React.FC<WhatYouMissedProps> = ({
         <div id="wym-summary" className="px-4 pb-3 pt-0">
           {isLoading ? (
             <p className="text-[#475569] text-xs italic">Loading summary…</p>
+          ) : highlights.length > 0 ? (
+            <ul className="space-y-1 list-none">
+              {highlights.map((point, i) => (
+                <li key={i} className="flex items-start gap-1.5 text-[#64748b] text-xs leading-relaxed">
+                  <span className="text-[#06b6d4] flex-shrink-0 mt-0.5">•</span>
+                  <span>{point}</span>
+                </li>
+              ))}
+            </ul>
           ) : (
-            <p className="text-[#64748b] text-xs leading-relaxed">{summary}</p>
+            <p className="text-[#475569] text-xs italic">
+              {unreadMessages.length} new message{unreadMessages.length !== 1 ? 's' : ''} — no summary available.
+            </p>
           )}
 
           {/* Mark as read link */}
