@@ -1,5 +1,37 @@
 const { Pool } = require('pg');
 
+/**
+ * On AWS Lambda, default localhost Postgres is never valid — fail fast with a clear message.
+ */
+function assertAwsLambdaDatabaseConfigured() {
+  if (!process.env.AWS_LAMBDA_FUNCTION_NAME) return;
+
+  const url = (process.env.DATABASE_URL || '').trim();
+  if (url) {
+    const u = url.toLowerCase();
+    if (
+      u.includes('@localhost') ||
+      u.includes('@127.0.0.1') ||
+      u.includes('://localhost') ||
+      u.includes('://127.0.0.1')
+    ) {
+      throw new Error(
+        '[Lambda] DATABASE_URL must point to real Postgres (e.g. RDS), not localhost. Set DATABASE_URL in the Lambda environment (or Secrets Manager).'
+      );
+    }
+    return;
+  }
+
+  const host = (process.env.DATABASE_HOST || 'localhost').trim().toLowerCase();
+  if (!host || host === 'localhost' || host === '127.0.0.1') {
+    throw new Error(
+      '[Lambda] Set DATABASE_URL to your Postgres connection string, or set DATABASE_HOST to your RDS endpoint — not localhost.'
+    );
+  }
+}
+
+assertAwsLambdaDatabaseConfigured();
+
 // Database connection pool
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,

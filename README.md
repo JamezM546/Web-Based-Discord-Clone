@@ -171,6 +171,57 @@ npx vitest run src/tests/apiService.test.ts --coverage
 
 ---
 
+## **P6 — Deploy to AWS (Lambda + API Gateway + Amplify)**
+
+**Phased deployment walkthrough (RDS, Lambda, API Gateway, Amplify, GitHub, teardown):** [`docs/DEPLOYMENT-README.md`](docs/DEPLOYMENT-README.md)
+
+This repo supports the course deployment sprint: **serverless backend** on Lambda behind **API Gateway REST**, **static frontend** on **Amplify Hosting**, and **GitHub Actions** for CI/CD.
+
+### Architecture gap (what changes vs Docker)
+
+| Local (Docker) | AWS target |
+|----------------|------------|
+| Long-lived Node process (`server.js` listens on 3001) | **Lambda** + [`serverless-http`](https://github.com/dougmoscrop/serverless-http) entry [`simple-server/lambda.js`](simple-server/lambda.js) (`lambda.handler`) |
+| Postgres container on `localhost` / `postgres` | **Amazon RDS PostgreSQL** (or other network Postgres). Set `DATABASE_URL` on the Lambda function. Put Lambda in the **same VPC** as RDS if the DB is private; open security group **5432** from the Lambda SG. |
+| Frontend talks to `http://localhost:3001` | Build with **`VITE_API_URL`** = your **API Gateway invoke URL** (Amplify console → environment variables). |
+| Open CORS | Set **`CORS_ORIGINS`** on Lambda to your Amplify site URL(s), comma-separated. |
+
+### One-time AWS setup (summary)
+
+1. **RDS (PostgreSQL)** — create instance, note endpoint, user, password, database name. Run migrations implicitly: first Lambda cold start runs [`initializeDatabase`](simple-server/config/database.js) if the DB is empty (same as local). Ensure **Lambda can reach RDS** (VPC + subnets + security groups).
+2. **Lambda** — runtime **Node.js 20.x**, handler **`lambda.handler`**, upload zip from [`npm run package:lambda`](simple-server/package.json) (artifact `simple-server/lambda-deploy.zip`). Set environment: `DATABASE_URL`, `JWT_SECRET`, `JWT_EXPIRES_IN`, `NODE_ENV=production`, `CORS_ORIGINS`.
+3. **API Gateway (REST)** — **proxy integration** (or ANY `{proxy+}`) to the Lambda. Enable **CORS** on the API as needed. Copy the **Invoke URL** for `VITE_API_URL`.
+4. **Amplify** — New app → Host web app → connect **this GitHub repo**. Amplify uses root [`amplify.yml`](amplify.yml). Add **`VITE_API_URL`** in Amplify → Environment variables.
+
+### GitHub Actions (after `main` is protected and secrets exist)
+
+| Workflow | Purpose |
+|----------|---------|
+| [`.github/workflows/run-integration-tests.yml`](.github/workflows/run-integration-tests.yml) | Postgres service + `npm run test:integration` |
+| [`.github/workflows/deploy-aws-lambda.yml`](.github/workflows/deploy-aws-lambda.yml) | Package zip → `aws lambda update-function-code` |
+| [`.github/workflows/deploy-aws-amplify.yml`](.github/workflows/deploy-aws-amplify.yml) | `npm run build` sanity check → `aws amplify start-job` |
+
+**Repository secrets** (Settings → Secrets and variables → Actions): `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, `LAMBDA_FUNCTION_NAME`, `AMPLIFY_APP_ID`, `AMPLIFY_BRANCH` (e.g. `main`), and optionally `VITE_API_URL` so the Action build matches production.
+
+Use an IAM user or OIDC role limited to Lambda update, Amplify start-job, and (for setup) API Gateway/RDS administration. See [GitHub: use secrets with GitHub Actions](https://docs.github.com/en/actions/security-guides/using-secrets-in-github-actions).
+
+### Integration tests and cloud
+
+- **Spec (English + table):** [`docs/INTEGRATION_TEST_SPEC.md`](docs/INTEGRATION_TEST_SPEC.md)
+- **Local + DB:** `cd simple-server && npm run test:integration`
+- **Against deployed API:** set `INTEGRATION_TEST_API_URL` to the API Gateway base URL, then run the same command (see spec).
+
+### Package Lambda locally
+
+```bash
+cd simple-server
+npm ci
+npm run package:lambda
+# Upload simple-server/lambda-deploy.zip in the Lambda console or via AWS CLI
+```
+
+---
+
 ## **How to Stop**
 
 When you're done using the app:

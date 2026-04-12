@@ -18,8 +18,20 @@ const inviteRoutes = require('./routes/serverInvites');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Middleware
-app.use(cors());
+// Middleware — optional CORS_ORIGINS (comma-separated) for Amplify / production frontends
+const corsOrigins = (process.env.CORS_ORIGINS || '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+if (corsOrigins.length > 0) {
+  app.use(
+    cors({
+      origin: corsOrigins,
+    })
+  );
+} else {
+  app.use(cors());
+}
 app.use(express.json());
 
 // Routes

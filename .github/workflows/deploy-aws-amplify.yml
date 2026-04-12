@@ -1,0 +1,43 @@
+# P6: verify frontend build, then trigger Amplify to pull latest from the connected branch.
+# Create the Amplify app in the console (GitHub provider), then add AMPLIFY_APP_ID and AMPLIFY_BRANCH secrets.
+name: Deploy frontend via AWS Amplify
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy-amplify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install and build (sanity-check before Amplify build)
+        env:
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+        run: |
+          npm ci
+          npm run build
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Start Amplify deployment job
+        run: >
+          aws amplify start-job
+          --app-id ${{ secrets.AMPLIFY_APP_ID }}
+          --branch-name ${{ secrets.AMPLIFY_BRANCH }}
+          --job-type RELEASE
