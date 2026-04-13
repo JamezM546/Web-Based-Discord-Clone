@@ -56,5 +56,4 @@ jobs:
 
       - name: Run Jest (integration + unit) with coverage
         run: npm run test:coverage
-        continue-on-error: true
         
