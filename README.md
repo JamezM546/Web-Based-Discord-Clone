@@ -2,6 +2,8 @@
 
 A web-based Discord-inspired communication app. Ready to run with Docker - no setup required!
 
+Deployment note: the `deployed` branch is intended to be the release branch for automated deployment workflow testing.
+
 ## **Quick Start**
 
 **Get the app running in one command:**
