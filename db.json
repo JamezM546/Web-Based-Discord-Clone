@@ -1,0 +1,9 @@
+{
+  "api": {
+    "health": { "ok": true },
+    "messages": [
+      { "id": 1, "user": "alice", "text": "Hello (mock)" },
+      { "id": 2, "user": "bob", "text": "Hi (mock)" }
+    ]
+  }
+}
