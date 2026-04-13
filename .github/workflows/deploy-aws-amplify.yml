@@ -5,12 +5,39 @@ name: Deploy frontend via AWS Amplify
 on:
   push:
     branches:
-      - main
+      - deployed
   workflow_dispatch:
 
 jobs:
-  deploy-amplify:
+  test-frontend:
+    name: Run frontend CI before deploy
     runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run linting
+        run: npm run lint --if-present
+
+      - name: Run type checking
+        run: npm run type-check --if-present
+
+      - name: Run frontend tests
+        run: npm run test:frontend:all
+
+  deploy-amplify:
+    name: Build and deploy frontend
+    runs-on: ubuntu-latest
+    needs:
+      - test-frontend
 
     steps:
       - uses: actions/checkout@v4
