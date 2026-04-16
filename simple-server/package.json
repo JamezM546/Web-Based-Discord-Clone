@@ -8,6 +8,7 @@
     "dev": "nodemon --legacy-watch server.js",
     "test": "jest --runInBand --forceExit --detectOpenHandles",
     "test:coverage": "jest --runInBand --forceExit --detectOpenHandles --coverage",
+    "test:unit:coverage": "jest --runInBand --forceExit --detectOpenHandles --coverage --testPathIgnorePatterns=tests/integration",
     "test:docker": "docker compose -f ../docker-compose.yml run --rm backend sh -c \"npm install && npm test\"",
     "test:integration": "jest --runInBand --forceExit --detectOpenHandles --testPathPattern=integration",
     "package:lambda": "node scripts/package-lambda.cjs"
