@@ -9,16 +9,34 @@ const base = (process.env.INTEGRATION_TEST_API_URL || '').replace(/\/$/, '');
 
 const runDeployed = base ? describe : describe.skip;
 
+async function fetchJson(url, options = {}) {
+  const headers = {
+    Connection: 'close',
+    ...(options.headers || {}),
+  };
+
+  const res = await fetch(url, {
+    ...options,
+    headers,
+  });
+
+  return { res, body: await res.json() };
+}
+
 runDeployed('Integration — deployed API (API Gateway + Lambda)', () => {
+  afterAll(async () => {
+    // Give Node a moment to close fetch TLS sockets before Jest exits.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  });
+
   test('GET /health', async () => {
-    const res = await fetch(`${base}/health`);
+    const { res, body } = await fetchJson(`${base}/health`);
     expect(res.ok).toBe(true);
-    const body = await res.json();
     expect(body.success).toBe(true);
   });
 
   test('POST /api/auth/login returns token for seeded demo user', async () => {
-    const res = await fetch(`${base}/api/auth/login`, {
+    const { res, body } = await fetchJson(`${base}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -27,12 +45,11 @@ runDeployed('Integration — deployed API (API Gateway + Lambda)', () => {
       }),
     });
     expect(res.ok).toBe(true);
-    const body = await res.json();
     expect(body.data?.token).toBeDefined();
   });
 
   test('GET /api/servers with Bearer token', async () => {
-    const loginRes = await fetch(`${base}/api/auth/login`, {
+    const { body: loginBody } = await fetchJson(`${base}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -40,14 +57,13 @@ runDeployed('Integration — deployed API (API Gateway + Lambda)', () => {
         password: 'password123',
       }),
     });
-    const { data } = await loginRes.json();
+    const { data } = loginBody;
     const token = data.token;
 
-    const res = await fetch(`${base}/api/servers`, {
+    const { res, body } = await fetchJson(`${base}/api/servers`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     expect(res.ok).toBe(true);
-    const body = await res.json();
     expect(Array.isArray(body.data?.servers)).toBe(true);
   });
 });
