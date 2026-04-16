@@ -38,6 +38,9 @@ jobs:
       DATABASE_USER: postgres
       DATABASE_PASSWORD: postgres123
       DATABASE_URL: postgresql://postgres:postgres123@localhost:5432/discord_clone
+      # Optional secret for cloud integration tests.
+      # If unset, deployed-api.integration.test.js skips cloud-only checks automatically.
+      INTEGRATION_TEST_API_URL: ${{ secrets.INTEGRATION_TEST_API_URL }}
 
     defaults:
       run:
