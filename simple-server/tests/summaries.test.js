@@ -14,8 +14,7 @@ describe('User Story 1 — Manual Summary On Demand (POST /api/summaries/manual)
     const res = await request
       .post('/api/summaries/manual')
       .set('Authorization', `Bearer ${getToken()}`)
-      // Use a wide window so this remains stable even when the dev/test DB persists across runs.
-      .send({ channelId: 'c1', hours: 24 * 365 * 5 });
+      .send({ channelId: 'c1', hours: 168 });
 
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
