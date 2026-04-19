@@ -6,6 +6,14 @@ const { authenticateToken } = require('../middleware/auth');
 
 const router = express.Router();
 
+// Get WebSocket server instance (will be injected)
+let wsServer = null;
+const setWebSocketServer = (wss) => {
+  wsServer = wss;
+};
+
+module.exports = { router, setWebSocketServer };
+
 const isNonEmptyString = (value) => typeof value === 'string' && value.trim().length > 0;
 
 const parseOptionalTimestamp = (value) => {

@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const http = require('http');
 const { initializeDatabase } = require('./config/database');
 
 // Import routes
@@ -16,6 +17,7 @@ const friendRoutes = require('./routes/friends');
 const inviteRoutes = require('./routes/serverInvites');
 
 const app = express();
+const server = http.createServer(app);
 const PORT = process.env.PORT || 3001;
 
 // Middleware
@@ -167,12 +169,13 @@ const initAll = async () => {
 
 // Only start listening when run directly (not when imported by tests)
 if (require.main === module) {
-  app.listen(PORT, '0.0.0.0', async () => {
+  server.listen(PORT, '0.0.0.0', async () => {
     console.log(`Simple server running on port ${PORT}`);
     console.log(`Health check: http://localhost:${PORT}/health`);
     console.log(`API endpoint: http://localhost:${PORT}/api`);
     console.log(`Interactive docs: http://localhost:${PORT}/api/docs`);
     console.log(`Auth endpoints: http://localhost:${PORT}/api/auth`);
+    console.log(`WebSocket server: ws://localhost:${PORT}`);
 
     try {
       await initAll();
@@ -183,4 +186,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { app, initAll };
+module.exports = { app, server, initAll };
