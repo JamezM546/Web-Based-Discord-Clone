@@ -30,11 +30,7 @@ export const MainLayout: React.FC = () => {
   const touchStartY = useRef<number | null>(null);
   const swipeAreaRef = useRef<HTMLDivElement>(null);
 
-  if (!currentUser) {
-    return <Navigate to="/login" replace />;
-  }
-
-  const userServers = servers.filter((s) => s.members.includes(currentUser.id));
+  const userServers = currentUser ? servers.filter((s) => s.members.includes(currentUser.id)) : [];
 
   // Flat ordered list of views: home first, then servers
   const views = [{ type: 'home', server: null }, ...userServers.map((s) => ({ type: 'server', server: s }))];
@@ -96,6 +92,10 @@ export const MainLayout: React.FC = () => {
 
   const canGoLeft = currentViewIndex > 0;
   const canGoRight = currentViewIndex < views.length - 1;
+
+  if (!currentUser) {
+    return <Navigate to="/login" replace />;
+  }
 
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-[#060c18]">

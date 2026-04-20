@@ -16,7 +16,9 @@
     "test:api-service": "vitest run src/tests/apiService.test.ts",
     "test:api-service:watch": "vitest src/tests/apiService.test.ts",
     "test:api-service:mutation": "stryker run",
-    "test:frontend:all": "npm run test:frontend && npm run test:api-service"
+    "test:frontend:all": "npm run test:frontend && npm run test:api-service",
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix"
   },
   "dependencies": {
     "@emotion/react": "11.14.0",
@@ -80,6 +82,7 @@
     "@babel/preset-env": "^7.29.2",
     "@babel/preset-react": "^7.28.5",
     "@babel/preset-typescript": "^7.28.5",
+    "@eslint/js": "^10.0.1",
     "@stryker-mutator/core": "^9.6.0",
     "@stryker-mutator/vitest-runner": "^9.6.0",
     "@tailwindcss/vite": "4.1.12",
@@ -92,11 +95,17 @@
     "babel-jest": "^30.3.0",
     "babel-plugin-transform-import-meta": "^2.3.3",
     "babel-plugin-transform-vite-meta-env": "^1.0.3",
+    "eslint": "^9.39.4",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "globals": "^17.5.0",
     "happy-dom": "^20.8.9",
     "jest": "^30.3.0",
     "jest-environment-jsdom": "^30.3.0",
     "tailwindcss": "4.1.12",
     "ts-jest": "^29.4.9",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.58.2",
     "vite": "6.3.5",
     "vitest": "^4.1.2"
   },
