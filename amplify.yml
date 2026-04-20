@@ -1,0 +1,18 @@
+# AWS Amplify Hosting — connect this repo and set branch + environment variables
+# (especially VITE_API_URL = your API Gateway invoke URL).
+version: 1
+frontend:
+  phases:
+    preBuild:
+      commands:
+        - npm ci
+    build:
+      commands:
+        - npm run build
+  artifacts:
+    baseDirectory: dist
+    files:
+      - '**/*'
+  cache:
+    paths:
+      - node_modules/**/*
