@@ -103,7 +103,9 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, onScrollToMes
 
   if (!author) return null;
 
-  const formattedTime = format(new Date(message.timestamp), 'h:mm a');
+  const messageDate = new Date(message.timestamp);
+  const formattedTime = format(messageDate, 'h:mm a');
+  const formattedDateForAria = format(messageDate, 'MMMM d, yyyy');
   const isoTime = new Date(message.timestamp).toISOString();
 
   return (
@@ -115,7 +117,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, onScrollToMes
       }`}
       style={isOwnMessage ? { background: 'rgba(6,182,212,0.03)' } : undefined}
       id={`message-${message.id}`}
-      aria-label={`Message from ${authorDisplayName}${isOwnMessage ? ' (you)' : ''}, sent at ${formattedTime}${message.edited ? ', edited' : ''}`}
+      aria-label={`Message from ${authorDisplayName}${isOwnMessage ? ' (you)' : ''}, sent on ${formattedDateForAria} at ${formattedTime}${message.edited ? ', edited' : ''}`}
     >
       {/* Reply preview */}
       {repliedMessage && repliedAuthor && (
@@ -166,7 +168,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, onScrollToMes
             */}
             <time
               dateTime={isoTime}
-              aria-label={`Sent at ${formattedTime}`}
+              aria-label={`Sent on ${formattedDateForAria} at ${formattedTime}`}
               className="text-[10px] text-[#334155]"
             >
               {formattedTime}

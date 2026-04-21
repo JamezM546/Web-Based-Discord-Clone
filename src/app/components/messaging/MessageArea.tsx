@@ -6,6 +6,7 @@ import { WhatYouMissed } from './WhatYouMissed';
 import { ManualSummary } from './ManualSummary';
 import { Hash, Sparkles, MessageSquare } from 'lucide-react';
 import { ScrollArea } from '../ui/scroll-area';
+import { format, isSameDay, isSameWeek, isToday, isYesterday } from 'date-fns';
 
 export const MessageArea: React.FC = () => {
   const { selectedChannel, selectedDM, messages, users, currentUser, getUnreadMessages, markAsRead } = useApp();
@@ -91,6 +92,14 @@ export const MessageArea: React.FC = () => {
     }
   };
 
+  const getDayDividerLabel = (timestamp: string) => {
+    const date = new Date(timestamp);
+    if (isToday(date)) return 'Today';
+    if (isYesterday(date)) return 'Yesterday';
+    if (isSameWeek(date, new Date(), { weekStartsOn: 0 })) return format(date, 'EEEE');
+    return format(date, 'MMMM d, yyyy');
+  };
+
   return (
     <div className="flex-1 bg-[#060c18] flex flex-col min-h-0">
       {/* Header */}
@@ -157,7 +166,28 @@ export const MessageArea: React.FC = () => {
         ) : (
           (() => {
             const elements: React.ReactNode[] = [];
+            let lastMessageDate: Date | null = null;
             channelMessages.forEach((message) => {
+              const messageDate = new Date(message.timestamp);
+              const shouldShowDayDivider = !lastMessageDate || !isSameDay(messageDate, lastMessageDate);
+              if (shouldShowDayDivider) {
+                const dayLabel = getDayDividerLabel(message.timestamp);
+                elements.push(
+                  <div
+                    key={`day-divider-${message.id}`}
+                    role="separator"
+                    aria-label={`Messages from ${dayLabel}`}
+                    className="flex items-center gap-3 py-1.5"
+                  >
+                    <div className="flex-1 h-px bg-[#1e3248]" aria-hidden="true" />
+                    <span className="text-xs font-medium px-2.5 py-0.5 rounded-full bg-[#0a1628] border border-[#1e3248] text-[#94a3b8]">
+                      {dayLabel}
+                    </span>
+                    <div className="flex-1 h-px bg-[#1e3248]" aria-hidden="true" />
+                  </div>
+                );
+              }
+
               const isFirstUnread =
                 filteredUnreadMessages.length > 0 &&
                 message.id === filteredUnreadMessages[0]?.id;
@@ -188,6 +218,7 @@ export const MessageArea: React.FC = () => {
               elements.push(
                 <MessageItem key={message.id} message={message} onScrollToMessage={scrollToMessage} />
               );
+              lastMessageDate = messageDate;
             });
             return elements;
           })()
