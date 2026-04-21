@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Message } from '../../types';
-import { format } from 'date-fns';
+import { format, isToday, isYesterday } from 'date-fns';
 import { MoreVertical, Edit2, Trash2, Smile, Plus, Reply, CornerUpLeft } from 'lucide-react';
 import {
   DropdownMenu,
@@ -103,8 +103,22 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, onScrollToMes
 
   if (!author) return null;
 
-  const formattedTime = format(new Date(message.timestamp), 'h:mm a');
-  const isoTime = new Date(message.timestamp).toISOString();
+  const messageDate = new Date(message.timestamp);
+  const formattedTime = format(messageDate, 'h:mm a');
+  const isoTime = messageDate.toISOString();
+  
+  // Determine date display format
+  let dateDisplay = formattedTime;
+  if (isToday(messageDate)) {
+    dateDisplay = `Today at ${formattedTime}`;
+  } else if (isYesterday(messageDate)) {
+    dateDisplay = `Yesterday at ${formattedTime}`;
+  } else {
+    // Show MM/DD/YY format for older messages
+    dateDisplay = `${format(messageDate, 'MM/dd/yy')} at ${formattedTime}`;
+  }
+  
+  const fullDateDisplay = format(messageDate, 'MM/dd/yy h:mm:ss a');
 
   return (
     <article
@@ -161,16 +175,25 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, onScrollToMes
             {isOwnMessage && <span className="sr-only">(you)</span>}
 
             {/*
-              No aria-hidden — NVDA mouse-hover reads the aria-label ("Sent at 3:45 PM").
-              The dateTime attribute provides machine-readable precision.
+              Enhanced timestamp with smart date display and full tooltip
+              Shows time only for today, date + time for older messages
             */}
-            <time
-              dateTime={isoTime}
-              aria-label={`Sent at ${formattedTime}`}
-              className="text-[10px] text-[#334155]"
-            >
-              {formattedTime}
-            </time>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <time
+                    dateTime={isoTime}
+                    aria-label={`Sent at ${dateDisplay}`}
+                    className="text-[10px] text-[#334155] cursor-help hover:text-[#475569] transition-colors"
+                  >
+                    {dateDisplay}
+                  </time>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="text-xs">{fullDateDisplay}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
 
             {message.edited && (
               <span className="text-[10px] text-[#334155] italic" aria-label="edited">(edited)</span>
