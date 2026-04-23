@@ -29,6 +29,11 @@ interface AppContextType {
   sendServerInvite: (serverId: string, userId: string) => void;
   acceptServerInvite: (inviteId: string) => void;
   declineServerInvite: (inviteId: string) => void;
+  createInviteCode: (serverId: string, opts?: { maxUses?: number; expiresAt?: string | Date }) => Promise<any>;
+  getInviteCodes: (serverId: string) => Promise<any[]>;
+  resolveInviteCode: (code: string) => Promise<any>;
+  deleteInviteCode: (serverId: string, inviteId: string) => Promise<void>;
+  joinInviteByCode: (code: string) => Promise<any>;
   createChannel: (serverId: string, name: string) => void;
   sendMessage: (content: string, channelId?: string, dmId?: string, replyToId?: string, serverInviteId?: string) => void;
   editMessage: (messageId: string, newContent: string) => void;
@@ -454,6 +459,116 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
+  const createInviteCode = async (serverId: string, opts?: { maxUses?: number; expiresAt?: string | Date }) => {
+    if (!currentUser) return null;
+    try {
+      const inv = await apiService.createInviteCode(serverId, opts);
+      return inv;
+    } catch (error) {
+      console.error('Failed to create invite code:', error);
+      return null;
+    }
+  };
+
+  const getInviteCodes = async (serverId: string) => {
+    try {
+      const codes = await apiService.getInviteCodes(serverId);
+      return codes || [];
+    } catch (error) {
+      console.error('Failed to load invite codes:', error);
+      return [];
+    }
+  };
+
+  const resolveInviteCode = async (code: string) => {
+    try {
+      const res = await apiService.resolveInviteCode(code);
+      return res;
+    } catch (error) {
+      console.error('Failed to resolve invite code:', error);
+      throw error;
+    }
+  };
+
+  const deleteInviteCode = async (serverId: string, inviteId: string) => {
+    try {
+      await apiService.deleteInviteCode(serverId, inviteId);
+    } catch (error) {
+      console.error('Failed to delete invite code:', error);
+      throw error;
+    }
+  };
+
+  const joinInviteByCode = async (code: string) => {
+    try {
+      const res = await apiService.joinInviteByCode(code);
+      // Try to determine serverId from response
+      let serverId: string | undefined = res?.server?.id || res?.server_id || res?.id;
+
+      // Refresh server list
+      await fetchUserServers();
+
+      // If we don't have serverId yet, resolve the invite to find it
+      if (!serverId) {
+        try {
+          const resolved = await apiService.resolveInviteCode(code);
+          serverId = resolved?.server?.id;
+        } catch (e) {
+          // ignore
+        }
+      }
+
+      // If we have a serverId, fetch its details and select it
+      if (serverId) {
+        try {
+          const sd = await apiService.getServerDetails(serverId);
+          if (sd && sd.id) {
+            const transformed: Server = {
+              id: sd.id,
+              name: sd.name,
+              icon: sd.icon || '📁',
+              ownerId: sd.owner_id || sd.ownerId,
+              members: sd.members || [],
+            };
+            setServers((prev) => {
+              const map = new Map(prev.map((s) => [s.id, s]));
+              map.set(transformed.id, transformed);
+              return Array.from(map.values());
+            });
+            setSelectedServer(transformed);
+            try {
+              // Fetch channels for the server and set the first channel as selected
+              const serverChannels = (await apiService.getChannels(transformed.id)) as any[];
+              const mappedChannels: Channel[] = serverChannels.map((c: any) => ({
+                id: c.id,
+                name: c.name,
+                serverId: c.server_id || c.serverId || transformed.id,
+              }));
+              if (mappedChannels.length > 0) {
+                setChannels((prev) => {
+                  const map = new Map(prev.map((c) => [c.id, c]));
+                  for (const mc of mappedChannels) map.set(mc.id, mc);
+                  return Array.from(map.values());
+                });
+                setSelectedChannel(mappedChannels[0]);
+              }
+            } catch (e) {
+              // ignore
+            }
+            return transformed;
+          }
+        } catch (e) {
+          console.error('Failed to fetch joined server details:', e);
+        }
+      }
+
+      return res;
+    } catch (error) {
+      console.error('Failed to join server via invite code:', error);
+      throw error;
+    }
+  };
+
   const acceptServerInvite = async (inviteId: string) => {
     try {
       await apiService.acceptServerInvite(inviteId);
@@ -808,6 +923,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         sendServerInvite,
         acceptServerInvite,
         declineServerInvite,
+        createInviteCode,
+        getInviteCodes,
+        resolveInviteCode,
+        deleteInviteCode,
+        joinInviteByCode,
         createChannel,
         sendMessage,
         editMessage,

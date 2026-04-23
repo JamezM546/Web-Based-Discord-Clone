@@ -14,6 +14,7 @@ import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 import { CustomEmojiPicker } from './CustomEmojiPicker';
+import InviteModal from '../server/InviteModal';
 
 interface MessageItemProps {
   message: Message;
@@ -22,6 +23,8 @@ interface MessageItemProps {
 
 export const MessageItem: React.FC<MessageItemProps> = ({ message, onScrollToMessage }) => {
   const { users, currentUser, editMessage, deleteMessage, toggleReaction, messages, setReplyingTo, serverInvites, servers, acceptServerInvite, declineServerInvite } = useApp();
+  const [inviteModalOpen, setInviteModalOpen] = useState(false);
+  const [inviteModalCode, setInviteModalCode] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(message.content);
   const [reactionPickerOpen, setReactionPickerOpen] = useState(false);
@@ -67,30 +70,65 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, onScrollToMes
   };
 
   const renderMessageContent = (content: string) => {
-    const mentionRegex = /@(\w+)/g;
+    // Match either a URL or an @mention. Group 1 = URL, Group 2 = username
+    const combinedRegex = /(https?:\/\/[^\s]+)|@(\w+)/g;
     const parts: React.ReactNode[] = [];
     let lastIndex = 0;
-    let match;
+    let match: RegExpExecArray | null;
 
-    while ((match = mentionRegex.exec(content)) !== null) {
+    while ((match = combinedRegex.exec(content)) !== null) {
       if (match.index > lastIndex) {
         parts.push(content.substring(lastIndex, match.index));
       }
-      const mentionedUsername = match[1];
-      const mentionedUser = users.find(u => u.username.toLowerCase() === mentionedUsername.toLowerCase());
-      const isMentioningCurrentUser = mentionedUser?.id === currentUser?.id;
-      parts.push(
-        <span
-          key={match.index}
-          className={`${
-            isMentioningCurrentUser
-              ? 'bg-[#06b6d4] text-white px-1.5 py-0.5 rounded-md text-sm font-medium'
-              : 'bg-[#06b6d4]/15 text-[#06b6d4] px-1.5 py-0.5 rounded-md text-sm hover:bg-[#06b6d4]/25 cursor-pointer'
-          }`}
-        >
-          @{mentionedUsername}
-        </span>
-      );
+
+      if (match[1]) {
+        // It's a URL
+        const url = match[1];
+        // If this looks like an invite link, open modal instead of new tab
+        const inviteMatch = url.match(/\/invite\/(?<code>[^\/?#\s]+)/i);
+        if (inviteMatch && (inviteMatch as any).groups?.code) {
+          const code = (inviteMatch as any).groups.code;
+          parts.push(
+            <button
+              key={`invite-${match.index}`}
+              onClick={() => { setInviteModalCode(code); setInviteModalOpen(true); }}
+              className="text-[#60a5fa] hover:underline break-words bg-transparent border-none p-0 cursor-pointer"
+            >
+              {url}
+            </button>
+          );
+        } else {
+          parts.push(
+            <a
+              key={`url-${match.index}`}
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[#60a5fa] hover:underline break-words"
+            >
+              {url}
+            </a>
+          );
+        }
+      } else if (match[2]) {
+        // It's a mention
+        const mentionedUsername = match[2];
+        const mentionedUser = users.find(u => u.username.toLowerCase() === mentionedUsername.toLowerCase());
+        const isMentioningCurrentUser = mentionedUser?.id === currentUser?.id;
+        parts.push(
+          <span
+            key={`mention-${match.index}`}
+            className={`${
+              isMentioningCurrentUser
+                ? 'bg-[#06b6d4] text-white px-1.5 py-0.5 rounded-md text-sm font-medium'
+                : 'bg-[#06b6d4]/15 text-[#06b6d4] px-1.5 py-0.5 rounded-md text-sm hover:bg-[#06b6d4]/25 cursor-pointer'
+            }`}
+          >
+            @{mentionedUsername}
+          </span>
+        );
+      }
+
       lastIndex = match.index + match[0].length;
     }
 
@@ -293,6 +331,10 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, onScrollToMes
             </>
           )}
         </div>
+
+        {inviteModalCode && (
+          <InviteModal code={inviteModalCode} open={inviteModalOpen} onOpenChange={setInviteModalOpen} />
+        )}
 
         {/* Hover action buttons */}
         {!isEditing && (

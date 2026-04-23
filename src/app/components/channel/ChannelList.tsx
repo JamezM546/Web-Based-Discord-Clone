@@ -57,6 +57,7 @@ export const ChannelList: React.FC<ChannelListProps> = ({ onChannelSelect }) => 
               <UserPlus className="size-4 mr-2 text-[#06b6d4]" />
               Invite People
             </DropdownMenuItem>
+            {/* Invite Links removed — functionality merged into Invite People dialog */}
             {isOwner && (
               <>
                 <DropdownMenuItem
@@ -147,6 +148,7 @@ export const ChannelList: React.FC<ChannelListProps> = ({ onChannelSelect }) => 
           onOpenChange={setInvitePeopleOpen}
         />
       )}
+      {/* InviteLinkDialog removed — invite link UI lives in InvitePeopleDialog */}
     </>
   );
 };

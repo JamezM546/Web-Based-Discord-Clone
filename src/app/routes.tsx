@@ -3,6 +3,7 @@ import { LoginForm } from './components/auth/LoginForm';
 import { RegisterForm } from './components/auth/RegisterForm';
 import { MainLayout } from './pages/MainLayout';
 import MockupsPage from './pages/MockupsPage';
+import InviteJoinPage from './pages/InviteJoinPage';
 import { AppProvider, useApp } from './context/AppContext';
 
 // Loading component
@@ -79,6 +80,10 @@ export const router = createBrowserRouter([
       {
         path: '/channels',
         element: <ProtectedRoute><MainLayout /></ProtectedRoute>,
+      },
+      {
+        path: '/invite/:code',
+        element: <InviteJoinPage />,
       },
       {
         path: '/mockups',

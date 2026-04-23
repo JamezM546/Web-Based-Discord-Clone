@@ -182,6 +182,21 @@ const createTables = async () => {
       )
     `);
     
+    // Server invite codes table (invite links)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS server_invite_codes (
+        id VARCHAR(255) PRIMARY KEY,
+        code VARCHAR(64) UNIQUE NOT NULL,
+        server_id VARCHAR(255) NOT NULL REFERENCES servers(id) ON DELETE CASCADE,
+        created_by VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        expires_at TIMESTAMP,
+        max_uses INTEGER DEFAULT 0,
+        uses_count INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    
     // Create indexes for better performance
     await client.query('CREATE INDEX IF NOT EXISTS idx_messages_channel_id ON messages(channel_id)');
     await client.query('CREATE INDEX IF NOT EXISTS idx_messages_dm_id ON messages(dm_id)');
