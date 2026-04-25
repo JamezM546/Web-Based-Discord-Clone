@@ -32,7 +32,8 @@ export const DMList: React.FC<DMListProps> = ({ searchQuery, onDMSelect }) => {
   const handleDMClick = (dm: typeof directMessages[0]) => {
     setSelectedDM(dm);
     setSelectedChannel(null);
-    markAsRead(undefined, dm.id);
+    // Don't markAsRead here — let WhatYouMissed show first.
+    // markAsRead is called when user dismisses the banner.
     if (onDMSelect) {
       onDMSelect();
     }

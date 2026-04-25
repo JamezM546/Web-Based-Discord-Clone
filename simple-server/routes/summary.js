@@ -15,54 +15,9 @@ const summaryRateLimiter = createRateLimiter({
   max: 10
 });
 
-const getLastReadAt = async (userId, channelId) => {
-  const query = `
-    SELECT last_read_at 
-    FROM channel_read_state
-    WHERE user_id = $1 AND channel_id = $2
-  `;
-
-  const result = await pool.query(query, [userId, channelId]);
-  return result.rows[0] ? result.rows[0].last_read_at : null;
-};
-
-const getCachedSummary = async (userId, channelId, optionsKey) => {
-  const query = `
-    SELECT *
-    FROM channel_summaries
-    WHERE user_id = $1
-      AND channel_id = $2
-      AND options_json = $3
-      AND expires_at > CURRENT_TIMESTAMP
-    ORDER BY generated_at DESC
-    LIMIT 1
-  `;
-
-  const result = await pool.query(query, [userId, channelId, optionsKey]);
-  return result.rows[0] || null;
-};
-
-const storeSummary = async (userId, channelId, format, optionsKey, summaryText, messageCount) => {
-  const id = `cs_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
-
-  const query = `
-    INSERT INTO channel_summaries (
-      id, user_id, channel_id, format, options_json, summary_text, message_count, generated_at, expires_at
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP, $8)
-  `;
-
-  await pool.query(query, [
-    id,
-    userId,
-    channelId,
-    format,
-    optionsKey,
-    summaryText,
-    messageCount,
-    expiresAt
-  ]);
-};
+// Manual summaries are always generated fresh — caching is intentionally omitted
+// because the user explicitly requests a specific time window and expects current results.
+// Stale DB cache rows from earlier TTL settings would silently return outdated text.
 
 const hasDmAccess = async (dmId, userId) => {
   const query = `
@@ -74,44 +29,6 @@ const hasDmAccess = async (dmId, userId) => {
   `;
   const result = await pool.query(query, [dmId, userId]);
   return result.rows[0] || null;
-};
-
-const getCachedDmSummary = async (userId, dmId, optionsKey) => {
-  const query = `
-    SELECT *
-    FROM direct_message_summaries
-    WHERE user_id = $1
-      AND dm_id = $2
-      AND options_json = $3
-      AND expires_at > CURRENT_TIMESTAMP
-    ORDER BY generated_at DESC
-    LIMIT 1
-  `;
-
-  const result = await pool.query(query, [userId, dmId, optionsKey]);
-  return result.rows[0] || null;
-};
-
-const storeDmSummary = async (userId, dmId, format, optionsKey, summaryText, messageCount) => {
-  const id = `ds_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
-
-  const query = `
-    INSERT INTO direct_message_summaries (
-      id, user_id, dm_id, format, options_json, summary_text, message_count, generated_at, expires_at
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP, $8)
-  `;
-
-  await pool.query(query, [
-    id,
-    userId,
-    dmId,
-    format,
-    optionsKey,
-    summaryText,
-    messageCount,
-    expiresAt
-  ]);
 };
 
 // Manual summary generation
@@ -139,33 +56,12 @@ router.post(
       const timeWindowMinutes =
         typeof options.timeWindow === 'number' ? options.timeWindow : null;
 
-      const optionsKey = JSON.stringify({
-        maxMessages,
-        format,
-        timeWindowMinutes
-      });
-
-      // Check cache first
-      try {
-        const cached = await getCachedSummary(userId, channelId, optionsKey);
-        if (cached) {
-          return res.status(200).json({
-            success: true,
-            data: {
-              source: 'cache',
-              summary: cached.summary_text,
-              format: cached.format,
-              messageCount: cached.message_count,
-              generatedAt: cached.generated_at
-            }
-          });
-        }
-      } catch (cacheError) {
-        console.error('Error reading summary cache:', cacheError);
-      }
-
       // Determine time range to summarize
-      const lastReadAt = await getLastReadAt(userId, channelId);
+      const lastReadAtResult = await pool.query(
+        'SELECT last_read_at FROM channel_read_state WHERE user_id = $1 AND channel_id = $2',
+        [userId, channelId]
+      );
+      const lastReadAt = lastReadAtResult.rows[0] ? lastReadAtResult.rows[0].last_read_at : null;
       let since;
       if (timeWindowMinutes) {
         since = new Date(Date.now() - timeWindowMinutes * 60 * 1000);
@@ -182,7 +78,6 @@ router.post(
         return res.status(200).json({
           success: true,
           data: {
-            source: 'live',
             summary: timeWindowMinutes
               ? 'There are no messages in this time range.'
               : 'There are no new messages since your last visit.',
@@ -202,26 +97,26 @@ router.post(
         options: { maxMessages, format }
       });
 
-      try {
-        await storeSummary(
-          userId,
-          channelId,
-          groqResult.format,
-          optionsKey,
-          groqResult.summary,
-          messages.length
-        );
-      } catch (cacheStoreError) {
-        console.error('Error storing summary cache:', cacheStoreError);
+      // Compute participation stats from the fetched messages
+      const userMessageCounts = {};
+      for (const m of messages) {
+        const name = m.username || m.display_name || 'Unknown';
+        userMessageCounts[name] = (userMessageCounts[name] || 0) + 1;
       }
+      const topUsers = Object.entries(userMessageCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([username, count]) => ({ username, count }));
 
       return res.status(200).json({
         success: true,
         data: {
-          source: 'live',
           summary: groqResult.summary,
+          topics: groqResult.topics || [],
           format: groqResult.format,
           messageCount: messages.length,
+          uniqueUsers: Object.keys(userMessageCounts).length,
+          topUsers,
           generatedAt: new Date().toISOString()
         }
       });
@@ -241,7 +136,7 @@ router.post(
 );
 
 // Manual summary generation for direct messages.
-// POST /api/v1/summaries/manual/dms/:dmId
+// POST /api/summaries/manual/dms/:dmId
 router.post(
   '/manual/dms/:dmId',
   authenticateToken,
@@ -266,37 +161,10 @@ router.post(
       const timeWindowMinutes =
         typeof options.timeWindow === 'number' ? options.timeWindow : null;
 
-      const optionsKey = JSON.stringify({
-        maxMessages,
-        format,
-        timeWindowMinutes
-      });
-
-      // Check cache first
-      try {
-        const cached = await getCachedDmSummary(userId, dmId, optionsKey);
-        if (cached) {
-          return res.status(200).json({
-            success: true,
-            data: {
-              source: 'cache',
-              summary: cached.summary_text,
-              format: cached.format,
-              messageCount: cached.message_count,
-              generatedAt: cached.generated_at
-            }
-          });
-        }
-      } catch (cacheError) {
-        console.error('Error reading DM summary cache:', cacheError);
-      }
-
-      const lastReadQuery = `
-        SELECT last_read_at
-        FROM direct_message_read_state
-        WHERE user_id = $1 AND dm_id = $2
-      `;
-      const lastReadResult = await pool.query(lastReadQuery, [userId, dmId]);
+      const lastReadResult = await pool.query(
+        'SELECT last_read_at FROM direct_message_read_state WHERE user_id = $1 AND dm_id = $2',
+        [userId, dmId]
+      );
       const lastReadAt = lastReadResult.rows[0] ? lastReadResult.rows[0].last_read_at : null;
 
       let since;
@@ -315,7 +183,6 @@ router.post(
         return res.status(200).json({
           success: true,
           data: {
-            source: 'live',
             summary: timeWindowMinutes
               ? 'There are no messages in this time range.'
               : 'There are no new messages since your last visit.',
@@ -326,33 +193,33 @@ router.post(
         });
       }
 
-      // Use the same summarizer; DM prompt still works with "channelName" as null.
       const groqResult = await generateChannelSummary({
         channelName: null,
+        isDm: true,
         messages,
         options: { maxMessages, format }
       });
 
-      try {
-        await storeDmSummary(
-          userId,
-          dmId,
-          groqResult.format,
-          optionsKey,
-          groqResult.summary,
-          messages.length
-        );
-      } catch (cacheStoreError) {
-        console.error('Error storing DM summary cache:', cacheStoreError);
+      // Compute participation stats from the fetched messages
+      const dmUserMessageCounts = {};
+      for (const m of messages) {
+        const name = m.username || m.display_name || 'Unknown';
+        dmUserMessageCounts[name] = (dmUserMessageCounts[name] || 0) + 1;
       }
+      const dmTopUsers = Object.entries(dmUserMessageCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([username, count]) => ({ username, count }));
 
       return res.status(200).json({
         success: true,
         data: {
-          source: 'live',
           summary: groqResult.summary,
+          topics: groqResult.topics || [],
           format: groqResult.format,
           messageCount: messages.length,
+          uniqueUsers: Object.keys(dmUserMessageCounts).length,
+          topUsers: dmTopUsers,
           generatedAt: new Date().toISOString()
         }
       });

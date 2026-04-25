@@ -13,6 +13,8 @@ if (!GROQ_API_KEY) {
   console.warn('GROQ_API_KEY is not set. Summary and preview features will be disabled until it is configured.');
 }
 
+const GROQ_TIMEOUT_MS = 15000; // 15 seconds — kill the request if Groq doesn't respond
+
 const callGroqChat = (payload) => {
   return new Promise((resolve, reject) => {
     if (!GROQ_API_KEY) {
@@ -31,12 +33,18 @@ const callGroqChat = (payload) => {
       }
     };
 
+    let settled = false;
+    const settle = (fn, value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      fn(value);
+    };
+
     const req = https.request(url, options, (res) => {
       let body = '';
 
-      res.on('data', (chunk) => {
-        body += chunk;
-      });
+      res.on('data', (chunk) => { body += chunk; });
 
       res.on('end', () => {
         try {
@@ -45,18 +53,21 @@ const callGroqChat = (payload) => {
             const message = parsed.error && parsed.error.message
               ? parsed.error.message
               : `Groq API error (status ${res.statusCode})`;
-            return reject(new Error(message));
+            return settle(reject, new Error(message));
           }
-          resolve(parsed);
+          settle(resolve, parsed);
         } catch (error) {
-          reject(error);
+          settle(reject, error);
         }
       });
     });
 
-    req.on('error', (error) => {
-      reject(error);
-    });
+    const timer = setTimeout(() => {
+      req.destroy();
+      settle(reject, new Error('Groq API request timed out after 15 seconds'));
+    }, GROQ_TIMEOUT_MS);
+
+    req.on('error', (error) => { settle(reject, error); });
 
     req.write(data);
     req.end();
@@ -66,13 +77,29 @@ const callGroqChat = (payload) => {
 const buildConversationSnippet = (messages, maxMessages) => {
   const sliced = messages.slice(-maxMessages);
   return sliced.map((m) => {
-    const timestamp = m.timestamp || m.created_at;
+    // m.timestamp is a JS Date from node-postgres; convert to a readable ISO string
+    const raw = m.timestamp || m.created_at;
+    const timestamp = raw instanceof Date
+      ? raw.toISOString().replace('T', ' ').substring(0, 16) // "2025-04-24 14:30"
+      : String(raw);
     const author = m.username || m.display_name || 'User';
     return `[${timestamp}] ${author}: ${m.content}`;
   }).join('\n');
 };
 
-const generateChannelSummary = async ({ channelName, messages, options = {} }) => {
+// Attempt to extract a JSON object from a string that may contain surrounding text/fences.
+const extractJson = (raw) => {
+  const firstBrace = raw.indexOf('{');
+  const lastBrace = raw.lastIndexOf('}');
+  if (firstBrace === -1 || lastBrace === -1) return null;
+  try {
+    return JSON.parse(raw.slice(firstBrace, lastBrace + 1));
+  } catch {
+    return null;
+  }
+};
+
+const generateChannelSummary = async ({ channelName, isDm = false, messages, options = {} }) => {
   const maxMessages = options.maxMessages || 50;
   const format = options.format === 'bullets' ? 'bullets' : 'paragraph';
 
@@ -80,6 +107,7 @@ const generateChannelSummary = async ({ channelName, messages, options = {} }) =
 
   const { systemPrompt, userPrompt } = buildDiscordSummaryPrompts({
     channelName,
+    isDm,
     format,
     conversation,
   });
@@ -87,7 +115,9 @@ const generateChannelSummary = async ({ channelName, messages, options = {} }) =
   const response = await callGroqChat({
     model: GROQ_SUMMARY_MODEL,
     temperature: 0.4,
-    max_tokens: 512,
+    max_tokens: 600,
+    // Ask the model to return a JSON object — supported by llama-3.x models on Groq
+    response_format: { type: 'json_object' },
     messages: [
       { role: 'system', content: systemPrompt.trim() },
       { role: 'user', content: userPrompt.trim() }
@@ -103,18 +133,33 @@ const generateChannelSummary = async ({ channelName, messages, options = {} }) =
     throw new Error('Groq response did not include summary content');
   }
 
+  // Parse JSON; fall back gracefully if the model ignores the format instruction
+  const parsed = extractJson(content);
+  const summary = (parsed && typeof parsed.summary === 'string')
+    ? parsed.summary.trim()
+    : content.trim();
+
+  const topics = (parsed && Array.isArray(parsed.topics))
+    ? parsed.topics
+        .filter((t) => typeof t === 'string' && t.trim())
+        .map((t) => t.trim())
+        .slice(0, 5)
+    : [];
+
   return {
-    summary: content.trim(),
+    summary,
+    topics,
     format,
     model: GROQ_SUMMARY_MODEL
   };
 };
 
-const generateChannelPreview = async ({ channelName, messages, unreadCount, maxHighlights = 5 }) => {
+const generateChannelPreview = async ({ channelName, isDm = false, messages, unreadCount, maxHighlights = 5 }) => {
   const conversation = buildConversationSnippet(messages, maxHighlights * 10);
 
   const { systemPrompt, userPrompt } = buildDiscordPreviewPrompts({
     channelName,
+    isDm,
     unreadCount,
     conversation,
   });

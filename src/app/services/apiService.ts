@@ -57,6 +57,24 @@ class HttpResponseError extends Error {
   }
 }
 
+const toPreviewSummaryText = (highlights: any): string => {
+  if (!highlights) return '';
+  const parsed = Array.isArray(highlights) ? highlights : (() => {
+    if (typeof highlights !== 'string') return [];
+    try {
+      const value = JSON.parse(highlights);
+      return Array.isArray(value) ? value : [];
+    } catch {
+      return [];
+    }
+  })();
+
+  const lines = parsed
+    .map((item: any) => (typeof item === 'string' ? item : String(item || '')).trim())
+    .filter(Boolean);
+  return lines.join(' · ');
+};
+
 class ApiService {
   private token: string | null = null;
 
@@ -337,11 +355,41 @@ class ApiService {
     hours?: number;
     maxMessages?: number;
   }): Promise<any> {
-    const response = await this.request<{ summary: any }>('/api/summaries/manual', {
+    const options: Record<string, any> = { format: 'paragraph' };
+    if (payload.maxMessages) options.maxMessages = payload.maxMessages;
+    if (payload.hours) options.timeWindow = Math.max(1, Math.round(payload.hours * 60));
+
+    const endpoint = payload.dmId
+      ? `/api/summaries/manual/dms/${encodeURIComponent(payload.dmId)}`
+      : '/api/summaries/manual';
+    const body = payload.dmId
+      ? { options }
+      : { channelId: payload.channelId, options };
+
+    const response = await this.request<any>(endpoint, {
       method: 'POST',
-      body: JSON.stringify(payload),
+      body: JSON.stringify(body),
     });
-    return response.data?.summary;
+
+    const result = response.data || {};
+    const fmtHours = payload.hours ?? 3;
+    const mostActiveUsers = Array.isArray(result.topUsers)
+      ? result.topUsers.map((u: any) => ({ username: u.username, count: u.count }))
+      : [];
+    const keyTopics = Array.isArray(result.topics)
+      ? result.topics.filter((t: any) => typeof t === 'string' && t.trim())
+      : [];
+    return {
+      overview: result.summary || 'No summary available.',
+      keyTopics,
+      mostActiveUsers,
+      importantMessages: [],
+      timeframe: `Last ${fmtHours < 1 ? `${fmtHours * 60} min` : `${fmtHours} hour${fmtHours !== 1 ? 's' : ''}`}`,
+      stats: {
+        totalMessages: result.messageCount || 0,
+        uniqueUsers: result.uniqueUsers || mostActiveUsers.length || 0,
+      },
+    };
   }
 
   async getPreviewSummary(params: {
@@ -349,15 +397,49 @@ class ApiService {
     dmId?: string;
     since?: string;
   }): Promise<any> {
-    const qs = new URLSearchParams();
-    if (params.channelId) qs.set('channelId', params.channelId);
-    if (params.dmId) qs.set('dmId', params.dmId);
-    if (params.since) qs.set('since', params.since);
+    // Preview routes are mounted at /api/previews (separate from summary routes)
+    const endpointBase = params.channelId
+      ? `/api/previews/channels/${encodeURIComponent(params.channelId)}`
+      : params.dmId
+      ? `/api/previews/dms/${encodeURIComponent(params.dmId)}`
+      : null;
 
-    const response = await this.request<{ preview: any }>(
-      `/api/summaries/preview?${qs.toString()}`
-    );
-    return response.data?.preview;
+    if (!endpointBase) {
+      return { summary: 'No recent messages.', highlights: [], unreadCount: 0 };
+    }
+
+    const qs = new URLSearchParams();
+    if (params.since) qs.set('since', params.since);
+    const endpoint = qs.toString() ? `${endpointBase}?${qs.toString()}` : endpointBase;
+
+    try {
+      const response = await this.request<any>(endpoint);
+      const preview = response.data || {};
+
+      // highlights may be a JSON string from the DB cache layer
+      let highlights: string[] = [];
+      if (Array.isArray(preview.highlights)) {
+        highlights = preview.highlights.filter((h: any) => typeof h === 'string' && h.trim());
+      } else if (typeof preview.highlights === 'string') {
+        try {
+          const parsed = JSON.parse(preview.highlights);
+          if (Array.isArray(parsed)) highlights = parsed.filter((h: any) => typeof h === 'string');
+        } catch { /* ignore */ }
+      }
+
+      const summary = highlights.length > 0
+        ? highlights.join(' · ')
+        : `${preview.unreadCount || 0} new message${preview.unreadCount === 1 ? '' : 's'}`;
+
+      return {
+        summary,
+        highlights,
+        unreadCount: preview.unreadCount || 0,
+        lastMessageTime: preview.lastMessageTime || null,
+      };
+    } catch {
+      return { summary: 'No recent messages.', highlights: [], unreadCount: 0 };
+    }
   }
 
   // User endpoints
@@ -466,6 +548,18 @@ class ApiService {
       `/api/servers/search?${qs.toString()}`
     );
     return response.data?.servers || [];
+  }
+
+  // Read state sync — fire-and-forget; errors are logged but do not throw
+  async syncReadState(params: { channelId?: string; dmId?: string }): Promise<void> {
+    try {
+      await this.request('/api/read-state', {
+        method: 'PUT',
+        body: JSON.stringify(params),
+      });
+    } catch (err) {
+      console.warn('[syncReadState] Failed to sync read state to backend:', err);
+    }
   }
 }
 

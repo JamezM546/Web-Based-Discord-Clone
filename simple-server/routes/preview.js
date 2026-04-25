@@ -25,6 +25,12 @@ const getLastReadAt = async (userId, channelId) => {
   return result.rows[0] ? result.rows[0].last_read_at : null;
 };
 
+const parseSinceQuery = (value) => {
+  if (!value || typeof value !== 'string') return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
 const getCachedPreview = async (userId, channelId) => {
   const query = `
     SELECT *
@@ -126,6 +132,7 @@ router.get(
         parseInt(req.query.maxHighlights, 10) || 5,
         5
       );
+      const sinceOverride = parseSinceQuery(req.query.since);
 
       // Check channel access
       const access = await Channel.hasAccess(channelId, userId);
@@ -136,27 +143,30 @@ router.get(
         });
       }
 
-      // Check cache first (5 minute TTL)
-      try {
-        const cached = await getCachedPreview(userId, channelId);
-        if (cached) {
-          return res.status(200).json({
-            success: true,
-            data: {
-              source: 'cache',
-              unreadCount: cached.unread_count,
-              timeRange: cached.time_range,
-              highlights: cached.highlights,
-              lastMessageTime: cached.last_message_time
-            }
-          });
+      // Skip cache when the caller provides an explicit 'since' — the cache is
+      // not keyed on that value and would return stale highlights.
+      if (!sinceOverride) {
+        try {
+          const cached = await getCachedPreview(userId, channelId);
+          if (cached) {
+            return res.status(200).json({
+              success: true,
+              data: {
+                source: 'cache',
+                unreadCount: cached.unread_count,
+                timeRange: cached.time_range,
+                highlights: cached.highlights,
+                lastMessageTime: cached.last_message_time
+              }
+            });
+          }
+        } catch (cacheError) {
+          console.error('Error reading preview cache:', cacheError);
         }
-      } catch (cacheError) {
-        console.error('Error reading preview cache:', cacheError);
       }
 
       const lastReadAt = await getLastReadAt(userId, channelId);
-      const since = lastReadAt || new Date(Date.now() - 60 * 60 * 1000);
+      const since = sinceOverride || lastReadAt || new Date(Date.now() - 60 * 60 * 1000);
 
       const unreadStats = await Message.getUnreadStats(channelId, since);
 
@@ -181,6 +191,14 @@ router.get(
         previewMessagesLimit
       );
 
+      // Guard against race condition where messages were deleted between stats and fetch
+      if (!messages || messages.length === 0) {
+        return res.status(200).json({
+          success: true,
+          data: { source: 'live', unreadCount: 0, timeRange: null, highlights: [], lastMessageTime: null }
+        });
+      }
+
       const channel = await Channel.findById(channelId);
       const channelName = channel ? channel.name : null;
 
@@ -204,11 +222,14 @@ router.get(
           : null
       };
 
-      try {
-        // Cache for 5 minutes as per architecture
-        await storePreview(userId, channelId, preview, 5 * 60 * 1000);
-      } catch (cacheStoreError) {
-        console.error('Error storing preview cache:', cacheStoreError);
+      // Only cache when no explicit since was provided; otherwise the cache key
+      // would be wrong for future requests using a different since value.
+      if (!sinceOverride) {
+        try {
+          await storePreview(userId, channelId, preview, 5 * 60 * 1000);
+        } catch (cacheStoreError) {
+          console.error('Error storing preview cache:', cacheStoreError);
+        }
       }
 
       return res.status(200).json({
@@ -243,6 +264,7 @@ router.get(
     try {
       const { dmId } = req.params;
       const userId = req.user.id;
+      const sinceOverride = parseSinceQuery(req.query.since);
 
       const maxHighlights = Math.min(
         parseInt(req.query.maxHighlights, 10) || 5,
@@ -257,23 +279,25 @@ router.get(
         });
       }
 
-      // Check cache first (5 minute TTL via expires_at)
-      try {
-        const cached = await getCachedDmPreview(userId, dmId);
-        if (cached) {
-          return res.status(200).json({
-            success: true,
-            data: {
-              source: 'cache',
-              unreadCount: cached.unread_count,
-              timeRange: cached.time_range,
-              highlights: cached.highlights,
-              lastMessageTime: cached.last_message_time
-            }
-          });
+      // Skip cache when the caller provides an explicit 'since' (see channel route comment above)
+      if (!sinceOverride) {
+        try {
+          const cached = await getCachedDmPreview(userId, dmId);
+          if (cached) {
+            return res.status(200).json({
+              success: true,
+              data: {
+                source: 'cache',
+                unreadCount: cached.unread_count,
+                timeRange: cached.time_range,
+                highlights: cached.highlights,
+                lastMessageTime: cached.last_message_time
+              }
+            });
+          }
+        } catch (cacheError) {
+          console.error('Error reading DM preview cache:', cacheError);
         }
-      } catch (cacheError) {
-        console.error('Error reading DM preview cache:', cacheError);
       }
 
       const lastReadAtQuery = `
@@ -283,7 +307,7 @@ router.get(
       `;
       const lastReadAtResult = await pool.query(lastReadAtQuery, [userId, dmId]);
       const lastReadAt = lastReadAtResult.rows[0] ? lastReadAtResult.rows[0].last_read_at : null;
-      const since = lastReadAt || new Date(Date.now() - 60 * 60 * 1000);
+      const since = sinceOverride || lastReadAt || new Date(Date.now() - 60 * 60 * 1000);
 
       const unreadStats = await Message.getDmUnreadStats(dmId, since);
 
@@ -304,8 +328,17 @@ router.get(
       const previewMessagesLimit = Math.min(unreadStats.unreadCount, 50);
       const messages = await Message.findSinceDmId(dmId, since, previewMessagesLimit);
 
+      // Guard against race condition where messages were deleted between stats and fetch
+      if (!messages || messages.length === 0) {
+        return res.status(200).json({
+          success: true,
+          data: { source: 'live', unreadCount: 0, timeRange: null, highlights: [], lastMessageTime: null }
+        });
+      }
+
       const groqResult = await generateChannelPreview({
         channelName: null,
+        isDm: true,
         messages,
         unreadCount: unreadStats.unreadCount,
         maxHighlights
@@ -322,10 +355,12 @@ router.get(
         lastMessageTime: unreadStats.lastUnreadAt ? unreadStats.lastUnreadAt.toISOString() : null
       };
 
-      try {
-        await storeDmPreview(userId, dmId, preview, 5 * 60 * 1000);
-      } catch (cacheStoreError) {
-        console.error('Error storing DM preview cache:', cacheStoreError);
+      if (!sinceOverride) {
+        try {
+          await storeDmPreview(userId, dmId, preview, 5 * 60 * 1000);
+        } catch (cacheStoreError) {
+          console.error('Error storing DM preview cache:', cacheStoreError);
+        }
       }
 
       return res.status(200).json({

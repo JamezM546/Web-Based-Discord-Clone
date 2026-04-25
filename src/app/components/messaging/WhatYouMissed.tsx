@@ -15,42 +15,16 @@ interface WhatYouMissedProps {
 const formatTimestamp = (date: Date) => {
   const now = new Date();
   const diff = now.getTime() - date.getTime();
+  const mins  = Math.floor(diff / (1000 * 60));
   const hours = Math.floor(diff / (1000 * 60 * 60));
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-  if (hours < 1) return 'just now';
+  const days  = Math.floor(diff / (1000 * 60 * 60 * 24));
+  if (mins  <  1) return 'just now';
+  if (mins  < 60) return `${mins}m ago`;
   if (hours < 24) return `${hours}h ago`;
-  if (days === 1) return 'yesterday';
+  if (days  ===1) return 'yesterday';
   return `${days}d ago`;
 };
 
-const highlightsToSummary = (highlights: any): string | null => {
-  if (!highlights) return null;
-  let arr: any[] | null = null;
-  if (Array.isArray(highlights)) arr = highlights;
-  else if (typeof highlights === 'string') {
-    try {
-      const parsed = JSON.parse(highlights);
-      if (Array.isArray(parsed)) arr = parsed;
-    } catch {
-      // ignore
-    }
-  }
-  if (!arr || arr.length === 0) return null;
-
-  const text = arr
-    .map((h) => {
-      if (!h) return null;
-      if (typeof h === 'string') return h.trim();
-      if (typeof h.text === 'string') return h.text.trim();
-      if (typeof h.summary === 'string') return h.summary.trim();
-      if (typeof h.highlight === 'string') return h.highlight.trim();
-      return null;
-    })
-    .filter(Boolean)
-    .slice(0, 5) as string[];
-
-  return text.length ? text.join(' · ') : null;
-};
 
 export const WhatYouMissed: React.FC<WhatYouMissedProps> = ({
   unreadMessages,
@@ -59,7 +33,7 @@ export const WhatYouMissed: React.FC<WhatYouMissedProps> = ({
   channelId,
   dmId,
 }) => {
-  const { users } = useApp();
+  const { users, lastReadMessages } = useApp();
   const [isExpanded, setIsExpanded] = useState(false);
   const [highlights, setHighlights] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -70,16 +44,21 @@ export const WhatYouMissed: React.FC<WhatYouMissedProps> = ({
     const fetchPreview = async () => {
       setIsLoading(true);
       try {
-        let result;
-        if (channelId) {
-          result = await apiService.getChannelPreview(channelId);
-        } else if (dmId) {
-          result = await apiService.getDmPreview(dmId);
-        }
+        const sinceKey = channelId || dmId || '';
+        const since = lastReadMessages[sinceKey]
+          ? new Date(lastReadMessages[sinceKey]).toISOString()
+          : undefined;
+        const result = await apiService.getPreviewSummary({
+          channelId: channelId || undefined,
+          dmId: dmId || undefined,
+          since,
+        });
 
         if (!cancelled) {
           const items: string[] = Array.isArray(result?.highlights) && result.highlights.length > 0
             ? result.highlights
+            : result?.summary
+            ? [result.summary]
             : [];
           setHighlights(items);
         }
@@ -99,7 +78,7 @@ export const WhatYouMissed: React.FC<WhatYouMissedProps> = ({
     }
 
     return () => { cancelled = true; };
-  }, [channelId, dmId, unreadMessages.length]);
+  }, [channelId, dmId, unreadMessages.length, lastReadMessages]);
 
   const lastReadTime = unreadMessages[0]?.timestamp;
 

@@ -30,7 +30,8 @@ export const ChannelList: React.FC<ChannelListProps> = ({ onChannelSelect }) => 
   const handleChannelClick = (channel: typeof channels[0]) => {
     setSelectedChannel(channel);
     setSelectedDM(null);
-    markAsRead(channel.id);
+    // Don't markAsRead here — let WhatYouMissed show first.
+    // markAsRead is called when user dismisses the banner.
     if (onChannelSelect) {
       onChannelSelect();
     }

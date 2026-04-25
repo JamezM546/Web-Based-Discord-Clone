@@ -44,6 +44,15 @@ const summaryRequestSchema = Joi.object({
   }).optional()
 });
 
+// DM summary request schema: dmId comes from URL params.
+const dmSummaryRequestSchema = Joi.object({
+  options: Joi.object({
+    maxMessages: Joi.number().integer().min(1).max(200).optional(),
+    timeWindow: Joi.number().integer().min(1).max(24 * 60).optional(),
+    format: Joi.string().valid('bullets', 'paragraph').optional()
+  }).optional()
+});
+
 // Generic validation middleware
 const validate = (schema) => {
   return (req, res, next) => {
@@ -66,5 +75,6 @@ module.exports = {
   channelSchema,
   messageSchema,
   summaryRequestSchema,
+  dmSummaryRequestSchema,
   validate
 };
