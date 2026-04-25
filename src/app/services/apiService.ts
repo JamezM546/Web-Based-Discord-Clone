@@ -355,39 +355,29 @@ class ApiService {
     hours?: number;
     maxMessages?: number;
   }): Promise<any> {
-    const options: Record<string, any> = { format: 'paragraph' };
-    if (payload.maxMessages) options.maxMessages = payload.maxMessages;
-    if (payload.hours) options.timeWindow = Math.max(1, Math.round(payload.hours * 60));
+    // Unified endpoint — send channelId XOR dmId plus optional hours/maxMessages at top level
+    const body: Record<string, any> = { format: 'paragraph' };
+    if (payload.channelId) body.channelId = payload.channelId;
+    if (payload.dmId) body.dmId = payload.dmId;
+    if (payload.hours) body.hours = payload.hours;
+    if (payload.maxMessages) body.maxMessages = payload.maxMessages;
 
-    const endpoint = payload.dmId
-      ? `/api/summaries/manual/dms/${encodeURIComponent(payload.dmId)}`
-      : '/api/summaries/manual';
-    const body = payload.dmId
-      ? { options }
-      : { channelId: payload.channelId, options };
-
-    const response = await this.request<any>(endpoint, {
+    const response = await this.request<any>('/api/summaries/manual', {
       method: 'POST',
       body: JSON.stringify(body),
     });
 
-    const result = response.data || {};
-    const fmtHours = payload.hours ?? 3;
-    const mostActiveUsers = Array.isArray(result.topUsers)
-      ? result.topUsers.map((u: any) => ({ username: u.username, count: u.count }))
-      : [];
-    const keyTopics = Array.isArray(result.topics)
-      ? result.topics.filter((t: any) => typeof t === 'string' && t.trim())
-      : [];
+    // Backend now returns data.summary as an object matching the SummaryData shape
+    const s = response.data?.summary || {};
     return {
-      overview: result.summary || 'No summary available.',
-      keyTopics,
-      mostActiveUsers,
+      overview: s.overview || 'No summary available.',
+      keyTopics: Array.isArray(s.keyTopics) ? s.keyTopics : [],
+      mostActiveUsers: Array.isArray(s.mostActiveUsers) ? s.mostActiveUsers : [],
       importantMessages: [],
-      timeframe: `Last ${fmtHours < 1 ? `${fmtHours * 60} min` : `${fmtHours} hour${fmtHours !== 1 ? 's' : ''}`}`,
+      timeframe: s.timeframe || '',
       stats: {
-        totalMessages: result.messageCount || 0,
-        uniqueUsers: result.uniqueUsers || mostActiveUsers.length || 0,
+        totalMessages: s.stats?.totalMessages ?? 0,
+        uniqueUsers: s.stats?.uniqueUsers ?? 0,
       },
     };
   }
@@ -397,45 +387,32 @@ class ApiService {
     dmId?: string;
     since?: string;
   }): Promise<any> {
-    // Preview routes are mounted at /api/previews (separate from summary routes)
-    const endpointBase = params.channelId
-      ? `/api/previews/channels/${encodeURIComponent(params.channelId)}`
-      : params.dmId
-      ? `/api/previews/dms/${encodeURIComponent(params.dmId)}`
-      : null;
-
-    if (!endpointBase) {
+    if (!params.channelId && !params.dmId) {
       return { summary: 'No recent messages.', highlights: [], unreadCount: 0 };
     }
 
+    // Single unified preview endpoint — accepts channelId or dmId as query params
     const qs = new URLSearchParams();
+    if (params.channelId) qs.set('channelId', params.channelId);
+    if (params.dmId) qs.set('dmId', params.dmId);
     if (params.since) qs.set('since', params.since);
-    const endpoint = qs.toString() ? `${endpointBase}?${qs.toString()}` : endpointBase;
 
     try {
-      const response = await this.request<any>(endpoint);
-      const preview = response.data || {};
+      const response = await this.request<any>(`/api/summaries/preview?${qs.toString()}`);
+      const preview = response.data?.preview || {};
 
-      // highlights may be a JSON string from the DB cache layer
-      let highlights: string[] = [];
-      if (Array.isArray(preview.highlights)) {
-        highlights = preview.highlights.filter((h: any) => typeof h === 'string' && h.trim());
-      } else if (typeof preview.highlights === 'string') {
-        try {
-          const parsed = JSON.parse(preview.highlights);
-          if (Array.isArray(parsed)) highlights = parsed.filter((h: any) => typeof h === 'string');
-        } catch { /* ignore */ }
-      }
-
-      const summary = highlights.length > 0
-        ? highlights.join(' · ')
-        : `${preview.unreadCount || 0} new message${preview.unreadCount === 1 ? '' : 's'}`;
+      // summary from backend is the highlights joined by '\n'; split back into array for the WYM component
+      const summaryStr: string = typeof preview.summary === 'string' ? preview.summary : '';
+      const highlights = summaryStr
+        .split('\n')
+        .map((l: string) => l.trim())
+        .filter((l: string) => l.length > 0);
 
       return {
-        summary,
+        summary: summaryStr,
         highlights,
         unreadCount: preview.unreadCount || 0,
-        lastMessageTime: preview.lastMessageTime || null,
+        lastMessageTime: null,
       };
     } catch {
       return { summary: 'No recent messages.', highlights: [], unreadCount: 0 };

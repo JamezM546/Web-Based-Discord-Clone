@@ -4,8 +4,8 @@ const Channel = require('../models/Channel');
 const Message = require('../models/Message');
 const { authenticateToken } = require('../middleware/auth');
 const { createRateLimiter } = require('../middleware/rateLimit');
-const { validate, summaryRequestSchema, dmSummaryRequestSchema } = require('../utils/validation');
-const { generateChannelSummary } = require('../services/groqService');
+const { validate, summaryRequestSchema } = require('../utils/validation');
+const { generateChannelSummary, generateChannelPreview } = require('../services/groqService');
 
 const router = express.Router();
 
@@ -15,23 +15,54 @@ const summaryRateLimiter = createRateLimiter({
   max: 10
 });
 
-// Manual summaries are always generated fresh — caching is intentionally omitted
-// because the user explicitly requests a specific time window and expects current results.
-// Stale DB cache rows from earlier TTL settings would silently return outdated text.
+// Preview API: 60 requests/minute per user
+const previewRateLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 60
+});
+
+// Manual summaries are always generated fresh — caching intentionally omitted.
 
 const hasDmAccess = async (dmId, userId) => {
-  const query = `
-    SELECT 1
-    FROM direct_messages
-    WHERE id = $1
-      AND $2 = ANY(participants)
-    LIMIT 1
-  `;
-  const result = await pool.query(query, [dmId, userId]);
+  const result = await pool.query(
+    'SELECT 1 FROM direct_messages WHERE id = $1 AND $2 = ANY(participants) LIMIT 1',
+    [dmId, userId]
+  );
   return result.rows[0] || null;
 };
 
-// Manual summary generation
+// Build the standard summary response object shared by channel + DM paths.
+const buildSummaryResponse = (groqResult, messages, hours) => {
+  const userMessageCounts = {};
+  for (const m of messages) {
+    const name = m.username || m.display_name || 'Unknown';
+    userMessageCounts[name] = (userMessageCounts[name] || 0) + 1;
+  }
+  const topUsers = Object.entries(userMessageCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([username, count]) => ({ username, count }));
+
+  const h = hours || 1;
+  const timeframe = h < 1
+    ? `Last ${Math.round(h * 60)} minutes`
+    : `Last ${h} hour${h !== 1 ? 's' : ''}`;
+
+  return {
+    overview: groqResult.summary,
+    keyTopics: groqResult.topics || [],
+    mostActiveUsers: topUsers,
+    timeframe,
+    stats: {
+      totalMessages: messages.length,
+      uniqueUsers: Object.keys(userMessageCounts).length
+    }
+  };
+};
+
+// ─── POST /api/summaries/manual ───────────────────────────────────────────────
+// Accepts { channelId } XOR { dmId }, plus optional hours / maxMessages / format.
+// Returns { data: { summary: { overview, keyTopics, mostActiveUsers, timeframe, stats } } }
 router.post(
   '/manual',
   authenticateToken,
@@ -39,143 +70,76 @@ router.post(
   validate(summaryRequestSchema),
   async (req, res) => {
     try {
-      const { channelId, options = {} } = req.body;
+      const { channelId, dmId, hours, maxMessages = 50, format = 'paragraph' } = req.body;
       const userId = req.user.id;
 
-      // Check channel access
-      const access = await Channel.hasAccess(channelId, userId);
-      if (!access) {
-        return res.status(403).json({
-          success: false,
-          message: 'Access denied: Not a member of this server'
-        });
-      }
+      // Convert hours → minutes for time-window queries
+      const timeWindowMinutes = hours ? Math.round(hours * 60) : null;
 
-      const format = options.format === 'bullets' ? 'bullets' : 'paragraph';
-      const maxMessages = options.maxMessages || 50;
-      const timeWindowMinutes =
-        typeof options.timeWindow === 'number' ? options.timeWindow : null;
-
-      // Determine time range to summarize
-      const lastReadAtResult = await pool.query(
-        'SELECT last_read_at FROM channel_read_state WHERE user_id = $1 AND channel_id = $2',
-        [userId, channelId]
-      );
-      const lastReadAt = lastReadAtResult.rows[0] ? lastReadAtResult.rows[0].last_read_at : null;
-      let since;
-      if (timeWindowMinutes) {
-        since = new Date(Date.now() - timeWindowMinutes * 60 * 1000);
-      } else {
-        since = lastReadAt;
-        if (!since) {
-          since = new Date(Date.now() - 60 * 60 * 1000); // default: last 60 minutes
+      // ── Channel path ──────────────────────────────────────────────────────
+      if (channelId) {
+        const access = await Channel.hasAccess(channelId, userId);
+        if (!access) {
+          return res.status(403).json({ success: false, message: 'Access denied: Not a member of this server' });
         }
-      }
 
-      const messages = await Message.findSinceChannelId(channelId, since, maxMessages);
+        const lastReadAtResult = await pool.query(
+          'SELECT last_read_at FROM channel_read_state WHERE user_id = $1 AND channel_id = $2',
+          [userId, channelId]
+        );
+        const lastReadAt = lastReadAtResult.rows[0]?.last_read_at || null;
 
-      if (messages.length === 0) {
+        const since = timeWindowMinutes
+          ? new Date(Date.now() - timeWindowMinutes * 60 * 1000)
+          : lastReadAt || new Date(Date.now() - 60 * 60 * 1000);
+
+        const messages = await Message.findSinceChannelId(channelId, since, maxMessages);
+
+        if (messages.length === 0) {
+          return res.status(200).json({
+            success: true,
+            data: {
+              summary: {
+                overview: timeWindowMinutes
+                  ? 'There are no messages in this time range.'
+                  : 'There are no new messages since your last visit.',
+                keyTopics: [],
+                mostActiveUsers: [],
+                timeframe: hours ? `Last ${hours} hour${hours !== 1 ? 's' : ''}` : 'Recent',
+                stats: { totalMessages: 0, uniqueUsers: 0 }
+              }
+            }
+          });
+        }
+
+        const channel = await Channel.findById(channelId);
+        const groqResult = await generateChannelSummary({
+          channelName: channel ? channel.name : null,
+          messages,
+          options: { maxMessages, format }
+        });
+
         return res.status(200).json({
           success: true,
-          data: {
-            summary: timeWindowMinutes
-              ? 'There are no messages in this time range.'
-              : 'There are no new messages since your last visit.',
-            format,
-            messageCount: 0,
-            generatedAt: new Date().toISOString()
-          }
+          data: { summary: buildSummaryResponse(groqResult, messages, hours) }
         });
       }
 
-      const channel = await Channel.findById(channelId);
-      const channelName = channel ? channel.name : null;
-
-      const groqResult = await generateChannelSummary({
-        channelName,
-        messages,
-        options: { maxMessages, format }
-      });
-
-      // Compute participation stats from the fetched messages
-      const userMessageCounts = {};
-      for (const m of messages) {
-        const name = m.username || m.display_name || 'Unknown';
-        userMessageCounts[name] = (userMessageCounts[name] || 0) + 1;
-      }
-      const topUsers = Object.entries(userMessageCounts)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 5)
-        .map(([username, count]) => ({ username, count }));
-
-      return res.status(200).json({
-        success: true,
-        data: {
-          summary: groqResult.summary,
-          topics: groqResult.topics || [],
-          format: groqResult.format,
-          messageCount: messages.length,
-          uniqueUsers: Object.keys(userMessageCounts).length,
-          topUsers,
-          generatedAt: new Date().toISOString()
-        }
-      });
-    } catch (error) {
-      console.error('Error generating manual summary:', error);
-      const status = error.message && error.message.includes('Groq API')
-        ? 502
-        : 500;
-
-      return res.status(status).json({
-        success: false,
-        message: 'Failed to generate summary',
-        error: error.message
-      });
-    }
-  }
-);
-
-// Manual summary generation for direct messages.
-// POST /api/summaries/manual/dms/:dmId
-router.post(
-  '/manual/dms/:dmId',
-  authenticateToken,
-  summaryRateLimiter,
-  validate(dmSummaryRequestSchema),
-  async (req, res) => {
-    try {
-      const { dmId } = req.params;
-      const userId = req.user.id;
-      const options = req.body?.options || {};
-
+      // ── DM path ───────────────────────────────────────────────────────────
       const access = await hasDmAccess(dmId, userId);
       if (!access) {
-        return res.status(403).json({
-          success: false,
-          message: 'Access denied: Not a participant of this direct message'
-        });
+        return res.status(403).json({ success: false, message: 'Access denied: Not a participant of this direct message' });
       }
-
-      const format = options.format === 'bullets' ? 'bullets' : 'paragraph';
-      const maxMessages = options.maxMessages || 50;
-      const timeWindowMinutes =
-        typeof options.timeWindow === 'number' ? options.timeWindow : null;
 
       const lastReadResult = await pool.query(
         'SELECT last_read_at FROM direct_message_read_state WHERE user_id = $1 AND dm_id = $2',
         [userId, dmId]
       );
-      const lastReadAt = lastReadResult.rows[0] ? lastReadResult.rows[0].last_read_at : null;
+      const lastReadAt = lastReadResult.rows[0]?.last_read_at || null;
 
-      let since;
-      if (timeWindowMinutes) {
-        since = new Date(Date.now() - timeWindowMinutes * 60 * 1000);
-      } else {
-        since = lastReadAt;
-        if (!since) {
-          since = new Date(Date.now() - 60 * 60 * 1000); // default: last 60 minutes
-        }
-      }
+      const since = timeWindowMinutes
+        ? new Date(Date.now() - timeWindowMinutes * 60 * 1000)
+        : lastReadAt || new Date(Date.now() - 60 * 60 * 1000);
 
       const messages = await Message.findSinceDmId(dmId, since, maxMessages);
 
@@ -183,12 +147,15 @@ router.post(
         return res.status(200).json({
           success: true,
           data: {
-            summary: timeWindowMinutes
-              ? 'There are no messages in this time range.'
-              : 'There are no new messages since your last visit.',
-            format,
-            messageCount: 0,
-            generatedAt: new Date().toISOString()
+            summary: {
+              overview: timeWindowMinutes
+                ? 'There are no messages in this time range.'
+                : 'There are no new messages since your last visit.',
+              keyTopics: [],
+              mostActiveUsers: [],
+              timeframe: hours ? `Last ${hours} hour${hours !== 1 ? 's' : ''}` : 'Recent',
+              stats: { totalMessages: 0, uniqueUsers: 0 }
+            }
           }
         });
       }
@@ -200,38 +167,149 @@ router.post(
         options: { maxMessages, format }
       });
 
-      // Compute participation stats from the fetched messages
-      const dmUserMessageCounts = {};
-      for (const m of messages) {
-        const name = m.username || m.display_name || 'Unknown';
-        dmUserMessageCounts[name] = (dmUserMessageCounts[name] || 0) + 1;
+      return res.status(200).json({
+        success: true,
+        data: { summary: buildSummaryResponse(groqResult, messages, hours) }
+      });
+
+    } catch (error) {
+      console.error('Error generating manual summary:', error);
+      return res.status(error.message?.includes('Groq API') ? 502 : 500).json({
+        success: false,
+        message: 'Failed to generate summary',
+        error: error.message
+      });
+    }
+  }
+);
+
+// ─── GET /api/summaries/preview ───────────────────────────────────────────────
+// Accepts ?channelId= OR ?dmId=, optional ?since= timestamp.
+// Returns { data: { preview: { summary, unreadCount, participants } } }
+router.get(
+  '/preview',
+  authenticateToken,
+  previewRateLimiter,
+  async (req, res) => {
+    try {
+      const { channelId, dmId, since: sinceParam } = req.query;
+
+      if (!channelId && !dmId) {
+        return res.status(400).json({ success: false, message: 'Provide either channelId or dmId' });
       }
-      const dmTopUsers = Object.entries(dmUserMessageCounts)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 5)
-        .map(([username, count]) => ({ username, count }));
+
+      const userId = req.user.id;
+      const since = sinceParam ? new Date(sinceParam) : null;
+
+      // ── Channel path ──────────────────────────────────────────────────────
+      if (channelId) {
+        const access = await Channel.hasAccess(channelId, userId);
+        if (!access) {
+          return res.status(403).json({ success: false, message: 'Access denied: Not a member of this server' });
+        }
+
+        const effectiveSince = since || (() => {
+          // Fall back to DB read state, then 1 hour ago
+          return pool.query(
+            'SELECT last_read_at FROM channel_read_state WHERE user_id = $1 AND channel_id = $2',
+            [userId, channelId]
+          ).then(r => r.rows[0]?.last_read_at || new Date(Date.now() - 60 * 60 * 1000));
+        })();
+
+        const resolvedSince = await Promise.resolve(effectiveSince);
+        const unreadStats = await Message.getUnreadStats(channelId, resolvedSince);
+
+        if (!unreadStats.unreadCount) {
+          return res.status(200).json({
+            success: true,
+            data: { preview: { summary: '', unreadCount: 0, participants: [] } }
+          });
+        }
+
+        const messages = await Message.findSinceChannelId(channelId, resolvedSince, Math.min(unreadStats.unreadCount, 50));
+
+        if (!messages || messages.length === 0) {
+          return res.status(200).json({
+            success: true,
+            data: { preview: { summary: '', unreadCount: 0, participants: [] } }
+          });
+        }
+
+        const channel = await Channel.findById(channelId);
+        const groqResult = await generateChannelPreview({
+          channelName: channel ? channel.name : null,
+          messages,
+          unreadCount: unreadStats.unreadCount
+        });
+
+        const participants = [...new Set(messages.map(m => m.username || m.display_name || 'User'))];
+
+        return res.status(200).json({
+          success: true,
+          data: {
+            preview: {
+              summary: groqResult.highlights.join('\n'),
+              unreadCount: unreadStats.unreadCount,
+              participants
+            }
+          }
+        });
+      }
+
+      // ── DM path ───────────────────────────────────────────────────────────
+      const access = await hasDmAccess(dmId, userId);
+      if (!access) {
+        return res.status(403).json({ success: false, message: 'Access denied: Not a participant of this direct message' });
+      }
+
+      const effectiveSince = since || await pool.query(
+        'SELECT last_read_at FROM direct_message_read_state WHERE user_id = $1 AND dm_id = $2',
+        [userId, dmId]
+      ).then(r => r.rows[0]?.last_read_at || new Date(Date.now() - 60 * 60 * 1000));
+
+      const unreadStats = await Message.getDmUnreadStats(dmId, effectiveSince);
+
+      if (!unreadStats.unreadCount) {
+        return res.status(200).json({
+          success: true,
+          data: { preview: { summary: '', unreadCount: 0, participants: [] } }
+        });
+      }
+
+      const messages = await Message.findSinceDmId(dmId, effectiveSince, Math.min(unreadStats.unreadCount, 50));
+
+      if (!messages || messages.length === 0) {
+        return res.status(200).json({
+          success: true,
+          data: { preview: { summary: '', unreadCount: 0, participants: [] } }
+        });
+      }
+
+      const groqResult = await generateChannelPreview({
+        channelName: null,
+        isDm: true,
+        messages,
+        unreadCount: unreadStats.unreadCount
+      });
+
+      const participants = [...new Set(messages.map(m => m.username || m.display_name || 'User'))];
 
       return res.status(200).json({
         success: true,
         data: {
-          summary: groqResult.summary,
-          topics: groqResult.topics || [],
-          format: groqResult.format,
-          messageCount: messages.length,
-          uniqueUsers: Object.keys(dmUserMessageCounts).length,
-          topUsers: dmTopUsers,
-          generatedAt: new Date().toISOString()
+          preview: {
+            summary: groqResult.highlights.join('\n'),
+            unreadCount: unreadStats.unreadCount,
+            participants
+          }
         }
       });
-    } catch (error) {
-      console.error('Error generating DM manual summary:', error);
-      const status = error.message && error.message.includes('Groq API')
-        ? 502
-        : 500;
 
-      return res.status(status).json({
+    } catch (error) {
+      console.error('Error generating preview:', error);
+      return res.status(error.message?.includes('Groq API') ? 502 : 500).json({
         success: false,
-        message: 'Failed to generate summary',
+        message: 'Failed to generate preview',
         error: error.message
       });
     }

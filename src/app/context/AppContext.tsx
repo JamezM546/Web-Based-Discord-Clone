@@ -723,7 +723,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setLastReadMessages((prev) => ({ ...prev, [key]: new Date() }));
     // Persist to backend so summary/preview routes have an accurate "since" baseline.
     // Fire-and-forget — UI should never be blocked by this network call.
-    apiService.syncReadState({ channelId, dmId });
+    // Optional chaining guards against test mocks that don't include this method.
+    apiService.syncReadState?.({ channelId, dmId });
   };
 
   const getUnreadCount = (channelId?: string, dmId?: string) => {
