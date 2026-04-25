@@ -112,6 +112,14 @@ router.post(
           });
         }
 
+        // When no API key is configured (e.g. CI), return real stats with a placeholder overview
+        if (!process.env.GROQ_API_KEY) {
+          return res.status(200).json({
+            success: true,
+            data: { summary: buildSummaryResponse({ summary: 'AI summary unavailable (API key not configured).', topics: [] }, messages, hours) }
+          });
+        }
+
         const channel = await Channel.findById(channelId);
         const groqResult = await generateChannelSummary({
           channelName: channel ? channel.name : null,
@@ -157,6 +165,14 @@ router.post(
               stats: { totalMessages: 0, uniqueUsers: 0 }
             }
           }
+        });
+      }
+
+      // When no API key is configured (e.g. CI), return real stats with a placeholder overview
+      if (!process.env.GROQ_API_KEY) {
+        return res.status(200).json({
+          success: true,
+          data: { summary: buildSummaryResponse({ summary: 'AI summary unavailable (API key not configured).', topics: [] }, messages, hours) }
         });
       }
 
@@ -235,14 +251,21 @@ router.get(
           });
         }
 
+        const participants = [...new Set(messages.map(m => m.username || m.display_name || 'User'))];
+
+        if (!process.env.GROQ_API_KEY) {
+          return res.status(200).json({
+            success: true,
+            data: { preview: { summary: '', unreadCount: unreadStats.unreadCount, participants } }
+          });
+        }
+
         const channel = await Channel.findById(channelId);
         const groqResult = await generateChannelPreview({
           channelName: channel ? channel.name : null,
           messages,
           unreadCount: unreadStats.unreadCount
         });
-
-        const participants = [...new Set(messages.map(m => m.username || m.display_name || 'User'))];
 
         return res.status(200).json({
           success: true,
@@ -285,14 +308,21 @@ router.get(
         });
       }
 
+      const participants = [...new Set(messages.map(m => m.username || m.display_name || 'User'))];
+
+      if (!process.env.GROQ_API_KEY) {
+        return res.status(200).json({
+          success: true,
+          data: { preview: { summary: '', unreadCount: unreadStats.unreadCount, participants } }
+        });
+      }
+
       const groqResult = await generateChannelPreview({
         channelName: null,
         isDm: true,
         messages,
         unreadCount: unreadStats.unreadCount
       });
-
-      const participants = [...new Set(messages.map(m => m.username || m.display_name || 'User'))];
 
       return res.status(200).json({
         success: true,
