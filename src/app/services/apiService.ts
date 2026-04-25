@@ -57,23 +57,6 @@ class HttpResponseError extends Error {
   }
 }
 
-const toPreviewSummaryText = (highlights: any): string => {
-  if (!highlights) return '';
-  const parsed = Array.isArray(highlights) ? highlights : (() => {
-    if (typeof highlights !== 'string') return [];
-    try {
-      const value = JSON.parse(highlights);
-      return Array.isArray(value) ? value : [];
-    } catch {
-      return [];
-    }
-  })();
-
-  const lines = parsed
-    .map((item: any) => (typeof item === 'string' ? item : String(item || '')).trim())
-    .filter(Boolean);
-  return lines.join(' · ');
-};
 
 class ApiService {
   private token: string | null = null;
@@ -355,8 +338,7 @@ class ApiService {
     hours?: number;
     maxMessages?: number;
   }): Promise<any> {
-    // Unified endpoint — send channelId XOR dmId plus optional hours/maxMessages at top level
-    const body: Record<string, any> = { format: 'paragraph' };
+    const body: Record<string, any> = {};
     if (payload.channelId) body.channelId = payload.channelId;
     if (payload.dmId) body.dmId = payload.dmId;
     if (payload.hours) body.hours = payload.hours;
@@ -367,19 +349,7 @@ class ApiService {
       body: JSON.stringify(body),
     });
 
-    // Backend now returns data.summary as an object matching the SummaryData shape
-    const s = response.data?.summary || {};
-    return {
-      overview: s.overview || 'No summary available.',
-      keyTopics: Array.isArray(s.keyTopics) ? s.keyTopics : [],
-      mostActiveUsers: Array.isArray(s.mostActiveUsers) ? s.mostActiveUsers : [],
-      importantMessages: [],
-      timeframe: s.timeframe || '',
-      stats: {
-        totalMessages: s.stats?.totalMessages ?? 0,
-        uniqueUsers: s.stats?.uniqueUsers ?? 0,
-      },
-    };
+    return response.data?.summary;
   }
 
   async getPreviewSummary(params: {
@@ -387,36 +357,13 @@ class ApiService {
     dmId?: string;
     since?: string;
   }): Promise<any> {
-    if (!params.channelId && !params.dmId) {
-      return { summary: 'No recent messages.', highlights: [], unreadCount: 0 };
-    }
-
-    // Single unified preview endpoint — accepts channelId or dmId as query params
     const qs = new URLSearchParams();
     if (params.channelId) qs.set('channelId', params.channelId);
     if (params.dmId) qs.set('dmId', params.dmId);
     if (params.since) qs.set('since', params.since);
 
-    try {
-      const response = await this.request<any>(`/api/summaries/preview?${qs.toString()}`);
-      const preview = response.data?.preview || {};
-
-      // summary from backend is the highlights joined by '\n'; split back into array for the WYM component
-      const summaryStr: string = typeof preview.summary === 'string' ? preview.summary : '';
-      const highlights = summaryStr
-        .split('\n')
-        .map((l: string) => l.trim())
-        .filter((l: string) => l.length > 0);
-
-      return {
-        summary: summaryStr,
-        highlights,
-        unreadCount: preview.unreadCount || 0,
-        lastMessageTime: null,
-      };
-    } catch {
-      return { summary: 'No recent messages.', highlights: [], unreadCount: 0 };
-    }
+    const response = await this.request<any>(`/api/summaries/preview?${qs.toString()}`);
+    return response.data?.preview;
   }
 
   // User endpoints

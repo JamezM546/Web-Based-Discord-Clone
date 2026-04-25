@@ -57,8 +57,8 @@ export const WhatYouMissed: React.FC<WhatYouMissedProps> = ({
         if (!cancelled) {
           const items: string[] = Array.isArray(result?.highlights) && result.highlights.length > 0
             ? result.highlights
-            : result?.summary
-            ? [result.summary]
+            : typeof result?.summary === 'string' && result.summary
+            ? result.summary.split('\n').map((l: string) => l.trim()).filter((l: string) => l.length > 0)
             : [];
           setHighlights(items);
         }

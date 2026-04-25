@@ -375,7 +375,7 @@ export const ManualSummary: React.FC<ManualSummaryProps> = ({ messages, channelI
                 )}
 
                 {/* Key Messages */}
-                {summaryData.importantMessages.length > 0 && (
+                {(summaryData.importantMessages?.length ?? 0) > 0 && (
                   <div>
                     <h3 className="flex items-center gap-2 text-[#e2e8f0] font-semibold mb-2.5">
                       <AlertCircle className="size-4 text-[#06b6d4]" aria-hidden="true" />
