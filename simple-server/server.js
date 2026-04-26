@@ -11,7 +11,6 @@ const channelRoutes = require('./routes/channel');
 const messageRoutes = require('./routes/messages');
 const directMessageRoutes = require('./routes/directMessages');
 const summaryRoutes = require('./routes/summary');
-const previewRoutes = require('./routes/preview');
 const readStateRoutes = require('./routes/readState');
 const userRoutes = require('./routes/users');
 const friendRoutes = require('./routes/friends');
@@ -155,9 +154,6 @@ app.use('/api/direct-messages', directMessageRoutes);
 
 // Summary routes: POST /api/summaries/manual, POST /api/summaries/manual/dms/:dmId
 app.use('/api/summaries', summaryRoutes);
-
-// Preview routes: GET /api/previews/channels/:channelId, GET /api/previews/dms/:dmId
-app.use('/api/previews', previewRoutes);
 
 // Read state sync: PUT /api/read-state
 app.use('/api/read-state', readStateRoutes);

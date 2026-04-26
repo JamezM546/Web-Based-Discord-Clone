@@ -38,15 +38,17 @@ export const WhatYouMissed: React.FC<WhatYouMissedProps> = ({
   const [highlights, setHighlights] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  const sinceKey = channelId || dmId || '';
+  const lastReadForKey = lastReadMessages[sinceKey];
+
   useEffect(() => {
     let cancelled = false;
 
     const fetchPreview = async () => {
       setIsLoading(true);
       try {
-        const sinceKey = channelId || dmId || '';
-        const since = lastReadMessages[sinceKey]
-          ? new Date(lastReadMessages[sinceKey]).toISOString()
+        const since = lastReadForKey
+          ? new Date(lastReadForKey).toISOString()
           : undefined;
         const result = await apiService.getPreviewSummary({
           channelId: channelId || undefined,
@@ -78,7 +80,7 @@ export const WhatYouMissed: React.FC<WhatYouMissedProps> = ({
     }
 
     return () => { cancelled = true; };
-  }, [channelId, dmId, unreadMessages.length, lastReadMessages]);
+  }, [channelId, dmId, unreadMessages.length, lastReadForKey]);
 
   const lastReadTime = unreadMessages[0]?.timestamp;
 

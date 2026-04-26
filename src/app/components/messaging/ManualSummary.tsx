@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useApp } from '../../context/AppContext';
 import { apiService } from '../../services/apiService';
-import { Sparkles, X, Clock, MessageSquare, TrendingUp, Users, RefreshCw } from 'lucide-react';
+import { Sparkles, X, Clock, MessageSquare, TrendingUp, Users, RefreshCw, AlertCircle } from 'lucide-react';
 import { Message } from '../../types';
 
 interface ManualSummaryProps {
@@ -16,7 +16,6 @@ interface SummaryData {
   overview: string;
   keyTopics: string[];
   mostActiveUsers: { username: string; count: number }[];
-  importantMessages: Message[];
   timeframe: string;
   stats: {
     totalMessages: number;
@@ -374,41 +373,6 @@ export const ManualSummary: React.FC<ManualSummaryProps> = ({ messages, channelI
                   </div>
                 )}
 
-                {/* Key Messages */}
-                {(summaryData.importantMessages?.length ?? 0) > 0 && (
-                  <div>
-                    <h3 className="flex items-center gap-2 text-[#e2e8f0] font-semibold mb-2.5">
-                      <AlertCircle className="size-4 text-[#06b6d4]" aria-hidden="true" />
-                      Key Messages
-                    </h3>
-                    <ul className="space-y-2">
-                      {summaryData.importantMessages.map(msg => {
-                        const author = users.find(u => u.id === msg.authorId);
-                        const displayName = author?.displayName || author?.username;
-                        return (
-                          <li
-                            key={msg.id}
-                            className="bg-[#111e30] border-l-4 border-l-[#06b6d4] border border-[#1e3248] rounded-xl p-3"
-                          >
-                            <div className="flex items-center gap-2 mb-1.5">
-                              {author && (
-                                <img src={author.avatar} alt="" aria-hidden="true" className="size-5 rounded-full" />
-                              )}
-                              <span className="text-[#e2e8f0] text-sm font-medium">{displayName}</span>
-                              <time
-                                dateTime={new Date(msg.timestamp).toISOString()}
-                                className="text-[#475569] text-xs"
-                              >
-                                {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                              </time>
-                            </div>
-                            <p className="text-[#94a3b8] text-sm">{msg.content}</p>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </div>
-                )}
               </>
             )}
           </div>

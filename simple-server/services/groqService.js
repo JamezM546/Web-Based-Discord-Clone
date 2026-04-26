@@ -3,21 +3,17 @@ const https = require('https');
 const { buildDiscordSummaryPrompts } = require('../prompts/summaryPromptTemplates');
 const { buildDiscordPreviewPrompts } = require('../prompts/previewPromptTemplates');
 
-const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const GROQ_BASE_URL = process.env.GROQ_BASE_URL || 'https://api.groq.com';
 const GROQ_SUMMARY_MODEL = process.env.GROQ_MODEL_SUMMARY || 'llama-3.3-70b-versatile';
 const GROQ_PREVIEW_MODEL = process.env.GROQ_MODEL_PREVIEW || 'llama-3.1-8b-instant';
-
-if (!GROQ_API_KEY) {
-  // Intentionally log a warning instead of throwing so the rest of the API still works.
-  console.warn('GROQ_API_KEY is not set. Summary and preview features will be disabled until it is configured.');
-}
 
 const GROQ_TIMEOUT_MS = 15000; // 15 seconds — kill the request if Groq doesn't respond
 
 const callGroqChat = (payload) => {
   return new Promise((resolve, reject) => {
-    if (!GROQ_API_KEY) {
+    // Read key at call time so late-set env vars (e.g. during test setup) are always picked up
+    const apiKey = process.env.GROQ_API_KEY;
+    if (!apiKey) {
       return reject(new Error('Groq API key is not configured'));
     }
 
@@ -29,7 +25,7 @@ const callGroqChat = (payload) => {
       headers: {
         'Content-Type': 'application/json',
         'Content-Length': Buffer.byteLength(data),
-        'Authorization': `Bearer ${GROQ_API_KEY}`
+        'Authorization': `Bearer ${apiKey}`
       }
     };
 
@@ -91,10 +87,14 @@ const buildConversationSnippet = (messages, maxMessages) => {
 const extractJson = (raw) => {
   const firstBrace = raw.indexOf('{');
   const lastBrace = raw.lastIndexOf('}');
-  if (firstBrace === -1 || lastBrace === -1) return null;
+  if (firstBrace === -1 || lastBrace === -1) {
+    console.warn('[groqService] extractJson: no JSON braces found in model response — falling back to raw text');
+    return null;
+  }
   try {
     return JSON.parse(raw.slice(firstBrace, lastBrace + 1));
   } catch {
+    console.warn('[groqService] extractJson: JSON.parse failed — falling back to raw text. Response snippet:', raw.slice(0, 120));
     return null;
   }
 };
