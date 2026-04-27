@@ -52,7 +52,20 @@ const waitForDatabase = async (maxRetries = 10, delay = 2000) => {
       }
     }
   }
-  throw new Error('Failed to connect to database after maximum retries');
+  const host = process.env.DATABASE_HOST || 'localhost';
+  const port = process.env.DATABASE_PORT || '5432';
+  const db = process.env.DATABASE_NAME || '(unset)';
+  throw new Error(
+    [
+      'Failed to connect to database after maximum retries.',
+      `Tried: host=${host} port=${port} database=${db}`,
+      '',
+      'If you ran `npm test` on your machine (not in Docker):',
+      '  • Start Postgres: from repo root run `docker compose up -d postgres` and wait until it is healthy.',
+      '  • Port 5432 must reach that container (stop local PostgreSQL if it already uses 5432).',
+      '  • Or skip host networking entirely: from `simple-server` run `npm run test:docker` (recommended).',
+    ].join('\n')
+  );
 };
 
 // Create all necessary tables
