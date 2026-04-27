@@ -47,12 +47,12 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '18'
           cache: npm
           cache-dependency-path: simple-server/package-lock.json
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Run Jest (integration + unit) with coverage
         run: npm test
