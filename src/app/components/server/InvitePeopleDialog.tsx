@@ -124,6 +124,58 @@ export const InvitePeopleDialog: React.FC<InvitePeopleDialogProps> = ({
     onOpenChange(false);
   };
 
+  // Invite link (invite codes) state
+  const { getInviteCodes, createInviteCode, deleteInviteCode } = useApp();
+  const [inviteCodes, setInviteCodes] = useState<any[]>([]);
+  const [inviteLoading, setInviteLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const loadInviteCodes = async () => {
+    if (!server) return;
+    setInviteLoading(true);
+    try {
+      const codes = await getInviteCodes(server.id);
+      const list = codes || [];
+      if (list.length === 0 && currentUser && server.ownerId === currentUser.id) {
+        // auto-create a single invite link for the owner (hidden creation)
+        try {
+          const inv = await createInviteCode(server.id, {});
+          if (inv) setInviteCodes([inv]);
+          else setInviteCodes([]);
+        } catch (e) {
+          console.error('Failed to auto-create invite code:', e);
+          setInviteCodes([]);
+        }
+      } else {
+        setInviteCodes(list);
+      }
+    } catch (err) {
+      console.error('Failed to load invite codes:', err);
+    } finally {
+      setInviteLoading(false);
+    }
+  };
+
+  // Load invite codes when dialog opens
+  React.useEffect(() => {
+    if (open && server) {
+      void loadInviteCodes();
+    }
+  }, [open, server]);
+
+  
+
+  const handleCopyInvite = (code: string) => {
+    const url = `${window.location.origin}/invite/${code}`;
+    try {
+      navigator.clipboard.writeText(url);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch (e) {
+      console.error('Clipboard write failed', e);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="bg-[#0d1a2e] border border-[#1e3248] text-[#e2e8f0] max-w-md">
@@ -268,6 +320,43 @@ export const InvitePeopleDialog: React.FC<InvitePeopleDialogProps> = ({
               <Check className="size-4 mr-2" />
               Send {selectedUsernames.length > 0 ? `(${selectedUsernames.length})` : ''} Invite{selectedUsernames.length !== 1 ? 's' : ''}
             </Button>
+          </div>
+
+          {/* Invite link area (Discord-like) */}
+          <div className="pt-4 border-t border-[#1e3248] mt-4">
+            <label className="text-xs font-semibold text-[#64748b] uppercase tracking-wider mb-2 block">
+              Or, send a server invite link to a friend
+            </label>
+              <div className="flex gap-2 items-center">
+              <Input
+                readOnly
+                value={inviteCodes.length > 0 ? `${window.location.origin}/invite/${inviteCodes[0].code}` : ''}
+                placeholder={inviteLoading ? 'Loading...' : 'No invite link yet'}
+                className="flex-1 bg-[#060c18] border border-[#1e3248] text-[#e2e8f0] placeholder:text-[#475569]"
+                aria-describedby={copied ? 'invite-copy-status' : undefined}
+              />
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={() => inviteCodes.length > 0 && handleCopyInvite(inviteCodes[0].code)}
+                  className={`text-white ${copied ? 'bg-green-500 hover:bg-green-600' : 'bg-[#06b6d4] hover:bg-[#0891b2]'}`}
+                  disabled={inviteCodes.length === 0}
+                  aria-pressed={copied}
+                >
+                  {copied ? (
+                    <>
+                      <Check className="size-4 mr-2" />Copied!
+                    </>
+                  ) : (
+                    'Copy'
+                  )}
+                </Button>
+              </div>
+            </div>
+            {/* Accessible live region for copy status */}
+            <div id="invite-copy-status" className="sr-only" aria-live="polite">{copied ? 'Invite link copied to clipboard' : ''}</div>
+            {inviteCodes.length > 0 && inviteCodes[0].expiresAt && (
+              <div className="text-xs text-[#94a3b8] mt-2">Your invite link expires on {new Date(inviteCodes[0].expiresAt).toLocaleString()}. Edit invite link.</div>
+            )}
           </div>
         </div>
       </DialogContent>

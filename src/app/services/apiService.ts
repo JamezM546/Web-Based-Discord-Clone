@@ -448,6 +448,44 @@ class ApiService {
     await this.request(`/api/invites/${inviteId}/decline`, { method: 'POST' });
   }
 
+  // Invite code (invite links) endpoints
+  async getInviteCodes(serverId: string): Promise<any[]> {
+    const qs = new URLSearchParams();
+    if (serverId) qs.set('serverId', serverId);
+    const url = `/api/invite-codes?${qs.toString()}`;
+    const response = await this.request<{ invites: any[] }>(url);
+    return response.data?.invites || response.data?.codes || [];
+  }
+
+  async createInviteCode(serverId: string, opts?: { maxUses?: number; expiresAt?: string | Date }): Promise<any> {
+    const body: any = {};
+    if (opts?.maxUses !== undefined) body.maxUses = opts.maxUses;
+    if (opts?.expiresAt) body.expiresAt = opts.expiresAt;
+    const response = await this.request<{ invite: any }>(`/api/invite-codes/${serverId}`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+    return response.data?.invite;
+  }
+
+  async deleteInviteCode(serverId: string, inviteId: string): Promise<void> {
+    await this.request(`/api/invite-codes/${serverId}/${inviteId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async resolveInviteCode(code: string): Promise<any> {
+    const response = await this.request<{ data: any }>(`/api/invite-codes/${code}`);
+    return response.data?.data || response.data;
+  }
+
+  async joinInviteByCode(code: string): Promise<any> {
+    const response = await this.request<{ server: any }>(`/api/invite-codes/${code}/join`, {
+      method: 'POST',
+    });
+    return response.data?.data || response.data;
+  }
+
   // Server detail / members
 
   async getServerDetails(serverId: string): Promise<any> {

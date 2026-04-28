@@ -14,6 +14,7 @@ const summaryRoutes = require('./routes/summary');
 const userRoutes = require('./routes/users');
 const friendRoutes = require('./routes/friends');
 const inviteRoutes = require('./routes/serverInvites');
+const inviteCodeRoutes = require('./routes/inviteCodes');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -104,6 +105,13 @@ app.get('/api', (req, res) => {
         'POST /api/invites': 'Create a server invite (protected)',
         'POST /api/invites/:id/accept': 'Accept a server invite (protected)',
         'POST /api/invites/:id/decline': 'Decline a server invite (protected)'
+      },
+      inviteCodes: {
+        'GET /api/invite-codes?serverId=': 'List invite codes for a server (protected)',
+        'POST /api/invite-codes/:serverId': 'Create an invite code (protected)',
+        'GET /api/invite-codes/:code': 'Resolve invite code info (public)',
+        'POST /api/invite-codes/:code/join': 'Join server via invite code (protected)',
+        'DELETE /api/invite-codes/:serverId/:inviteId': 'Delete invite code (protected)'
       }
     }
   });
@@ -147,6 +155,8 @@ app.use('/api/friends', friendRoutes);
 
 // Server invite routes (create, pending, accept, decline)
 app.use('/api/invites', inviteRoutes);
+// Invite code routes (invite links)
+app.use('/api/invite-codes', inviteCodeRoutes);
 
 // API Documentation/Explorer
 app.get('/api/docs', (req, res) => {
