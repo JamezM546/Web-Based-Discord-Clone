@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Message } from '../../types';
 import { format } from 'date-fns';
+import { useNavigate } from 'react-router';
 import { MoreVertical, Edit2, Trash2, Smile, Plus, Reply, CornerUpLeft } from 'lucide-react';
 import {
   DropdownMenu,
@@ -22,9 +23,12 @@ interface MessageItemProps {
 }
 
 export const MessageItem: React.FC<MessageItemProps> = ({ message, onScrollToMessage }) => {
-  const { users, currentUser, editMessage, deleteMessage, toggleReaction, messages, setReplyingTo, serverInvites, servers, acceptServerInvite, declineServerInvite } = useApp();
+  const { users, currentUser, editMessage, deleteMessage, toggleReaction, messages, setReplyingTo, serverInvites, servers, acceptServerInvite, declineServerInvite, directMessages, setSelectedServer, setSelectedChannel, channels, setSelectedDM, resolveInviteCode } = useApp();
+  const navigate = useNavigate();
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
   const [inviteModalCode, setInviteModalCode] = useState<string | null>(null);
+  const [inviteCardData, setInviteCardData] = useState<any>(null);
+  const [inviteCardCode, setInviteCardCode] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(message.content);
   const [reactionPickerOpen, setReactionPickerOpen] = useState(false);
@@ -40,6 +44,19 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, onScrollToMes
   const invitedServer = serverInvite
     ? servers.find(s => s.id === serverInvite.serverId) ||
       (serverInvite.serverName ? { id: serverInvite.serverId, name: serverInvite.serverName, icon: serverInvite.serverIcon || '📁', ownerId: '', members: [] } : null)
+    : message.serverInviteId && currentUser?.id === message.authorId
+    ? (() => {
+        // For sent invites, extract server name from message content
+        const match = message.content.match(/invited you to join\s+(.+?)(?:\s+\S+)?$/);
+        const serverName = match ? match[1].trim() : null;
+        if (serverName) {
+          const found = servers.find(s => s.name === serverName);
+          if (found) return found;
+          // Return a synthetic server object if not found
+          return { id: '', name: serverName, icon: '📁', ownerId: '', members: [] };
+        }
+        return null;
+      })()
     : null;
   const isInviteRecipient = serverInvite && currentUser && serverInvite.toUserId === currentUser.id;
 
@@ -52,6 +69,26 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, onScrollToMes
     }
     setIsEditing(false);
   };
+
+  // Detect and load invite card data from URLs in message
+  React.useEffect(() => {
+    if (!message.content) return;
+    const inviteMatch = message.content.match(/\/invite\/(?<code>[^\/?#\s]+)/i);
+    if (inviteMatch && (inviteMatch as any).groups?.code) {
+      const code = (inviteMatch as any).groups.code;
+      setInviteCardCode(code);
+      
+      // Fetch invite details
+      (async () => {
+        try {
+          const data = await resolveInviteCode(code);
+          setInviteCardData(data);
+        } catch (error) {
+          console.error('Failed to load invite data:', error);
+        }
+      })();
+    }
+  }, [message.content, resolveInviteCode]);
 
   const handleDelete = () => {
     if (window.confirm('Are you sure you want to delete this message?')) {
@@ -91,7 +128,10 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, onScrollToMes
           parts.push(
             <button
               key={`invite-${match.index}`}
-              onClick={() => { setInviteModalCode(code); setInviteModalOpen(true); }}
+              onClick={() => {
+                setInviteModalCode(code);
+                setInviteModalOpen(true);
+              }}
               className="text-[#60a5fa] hover:underline break-words bg-transparent border-none p-0 cursor-pointer"
             >
               {url}
@@ -239,24 +279,36 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, onScrollToMes
                 their text content naturally as part of the paragraph.
               */}
               <p className="text-[#b0bec5] text-sm break-words leading-relaxed">
-                {renderMessageContent(message.content)}
+                {message.serverInviteId && currentUser?.id === message.authorId
+                  ? (() => {
+                      // Extract server name from message content like "invited you to join [server name] [emoji]"
+                      const match = message.content.match(/invited you to join\s+(.+?)(?:\s+\S+)?$/);
+                      const serverName = match ? match[1].trim() : 'a server';
+                      // Get recipient name from DM participants
+                      const dm = directMessages.find(dm => dm.id === message.dmId);
+                      const recipientId = dm?.participants?.find(p => p !== currentUser?.id);
+                      const recipient = recipientId ? users.find(u => u.id === recipientId) : null;
+                      const recipientName = recipient?.displayName || recipient?.username || 'someone';
+                      return `You invited ${recipientName} to join ${serverName}`;
+                    })()
+                  : renderMessageContent(message.content)}
               </p>
 
-              {/* Server Invite Card */}
+              {/* Server Invite Card - Recipient Pending */}
               {serverInvite && invitedServer && isInviteRecipient && serverInvite.status === 'pending' && (
-                <div className="mt-2 bg-[#0a1628] rounded-lg p-3 border border-[#1e3248] max-w-xs" role="region" aria-label={`Invitation to join ${invitedServer.name}`}>
-                  <div className="flex items-center gap-2.5 mb-2.5">
+                <div className="mt-3 bg-[#0a1628] rounded-lg p-3 border border-[#1e3248] w-full max-w-sm" role="region" aria-label={`Invitation to join ${invitedServer.name}`}>
+                  <div className="flex items-center gap-2.5 mb-3">
                     <div className="text-2xl" aria-hidden="true">{invitedServer.icon}</div>
                     <div>
                       <div className="text-[#e2e8f0] text-sm font-semibold">{invitedServer.name}</div>
-                      <div className="text-[#475569] text-xs">Space Invitation</div>
+                      <div className="text-[#475569] text-xs">Server Invitation</div>
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <Button onClick={() => acceptServerInvite(serverInvite.id)} aria-label={`Accept invitation to ${invitedServer.name}`} className="flex-1 bg-[#06b6d4] hover:bg-[#0891b2] text-white h-7 text-xs">
+                    <Button onClick={() => acceptServerInvite(serverInvite.id)} aria-label={`Accept invitation to ${invitedServer.name}`} className="flex-1 bg-[#06b6d4] hover:bg-[#0891b2] text-white h-8 text-xs font-medium">
                       Accept
                     </Button>
-                    <Button onClick={() => declineServerInvite(serverInvite.id)} aria-label={`Decline invitation to ${invitedServer.name}`} variant="ghost" className="flex-1 text-[#64748b] hover:text-[#e2e8f0] hover:bg-[#1a2d45] border border-[#1e3248] h-7 text-xs">
+                    <Button onClick={() => declineServerInvite(serverInvite.id)} aria-label={`Decline invitation to ${invitedServer.name}`} variant="ghost" className="flex-1 text-[#94a3b8] hover:text-[#e2e8f0] hover:bg-[#1a2d45] border border-[#1e3248] h-8 text-xs font-medium">
                       Decline
                     </Button>
                   </div>
@@ -268,6 +320,44 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, onScrollToMes
                   {serverInvite.status === 'accepted' ? '✓ Accepted' : '✗ Declined'}
                 </div>
               )}
+
+              {/* Sender Invite Card */}
+              {message.serverInviteId && currentUser?.id === message.authorId && invitedServer
+                ? (() => {
+                    const server = servers.find(s => s.name === invitedServer.name);
+                    return (
+                      <div className="mt-3 bg-[#0a1628] rounded-lg p-3 border border-[#1e3248] w-full max-w-sm" role="region" aria-label={`Server: ${invitedServer.name}`}>
+                        <div className="flex items-center gap-2.5 mb-3">
+                          <div className="text-2xl" aria-hidden="true">{invitedServer.icon}</div>
+                          <div>
+                            <div className="text-[#e2e8f0] text-sm font-semibold">{invitedServer.name}</div>
+                            <div className="text-[#475569] text-xs">You Invited</div>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            onClick={() => {
+                              if (server) {
+                                setSelectedServer(server);
+                                setSelectedDM(null); // Clear DM selection
+                                // Set the first channel in the server
+                                const serverChannels = channels.filter(c => c.serverId === server.id);
+                                if (serverChannels.length > 0) {
+                                  setSelectedChannel(serverChannels[0]);
+                                }
+                                navigate('/channels');
+                              }
+                            }}
+                            aria-label={`Go to ${invitedServer.name}`}
+                            className="flex-1 bg-[#06b6d4] hover:bg-[#0891b2] text-white h-8 text-xs font-medium"
+                          >
+                            Jump to Server
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })()
+                : null}
 
               {/* Reactions */}
               {message.reactions && message.reactions.length > 0 && (
@@ -326,6 +416,31 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, onScrollToMes
                       <CustomEmojiPicker onEmojiClick={handleReactionClick} />
                     </PopoverContent>
                   </Popover>
+                </div>
+              )}
+
+              {/* Invite Code Card */}
+              {inviteCardCode && inviteCardData && (
+                <div className="mt-3 bg-[#0a1628] rounded-lg p-3 border border-[#1e3248] w-full max-w-sm" role="region" aria-label={`Invitation to ${inviteCardData.server?.name}`}>
+                  <div className="flex items-center gap-2.5 mb-3">
+                    <div className="text-2xl" aria-hidden="true">{inviteCardData.server?.icon || '📁'}</div>
+                    <div>
+                      <div className="text-[#e2e8f0] text-sm font-semibold">{inviteCardData.server?.name}</div>
+                      <div className="text-[#475569] text-xs">Invite Link</div>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={() => {
+                        setInviteModalCode(inviteCardCode);
+                        setInviteModalOpen(true);
+                      }}
+                      aria-label={`Join ${inviteCardData.server?.name}`}
+                      className="flex-1 bg-[#06b6d4] hover:bg-[#0891b2] text-white h-8 text-xs font-medium"
+                    >
+                      Join Server
+                    </Button>
+                  </div>
                 </div>
               )}
             </>

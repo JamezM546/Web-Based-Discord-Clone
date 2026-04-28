@@ -406,6 +406,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         members: [currentUser.id],
       };
       setServers((prev) => [...prev, newServer]);
+      setSelectedDM(null); // Clear DM selection when creating a new server
       try {
         const newChannels = (await apiService.getChannels(newServer.id)) as any[];
         const mapped: Channel[] = newChannels.map((c: any) => ({
@@ -414,8 +415,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           serverId: c.server_id || c.serverId || newServer.id,
         }));
         setChannels((prev) => [...prev, ...mapped]);
-      } catch (_) { /* ignored */ }
-      setSelectedServer(newServer);
+        setSelectedServer(newServer);
+        // Select the first channel in the new server
+        if (mapped.length > 0) {
+          setSelectedChannel(mapped[0]);
+        }
+      } catch (_) {
+        setSelectedServer(newServer);
+      }
     } catch (error) {
       console.error('Failed to create server:', error);
     }

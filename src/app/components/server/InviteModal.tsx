@@ -11,7 +11,7 @@ interface InviteModalProps {
 }
 
 export const InviteModal: React.FC<InviteModalProps> = ({ code, open, onOpenChange }) => {
-  const { resolveInviteCode, joinInviteByCode, currentUser, servers, setSelectedServer, channels, setSelectedChannel } = useApp();
+  const { resolveInviteCode, joinInviteByCode, currentUser, servers, setSelectedServer, channels, setSelectedChannel, setSelectedDM } = useApp();
   const navigate = useNavigate();
 
   const [inviteInfo, setInviteInfo] = useState<any>(null);
@@ -34,6 +34,7 @@ export const InviteModal: React.FC<InviteModalProps> = ({ code, open, onOpenChan
           const existing = servers.find((s) => s.id === serverId);
           if (existing && existing.members && existing.members.includes(currentUser.id)) {
             setMessage('You are already a member — opening server...');
+            setSelectedDM(null);
             setSelectedServer(existing);
             try {
               // set first channel for that server if available
@@ -71,7 +72,13 @@ export const InviteModal: React.FC<InviteModalProps> = ({ code, open, onOpenChan
 
       // Ensure server selection happens before navigating. Keep modal open briefly
       if (joined && joined.id) {
+        setSelectedDM(null);
         setSelectedServer(joined as any);
+        // Set first channel in the new server
+        const serverChannels = channels.filter(c => c.serverId === joined.id);
+        if (serverChannels.length > 0) {
+          setSelectedChannel(serverChannels[0]);
+        }
       }
 
       // Small delay to ensure state updates propagate and user sees success
@@ -83,7 +90,15 @@ export const InviteModal: React.FC<InviteModalProps> = ({ code, open, onOpenChan
       const msg = err?.message || '';
       if (msg.toLowerCase().includes('already') && inviteInfo?.server?.id) {
         const s = servers.find((x) => x.id === inviteInfo.server.id);
-        if (s) setSelectedServer(s);
+        if (s) {
+          setSelectedDM(null);
+          setSelectedServer(s);
+          // Set first channel in the server
+          const serverChannels = channels.filter(c => c.serverId === s.id);
+          if (serverChannels.length > 0) {
+            setSelectedChannel(serverChannels[0]);
+          }
+        }
         onOpenChange(false);
         navigate('/channels');
         return;
