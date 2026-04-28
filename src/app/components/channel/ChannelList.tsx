@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { Hash, ChevronDown, Settings, Plus, UserPlus } from 'lucide-react';
+import { Hash, ChevronDown, Settings, Plus, UserPlus, LogOut } from 'lucide-react';
 import { CreateChannelDialog } from './CreateChannelDialog';
 import { ServerSettings } from '../server/ServerSettings';
 import { InvitePeopleDialog } from '../server/InvitePeopleDialog';
@@ -17,10 +17,11 @@ interface ChannelListProps {
 }
 
 export const ChannelList: React.FC<ChannelListProps> = ({ onChannelSelect }) => {
-  const { selectedServer, channels, selectedChannel, setSelectedChannel, setSelectedDM, currentUser, getUnreadCount, markAsRead } = useApp();
+  const { selectedServer, channels, selectedChannel, setSelectedChannel, setSelectedDM, currentUser, getUnreadCount, markAsRead, leaveServer } = useApp();
   const [createChannelOpen, setCreateChannelOpen] = useState(false);
   const [serverSettingsOpen, setServerSettingsOpen] = useState(false);
   const [invitePeopleOpen, setInvitePeopleOpen] = useState(false);
+  const [isLeavingServer, setIsLeavingServer] = useState(false);
 
   if (!selectedServer) return null;
 
@@ -33,6 +34,22 @@ export const ChannelList: React.FC<ChannelListProps> = ({ onChannelSelect }) => 
     markAsRead(channel.id);
     if (onChannelSelect) {
       onChannelSelect();
+    }
+  };
+
+  const handleLeaveServer = async () => {
+    if (!selectedServer) return;
+    const confirmed = window.confirm(`Are you sure you want to leave "${selectedServer.name}"?`);
+    if (confirmed) {
+      try {
+        setIsLeavingServer(true);
+        await leaveServer(selectedServer.id);
+      } catch (error) {
+        console.error('Failed to leave server:', error);
+        alert('Failed to leave server. Try again.');
+      } finally {
+        setIsLeavingServer(false);
+      }
     }
   };
 
@@ -75,6 +92,15 @@ export const ChannelList: React.FC<ChannelListProps> = ({ onChannelSelect }) => 
                 </DropdownMenuItem>
               </>
             )}
+            <div className="my-1 h-px bg-[#1e3248]" />
+            <DropdownMenuItem
+              onClick={handleLeaveServer}
+              disabled={isLeavingServer}
+              className="text-[#ef4444] hover:text-white hover:bg-[#7f1d1d] cursor-pointer"
+            >
+              <LogOut className="size-4 mr-2" />
+              {isLeavingServer ? 'Leaving...' : 'Leave Server'}
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
 

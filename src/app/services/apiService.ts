@@ -203,6 +203,12 @@ class ApiService {
     });
   }
 
+  async leaveServer(serverId: string): Promise<void> {
+    await this.request(`/api/servers/${serverId}/leave`, {
+      method: 'POST',
+    });
+  }
+
   // Channel Management Methods
   async createChannel(serverId: string, name: string): Promise<Channel> {
     const response = await this.request<Channel>('/api/channels', {
