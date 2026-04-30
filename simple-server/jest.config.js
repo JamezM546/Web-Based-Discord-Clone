@@ -1,6 +1,7 @@
 module.exports = {
   testEnvironment: 'node',
   testMatch: ['**/tests/**/*.test.js'],
+  modulePathIgnorePatterns: ['<rootDir>/lambda-package/'],
   testTimeout: 15000,
   collectCoverageFrom: [
     'services/userService.js',

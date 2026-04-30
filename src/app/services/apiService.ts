@@ -1,4 +1,5 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const rawApiBase = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_BASE_URL = rawApiBase.replace(/\/api\/?$/, '');
 
 export interface ApiResponse<T = any> {
   success: boolean;
@@ -199,6 +200,12 @@ class ApiService {
   async deleteServer(serverId: string): Promise<void> {
     await this.request(`/api/servers/${serverId}`, {
       method: 'DELETE',
+    });
+  }
+
+  async leaveServer(serverId: string): Promise<void> {
+    await this.request(`/api/servers/${serverId}/leave`, {
+      method: 'POST',
     });
   }
 

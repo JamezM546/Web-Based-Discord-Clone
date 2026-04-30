@@ -1,4 +1,5 @@
-name: Run backend tests
+# P6: run integration tests on every push / PR (paths that span client ↔ API ↔ DB).
+name: Run integration tests
 
 on:
   push:
@@ -9,7 +10,7 @@ on:
       - '**'
 
 jobs:
-  test:
+  integration:
     runs-on: ubuntu-latest
 
     services:
@@ -37,6 +38,9 @@ jobs:
       DATABASE_USER: postgres
       DATABASE_PASSWORD: postgres123
       DATABASE_URL: postgresql://postgres:postgres123@localhost:5432/discord_clone
+      # Optional secret for cloud integration tests.
+      # If unset, deployed-api.integration.test.js skips cloud-only checks automatically.
+      INTEGRATION_TEST_API_URL: ${{ secrets.INTEGRATION_TEST_API_URL }}
 
     defaults:
       run:
@@ -51,8 +55,8 @@ jobs:
           cache: npm
           cache-dependency-path: simple-server/package-lock.json
 
-      - name: Install dependencies
+      - name: Install backend dependencies
         run: npm ci
 
-      - name: Run backend unit tests with coverage (integration runs separately)
-        run: npm run test:unit:coverage
+      - name: Run integration test suite
+        run: npm run test:integration
