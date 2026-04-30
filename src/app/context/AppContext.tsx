@@ -801,7 +801,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       return true;
     } catch (error) {
       console.error('Registration failed:', error);
-      return false;
+      throw error;
     }
   };
 

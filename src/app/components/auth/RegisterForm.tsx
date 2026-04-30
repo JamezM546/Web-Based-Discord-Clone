@@ -14,18 +14,18 @@ export const RegisterForm: React.FC = () => {
   const { register } = useApp();
   const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     if (!username || !email || !password) {
       setError('Please fill in all fields');
       return;
     }
-    const success = register(username, email, password);
-    if (success) {
+    try {
+      await register(username, email, password);
       navigate('/channels');
-    } else {
-      setError('Email already exists');
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Registration failed');
     }
   };
 

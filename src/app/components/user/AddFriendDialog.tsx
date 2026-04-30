@@ -17,6 +17,7 @@ export const AddFriendDialog: React.FC<AddFriendDialogProps> = ({ open, onOpenCh
   const [message, setMessage] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const { currentUser, sendFriendRequest } = useApp();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -25,6 +26,7 @@ export const AddFriendDialog: React.FC<AddFriendDialogProps> = ({ open, onOpenCh
       setUsername('');
       setMessage('');
       setSearchResults([]);
+      setSelectedUserId(null);
     }
   }, [open]);
 
@@ -49,8 +51,8 @@ export const AddFriendDialog: React.FC<AddFriendDialogProps> = ({ open, onOpenCh
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [username, currentUser?.id]);
 
-  const handleSend = (userId?: string) => {
-    const targetId = userId || searchResults.find(
+  const handleSend = () => {
+    const targetId = selectedUserId || searchResults.find(
       (u) => u.username.toLowerCase() === username.toLowerCase()
     )?.id;
 
@@ -67,6 +69,14 @@ export const AddFriendDialog: React.FC<AddFriendDialogProps> = ({ open, onOpenCh
       onOpenChange(false);
       setMessage('');
     }, 1500);
+  };
+
+  const handleSelectUser = (userId: string) => {
+    setSelectedUserId(userId);
+    const selectedUser = searchResults.find(u => u.id === userId);
+    if (selectedUser) {
+      setUsername(selectedUser.username);
+    }
   };
 
   return (
@@ -92,7 +102,6 @@ export const AddFriendDialog: React.FC<AddFriendDialogProps> = ({ open, onOpenCh
               id="username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSend()}
               className="bg-[#060c18] border border-[#1e3248] text-[#e2e8f0] mt-2 focus-visible:ring-[#06b6d4]/50 placeholder:text-[#475569]"
               placeholder="Enter username"
             />
@@ -117,8 +126,10 @@ export const AddFriendDialog: React.FC<AddFriendDialogProps> = ({ open, onOpenCh
               {searchResults.map((u) => (
                 <button
                   key={u.id}
-                  onClick={() => handleSend(u.id)}
-                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-[#1a2d45] transition-colors text-left"
+                  onClick={() => handleSelectUser(u.id)}
+                  className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-[#1a2d45] transition-colors text-left ${
+                    selectedUserId === u.id ? 'bg-[#1a2d45] ring-1 ring-[#06b6d4]/50' : ''
+                  }`}
                 >
                   <img
                     src={u.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${u.username}`}
@@ -127,6 +138,11 @@ export const AddFriendDialog: React.FC<AddFriendDialogProps> = ({ open, onOpenCh
                   />
                   <span className="text-sm text-[#e2e8f0]">{u.display_name || u.username}</span>
                   <span className="text-xs text-[#475569]">@{u.username}</span>
+                  {selectedUserId === u.id && (
+                    <div className="ml-auto">
+                      <div className="w-2 h-2 bg-[#06b6d4] rounded-full"></div>
+                    </div>
+                  )}
                 </button>
               ))}
             </div>
@@ -147,7 +163,11 @@ export const AddFriendDialog: React.FC<AddFriendDialogProps> = ({ open, onOpenCh
           >
             Cancel
           </Button>
-          <Button onClick={() => handleSend()} className="bg-[#06b6d4] hover:bg-[#0891b2] text-white border-none">
+          <Button 
+            onClick={() => handleSend()} 
+            className="bg-[#06b6d4] hover:bg-[#0891b2] text-white border-none"
+            disabled={!selectedUserId && searchResults.length === 0}
+          >
             Send Request
           </Button>
         </DialogFooter>

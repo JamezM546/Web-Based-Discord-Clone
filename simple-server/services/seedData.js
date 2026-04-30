@@ -1,6 +1,9 @@
 const { pool } = require('../config/database');
 
 const minutesAgo = (min) => new Date(Date.now() - min * 60 * 1000).toISOString();
+const hoursAgo = (hours) => new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+const daysAgo = (days) => new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+const weeksAgo = (weeks) => new Date(Date.now() - weeks * 7 * 24 * 60 * 60 * 1000).toISOString();
 
 const seedDatabase = async () => {
   const client = await pool.connect();
@@ -58,23 +61,23 @@ const seedDatabase = async () => {
     `);
 
     // ── Channel messages ────────────────────────────────────────────────
-    // Team Project → #general (a realistic project conversation)
+    // Team Project -> #general (messages from different time periods for date testing)
     await client.query(`
       INSERT INTO messages (id, content, author_id, channel_id, timestamp) VALUES
-        ('m1',  'Hey everyone! Welcome to the project server 🎉',                          '1', 'c1', $1),
-        ('m2',  'Thanks for setting this up! Excited to work together.',                    '2', 'c1', $2),
-        ('m3',  'What features are we implementing first?',                                 '3', 'c1', $3),
-        ('m4',  'I''m working on the user system — registration, login, and profiles.',     '1', 'c1', $4),
-        ('m5',  'I''ll handle servers — creating, deleting, and settings.',                 '2', 'c1', $5),
-        ('m6',  'I can take care of the channels — text channels with permissions.',        '3', 'c1', $6),
-        ('m7',  'We''ll work on messaging — real-time chat, timestamps, edit/delete!',      '4', 'c1', $7),
-        ('m8',  'The emoji picker is working great! 😄',                                    '5', 'c1', $8),
-        ('m9',  'Should we have a meeting tomorrow to discuss the deadline?',               '2', 'c1', $9),
-        ('m10', 'Yes, let''s meet at 10 AM. I''ll prepare the agenda.',                     '1', 'c1', $10)
+        ('m1',  'Hey everyone! Welcome to the project server! (Last week)',                          '1', 'c1', $1),
+        ('m2',  'Thanks for setting this up! Excited to work together.',                            '2', 'c1', $2),
+        ('m3',  'What features are we implementing first? (Yesterday)',                             '3', 'c1', $3),
+        ('m4',  'I''m working on the user system - registration, login, and profiles.',             '1', 'c1', $4),
+        ('m5',  'I''ll handle servers - creating, deleting, and settings.',                         '2', 'c1', $5),
+        ('m6',  'I can take care of the channels - text channels with permissions.',                '3', 'c1', $6),
+        ('m7',  'We''ll work on messaging - real-time chat, timestamps, edit/delete! (2 days ago)',  '4', 'c1', $7),
+        ('m8',  'The emoji picker is working great! This morning.',                                 '5', 'c1', $8),
+        ('m9',  'Should we have a meeting tomorrow to discuss the deadline?',                      '2', 'c1', $9),
+        ('m10', 'Yes, let''s meet at 10 AM. I''ll prepare the agenda.',                           '1', 'c1', $10)
       ON CONFLICT DO NOTHING
     `, [
-      minutesAgo(50), minutesAgo(45), minutesAgo(40), minutesAgo(35), minutesAgo(30),
-      minutesAgo(25), minutesAgo(20), minutesAgo(15), minutesAgo(10), minutesAgo(5),
+      weeksAgo(1), daysAgo(2), daysAgo(1), hoursAgo(6), hoursAgo(5),
+      hoursAgo(4), daysAgo(2), hoursAgo(3), minutesAgo(30), minutesAgo(15),
     ]);
 
     // Team Project → #announcements
@@ -94,14 +97,14 @@ const seedDatabase = async () => {
       ON CONFLICT DO NOTHING
     `, [minutesAgo(35), minutesAgo(20), minutesAgo(8)]);
 
-    // Gaming Squad → #general
+    // Gaming Squad -> #general
     await client.query(`
       INSERT INTO messages (id, content, author_id, channel_id, timestamp) VALUES
-        ('m16', 'Who''s up for a game tonight?',                  '2', 'c4', $1),
-        ('m17', 'I''m in! What are we playing?',                  '1', 'c4', $2),
+        ('m16', 'Who''s up for a game tonight? (Last week)',                  '2', 'c4', $1),
+        ('m17', 'I''m in! What are we playing? (Yesterday)',                  '1', 'c4', $2),
         ('m18', 'Let''s try that new co-op game everyone''s talking about', '3', 'c4', $3)
       ON CONFLICT DO NOTHING
-    `, [minutesAgo(120), minutesAgo(115), minutesAgo(110)]);
+    `, [weeksAgo(1), daysAgo(1), minutesAgo(90)]);
 
     // Study Group → #general
     await client.query(`

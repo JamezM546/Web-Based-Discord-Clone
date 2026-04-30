@@ -94,6 +94,18 @@ const verifyPassword = async (password, hashedPassword) => {
 const registerUser = async (userData) => {
   const { username, email, password } = userData;
 
+  // Check if email already exists
+  const existingUser = await User.findByEmail(email);
+  if (existingUser) {
+    throw new Error('Email already exists');
+  }
+
+  // Check if username already exists
+  const existingUsername = await User.findByUsername(username);
+  if (existingUsername) {
+    throw new Error('Username already exists');
+  }
+
   // Hash password
   const hashedPassword = await hashPassword(password);
 

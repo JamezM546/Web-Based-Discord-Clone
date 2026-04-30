@@ -18,9 +18,9 @@ class User {
       return result.rows[0];
     } catch (error) {
       if (error.code === '23505') { // Unique violation
-        if (error.constraint === 'users_username_unique') {
+        if (error.constraint === 'users_username_unique' || error.constraint === 'users_username_key') {
           throw new Error('Username already exists');
-        } else if (error.constraint === 'users_email_unique') {
+        } else if (error.constraint === 'users_email_unique' || error.constraint === 'users_email_key') {
           throw new Error('Email already exists');
         }
       }

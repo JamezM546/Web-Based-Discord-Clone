@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { ScrollArea } from '../ui/scroll-area';
 import { StatusDot, getStatusLabel } from '../ui/StatusDot';
-import { MessageSquare, UserPlus, UserCheck, Clock } from 'lucide-react';
+import { MessageSquare, UserPlus, UserCheck, Clock, Crown } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -83,6 +83,7 @@ export const MemberList: React.FC = () => {
   const renderMember = (member: typeof users[0], isOffline = false) => {
     const displayName = member.displayName || member.username;
     const isCurrentUser = member.id === currentUser?.id;
+    const isOwner = selectedServer?.ownerId === member.id;
     const friendshipStatus = getFriendshipStatus(member.id);
     const statusLabel = getStatusLabel(member.status);
 
@@ -98,7 +99,8 @@ export const MemberList: React.FC = () => {
             <StatusDot status={member.status} borderColor="#0d1a2e" className="absolute -bottom-0.5 -right-0.5" />
           </div>
           <div className="flex-1 min-w-0">
-            <div className={`text-sm font-medium truncate ${isOffline ? 'text-[#475569]' : 'text-[#94a3b8]'}`}>
+            <div className={`text-sm font-medium truncate flex items-center gap-1 ${isOffline ? 'text-[#475569]' : 'text-[#94a3b8]'}`}>
+              {isOwner && <Crown className="size-3 text-yellow-400" />}
               {displayName}
               <span className="text-xs text-[#475569] ml-1" aria-hidden="true">(You)</span>
             </div>
@@ -124,11 +126,12 @@ export const MemberList: React.FC = () => {
                 <StatusDot status={member.status} borderColor="#0d1a2e" className="absolute -bottom-0.5 -right-0.5" />
               </div>
               <div className="flex-1 min-w-0 text-left">
-                <div className={`text-sm font-medium truncate transition-colors ${
+                <div className={`text-sm font-medium truncate flex items-center gap-1 transition-colors ${
                   isOffline
                     ? 'text-[#475569] group-hover:text-[#94a3b8]'
                     : 'text-[#94a3b8] group-hover:text-[#e2e8f0]'
                 }`}>
+                  {isOwner && <Crown className="size-3 text-yellow-400" />}
                   {displayName}
                 </div>
               </div>
