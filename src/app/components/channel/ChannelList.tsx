@@ -11,13 +11,17 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
+ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '../ui/dialog';
+ import { Button } from '../ui/button';
+ import { Input } from '../ui/input';
+ import { Label } from '../ui/label';
 
 interface ChannelListProps {
   onChannelSelect?: () => void;
 }
 
 export const ChannelList: React.FC<ChannelListProps> = ({ onChannelSelect }) => {
-  const { selectedServer, channels, selectedChannel, setSelectedChannel, setSelectedDM, currentUser, getUnreadCount, markAsRead, leaveServer } = useApp();
+  const { selectedServer, channels, selectedChannel, setSelectedChannel, setSelectedDM, currentUser, getUnreadCount, markAsRead, updateChannel, deleteChannel } = useApp();
   const [createChannelOpen, setCreateChannelOpen] = useState(false);
   const [serverSettingsOpen, setServerSettingsOpen] = useState(false);
   const [invitePeopleOpen, setInvitePeopleOpen] = useState(false);
@@ -37,6 +41,12 @@ export const ChannelList: React.FC<ChannelListProps> = ({ onChannelSelect }) => 
     }
   };
 
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [renameName, setRenameName] = useState('');
+  const [channelToRename, setChannelToRename] = useState<string | null>(null);
+
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [channelToDelete, setChannelToDelete] = useState<string | null>(null);
   const handleLeaveServer = async () => {
     if (!selectedServer) return;
     const confirmed = window.confirm(`Are you sure you want to leave "${selectedServer.name}"?`);
@@ -125,26 +135,44 @@ export const ChannelList: React.FC<ChannelListProps> = ({ onChannelSelect }) => 
               {serverChannels.map((channel) => {
                 const unread = hasUnreadMessages(channel.id) && selectedChannel?.id !== channel.id;
                 const isSelected = selectedChannel?.id === channel.id;
+                const showControls = selectedServer.ownerId === currentUser?.id;
                 return (
-                  <button
-                    key={channel.id}
-                    onClick={() => handleChannelClick(channel)}
-                    className={`w-full px-3 py-2 rounded-lg flex items-center gap-2 transition-all text-left ${
-                      isSelected
-                        ? 'bg-[#06b6d4]/20 text-[#06b6d4] border border-[#06b6d4]/30'
-                        : unread
-                        ? 'text-[#e2e8f0] hover:bg-[#1a2d45]'
-                        : 'text-[#64748b] hover:bg-[#1a2d45] hover:text-[#94a3b8]'
-                    }`}
-                  >
-                    <Hash className={`size-4 flex-shrink-0 ${isSelected ? 'text-[#06b6d4]' : ''}`} />
-                    <span className={`text-sm truncate ${unread ? 'font-semibold' : ''}`}>
-                      {channel.name}
-                    </span>
-                    {unread && (
-                      <span className="ml-auto size-2 rounded-full bg-[#06b6d4] flex-shrink-0" />
+                  <div key={channel.id} className="group flex items-center">
+                    <button
+                      onClick={() => handleChannelClick(channel)}
+                      className={`w-full px-3 py-2 rounded-lg flex items-center gap-2 transition-all text-left ${
+                        isSelected
+                          ? 'bg-[#06b6d4]/20 text-[#06b6d4] border border-[#06b6d4]/30'
+                          : unread
+                          ? 'text-[#e2e8f0] hover:bg-[#1a2d45]'
+                          : 'text-[#64748b] hover:bg-[#1a2d45] hover:text-[#94a3b8]'
+                      }`}
+                    >
+                      <Hash className={`size-4 flex-shrink-0 ${isSelected ? 'text-[#06b6d4]' : ''}`} />
+                      <span className={`text-sm truncate ${unread ? 'font-semibold' : ''}`}>
+                        {channel.name}
+                      </span>
+                      {unread && (
+                        <span className="ml-auto size-2 rounded-full bg-[#06b6d4] flex-shrink-0" />
+                      )}
+                    </button>
+
+                    {showControls && (
+                      <div className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button className="p-1 rounded hover:bg-[#1a2d45]">
+                              <Settings className="size-4 text-[#94a3b8]" />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent className="w-40 bg-[#0a1628] border border-[#1e3248] text-[#e2e8f0] shadow-xl">
+                            <DropdownMenuItem onClick={() => { setChannelToRename(channel.id); setRenameName(channel.name); setRenameOpen(true); }} className="cursor-pointer text-[#94a3b8] hover:text-[#e2e8f0] hover:bg-[#1a2d45]">Rename</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => { setChannelToDelete(channel.id); setConfirmDeleteOpen(true); }} className="cursor-pointer text-[#94a3b8] hover:text-[#e2e8f0] hover:bg-[#1a2d45]">Delete</DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                     )}
-                  </button>
+                  </div>
                 );
               })}
             </div>
@@ -173,6 +201,53 @@ export const ChannelList: React.FC<ChannelListProps> = ({ onChannelSelect }) => 
           onOpenChange={setInvitePeopleOpen}
         />
       )}
+
+      {/* Rename dialog */}
+      <Dialog open={renameOpen} onOpenChange={(v) => setRenameOpen(v)}>
+        <DialogContent className="bg-[#0d1a2e] border border-[#1e3248] text-[#e2e8f0]">
+          <DialogHeader>
+            <DialogTitle>Rename Channel</DialogTitle>
+            <DialogDescription className="text-[#64748b]">Enter a new name for the channel</DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Label htmlFor="rename-name" className="text-[#64748b] uppercase text-xs font-semibold tracking-wider">Name</Label>
+            <div className="mt-2">
+              <Input id="rename-name" value={renameName} onChange={(e) => setRenameName(e.target.value)} className="bg-[#060c18] border border-[#1e3248] text-[#e2e8f0]" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" className="text-[#94a3b8] hover:text-[#e2e8f0]" onClick={() => setRenameOpen(false)}>Cancel</Button>
+            <Button className="bg-[#06b6d4] hover:bg-[#0891b2] text-white border-none" onClick={() => {
+              if (channelToRename && renameName.trim()) {
+                const formatted = renameName.trim().toLowerCase().replace(/\s+/g, '-');
+                updateChannel(channelToRename, { name: formatted });
+                setRenameOpen(false);
+                setChannelToRename(null);
+              }
+            }}>Rename</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirmation dialog */}
+      <Dialog open={confirmDeleteOpen} onOpenChange={(v) => setConfirmDeleteOpen(v)}>
+        <DialogContent className="bg-[#0d1a2e] border border-[#1e3248] text-[#e2e8f0]">
+          <DialogHeader>
+            <DialogTitle>Delete Channel</DialogTitle>
+            <DialogDescription className="text-[#64748b]">This will permanently delete the channel and its messages. This action cannot be undone.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" className="text-[#94a3b8] hover:text-[#e2e8f0]" onClick={() => setConfirmDeleteOpen(false)}>Cancel</Button>
+            <Button className="bg-red-600 hover:bg-red-700 text-white border-none" onClick={() => {
+              if (channelToDelete) {
+                deleteChannel(channelToDelete);
+                setConfirmDeleteOpen(false);
+                setChannelToDelete(null);
+              }
+            }}>Delete</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 };
