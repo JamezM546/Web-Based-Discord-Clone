@@ -119,11 +119,14 @@ const registerUser = async (userData) => {
     avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`
   });
 
+  // Set user status to online
+  const onlineUser = await User.updateStatus(newUser.id, 'online');
+
   // Generate token
-  const token = generateToken(newUser);
+  const token = generateToken(onlineUser);
   
   return {
-    user: newUser,
+    user: onlineUser,
     token
   };
 };
@@ -144,14 +147,14 @@ const loginUser = async (loginData) => {
     throw new Error('Invalid email or password');
   }
 
-  // Get user without password for response
-  const user = await User.findByEmail(email, false);
+  // Set user status to online
+  const onlineUser = await User.updateStatus(userWithPassword.id, 'online');
 
   // Generate token
-  const token = generateToken(user);
+  const token = generateToken(onlineUser);
   
   return {
-    user,
+    user: onlineUser,
     token
   };
 };
@@ -167,10 +170,16 @@ const getAllUsers = async () => {
   return [];
 };
 
+// Logout user
+const logoutUser = async (id) => {
+  return await User.updateStatus(id, 'offline');
+};
+
 module.exports = {
   registerUser,
   loginUser,
   getUserById,
   getAllUsers,
+  logoutUser,
   initializeDemoAccounts
 };

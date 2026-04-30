@@ -25,11 +25,14 @@ interface AppContextType {
   setSelectedDM: (dm: DirectMessage | null) => void;
   createServer: (name: string, icon: string) => void;
   deleteServer: (serverId: string) => void;
+  leaveServer: (serverId: string) => void;
   updateServer: (serverId: string, name: string, icon: string) => void;
   sendServerInvite: (serverId: string, userId: string) => void;
   acceptServerInvite: (inviteId: string) => void;
   declineServerInvite: (inviteId: string) => void;
   createChannel: (serverId: string, name: string) => void;
+  updateChannel: (channelId: string, updates: { name?: string; position?: number }) => void;
+  deleteChannel: (channelId: string) => void;
   sendMessage: (content: string, channelId?: string, dmId?: string, replyToId?: string, serverInviteId?: string) => void;
   editMessage: (messageId: string, newContent: string) => void;
   deleteMessage: (messageId: string) => void;
@@ -428,6 +431,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
+  const leaveServer = async (serverId: string) => {
+    try {
+      await apiService.leaveServer(serverId);
+      setServers((prev) => prev.filter((s) => s.id !== serverId));
+      if (selectedServer?.id === serverId) setSelectedServer(null);
+      setChannels((prev) => prev.filter((c) => c.serverId !== serverId));
+    } catch (error) {
+      console.error('Failed to leave server:', error);
+      throw error;
+    }
+  };
+
   const updateServer = async (serverId: string, name: string, icon: string) => {
     try {
       await apiService.updateServer(serverId, { name, icon });
@@ -492,6 +507,38 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       console.error('Failed to create channel:', error);
       throw error;
     }
+  };
+
+  const updateChannel = (channelId: string, updates: { name?: string; position?: number }) => {
+    if (!currentUser) return;
+    void (async () => {
+      try {
+        const backendResponse = (await apiService.updateChannel(channelId, updates)) as any;
+        const cd = backendResponse?.data || backendResponse || {};
+        const updated: Channel = {
+          id: cd.id || channelId,
+          name: cd.name || updates.name || '',
+          serverId: cd.server_id || cd.serverId || (channels.find(c => c.id === channelId)?.serverId || ''),
+        };
+        setChannels((prev) => prev.map((c) => (c.id === channelId ? { ...c, ...updated } : c)));
+        if (selectedChannel?.id === channelId) setSelectedChannel((s) => s ? { ...s, ...updated } : s);
+      } catch (error) {
+        console.error('Failed to update channel:', error);
+      }
+    })();
+  };
+
+  const deleteChannel = (channelId: string) => {
+    if (!currentUser) return;
+    void (async () => {
+      try {
+        await apiService.deleteChannel(channelId);
+        setChannels((prev) => prev.filter((c) => c.id !== channelId));
+        if (selectedChannel?.id === channelId) setSelectedChannel(null);
+      } catch (error) {
+        console.error('Failed to delete channel:', error);
+      }
+    })();
   };
 
   // ---------------------------------------------------------------------------
@@ -804,11 +851,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setSelectedDM,
         createServer,
         deleteServer,
+        leaveServer,
         updateServer,
         sendServerInvite,
         acceptServerInvite,
         declineServerInvite,
         createChannel,
+        updateChannel,
+        deleteChannel,
         sendMessage,
         editMessage,
         deleteMessage,

@@ -14,6 +14,7 @@ const {
   loginUser,
   getUserById,
   getAllUsers,
+  logoutUser,
   initializeDemoAccounts,
 } = require('../services/userService');
 
@@ -32,8 +33,13 @@ describe('userService (unit)', () => {
         email: 'new@test.com',
         display_name: 'newuser',
       };
+      const onlineUser = {
+        ...created,
+        status: 'online',
+      };
       bcrypt.hash.mockResolvedValue('hashed-secret');
       User.create.mockResolvedValue(created);
+      User.updateStatus.mockResolvedValue(onlineUser);
       jwt.sign.mockReturnValue('signed.jwt');
 
       const result = await registerUser({
@@ -50,8 +56,9 @@ describe('userService (unit)', () => {
           passwordHash: 'hashed-secret',
         })
       );
+      expect(User.updateStatus).toHaveBeenCalledWith('99', 'online');
       expect(jwt.sign).toHaveBeenCalled();
-      expect(result).toEqual({ user: created, token: 'signed.jwt' });
+      expect(result).toEqual({ user: onlineUser, token: 'signed.jwt' });
     });
   });
 
@@ -62,22 +69,22 @@ describe('userService (unit)', () => {
         email: 'a@b.com',
         password_hash: 'stored-hash',
       };
-      const publicUser = {
+      const onlineUser = {
         id: '1',
         email: 'a@b.com',
         username: 'A',
+        status: 'online',
       };
-      User.findByEmail.mockImplementation((email, includePassword) => {
-        if (includePassword) return Promise.resolve(withHash);
-        return Promise.resolve(publicUser);
-      });
+      User.findByEmail.mockResolvedValue(withHash);
       bcrypt.compare.mockResolvedValue(true);
+      User.updateStatus.mockResolvedValue(onlineUser);
       jwt.sign.mockReturnValue('login.jwt');
 
       const result = await loginUser({ email: 'a@b.com', password: 'ok' });
 
       expect(bcrypt.compare).toHaveBeenCalledWith('ok', 'stored-hash');
-      expect(result).toEqual({ user: publicUser, token: 'login.jwt' });
+      expect(User.updateStatus).toHaveBeenCalledWith('1', 'online');
+      expect(result).toEqual({ user: onlineUser, token: 'login.jwt' });
     });
 
     test('throws when email is not found', async () => {
@@ -98,6 +105,24 @@ describe('userService (unit)', () => {
       await expect(
         loginUser({ email: 'a@b.com', password: 'wrong' })
       ).rejects.toThrow('Invalid email or password');
+    });
+  });
+
+  describe('logoutUser', () => {
+    test('sets user status to offline', async () => {
+      const offlineUser = {
+        id: '1',
+        username: 'testuser',
+        display_name: 'Test User',
+        avatar: 'https://example.com/avatar.png',
+        status: 'offline',
+      };
+      User.updateStatus.mockResolvedValue(offlineUser);
+
+      const result = await logoutUser('1');
+
+      expect(User.updateStatus).toHaveBeenCalledWith('1', 'offline');
+      expect(result).toEqual(offlineUser);
     });
   });
 
