@@ -1,5 +1,5 @@
 const express = require('express');
-const { registerUser, loginUser, getUserById } = require('../services/userService');
+const { registerUser, loginUser, getUserById, logoutUser } = require('../services/userService');
 const { validate, registerSchema, loginSchema } = require('../utils/validation');
 const { authenticateToken } = require('../middleware/auth');
 
@@ -37,6 +37,24 @@ router.post('/login', validate(loginSchema), async (req, res) => {
     res.status(401).json({
       success: false,
       message: error.message || 'Login failed'
+    });
+  }
+});
+
+// Logout user (protected route)
+router.post('/logout', authenticateToken, async (req, res) => {
+  try {
+    const user = await logoutUser(req.user.id);
+
+    res.status(200).json({
+      success: true,
+      message: 'Logout successful',
+      data: { user }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Logout failed'
     });
   }
 });
