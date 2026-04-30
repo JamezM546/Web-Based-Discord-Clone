@@ -25,6 +25,7 @@ interface AppContextType {
   setSelectedDM: (dm: DirectMessage | null) => void;
   createServer: (name: string, icon: string) => void;
   deleteServer: (serverId: string) => void;
+  leaveServer: (serverId: string) => void;
   updateServer: (serverId: string, name: string, icon: string) => void;
   sendServerInvite: (serverId: string, userId: string) => void;
   acceptServerInvite: (inviteId: string) => void;
@@ -426,6 +427,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setChannels((prev) => prev.filter((c) => c.serverId !== serverId));
     } catch (error) {
       console.error('Failed to delete server:', error);
+      throw error;
+    }
+  };
+
+  const leaveServer = async (serverId: string) => {
+    try {
+      await apiService.leaveServer(serverId);
+      setServers((prev) => prev.filter((s) => s.id !== serverId));
+      if (selectedServer?.id === serverId) setSelectedServer(null);
+      setChannels((prev) => prev.filter((c) => c.serverId !== serverId));
+    } catch (error) {
+      console.error('Failed to leave server:', error);
       throw error;
     }
   };
@@ -838,6 +851,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setSelectedDM,
         createServer,
         deleteServer,
+        leaveServer,
         updateServer,
         sendServerInvite,
         acceptServerInvite,
