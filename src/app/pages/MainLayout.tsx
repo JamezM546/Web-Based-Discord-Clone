@@ -29,6 +29,47 @@ export const MainLayout: React.FC = () => {
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
   const swipeAreaRef = useRef<HTMLDivElement>(null);
+  const spacesViewportRef = useRef<HTMLDivElement | null>(null);
+  // selector to find the spaces viewport if ref isn't wired up
+  const spacesViewportSelector = '.spaces-scroll-area [data-slot="scroll-area-viewport"]';
+
+  // enable vertical wheel -> horizontal scroll for the spaces ScrollArea
+  React.useEffect(() => {
+    const handler = (e: WheelEvent) => {
+      const el = (e.target as Element) || null;
+      if (!el) return;
+      // only handle events that originate inside the spaces area
+      const inSpaces = el.closest && el.closest('.spaces-scroll-area');
+      if (!inSpaces) return;
+      // convert mostly-vertical wheel motion into horizontal scroll for the spaces strip
+      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+      e.preventDefault();
+      const vp = getVisibleSpacesViewport();
+      if (vp) vp.scrollBy({ left: e.deltaY, behavior: 'auto' });
+    };
+    document.addEventListener('wheel', handler, { passive: false });
+    return () => document.removeEventListener('wheel', handler as EventListener);
+  }, []);
+
+  const scrollViewportBy = (delta: number) => {
+    const vp = getVisibleSpacesViewport();
+    if (!vp) return;
+    vp.scrollBy({ left: delta, behavior: 'smooth' });
+  };
+
+  const getVisibleSpacesViewport = (): HTMLElement | null => {
+    // prefer ref
+    const refVp = spacesViewportRef.current as HTMLElement | null;
+    if (refVp && refVp.offsetParent !== null && (refVp.clientWidth || refVp.clientHeight)) return refVp;
+    // otherwise search all matching viewports and pick the first visible one
+    const nodes = Array.from(document.querySelectorAll(spacesViewportSelector)) as HTMLElement[];
+    for (const n of nodes) {
+      if (n.offsetParent !== null && (n.clientWidth || n.clientHeight)) return n;
+      const s = getComputedStyle(n);
+      if (s.display !== 'none' && s.visibility !== 'hidden' && (n.clientWidth || n.clientHeight)) return n;
+    }
+    return null;
+  };
 
   if (!currentUser) {
     return <Navigate to="/login" replace />;
@@ -54,6 +95,22 @@ export const MainLayout: React.FC = () => {
       setSelectedChannel(firstChannel);
       setSelectedDM(null);
     }
+
+    // After changing the selected view, ensure the corresponding tab (or the Add button)
+    // is visible inside the spaces ScrollArea viewport.
+    requestAnimationFrame(() => {
+      const vp = getVisibleSpacesViewport();
+      if (!vp) return;
+      const target = view.type === 'home'
+        ? vp.querySelector('[aria-label="Direct Chats"]') as HTMLElement | null
+        : vp.querySelector(`[aria-label="${view.server?.name}"]`) as HTMLElement | null;
+      if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+        return;
+      }
+      const addBtn = vp.querySelector('[aria-label="Create a new Space"]') as HTMLElement | null;
+      if (addBtn) addBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'end' });
+    });
   };
 
   const handleSpaceClick = (server: typeof servers[0]) => {
@@ -114,7 +171,7 @@ export const MainLayout: React.FC = () => {
 
           {/* Direct Chats section */}
           <div
-            className="flex items-center flex-shrink-0 px-2"
+            className="flex items-center flex-shrink-0 px-2 overflow-y-auto h-full min-h-0"
             style={{ borderRight: '1px solid rgba(30,50,72,0.8)' }}
           >
             <div className="flex flex-col mr-3 flex-shrink-0">
@@ -168,7 +225,7 @@ export const MainLayout: React.FC = () => {
                 Spaces
               </span>
             </div>
-            <ScrollArea className="flex-1">
+            <ScrollArea className="flex-1 spaces-scroll-area" viewportRef={spacesViewportRef}>
               <div className="flex items-center gap-1 py-1">
                 <TooltipProvider delayDuration={100}>
                   {userServers.map((server) => (
@@ -226,7 +283,7 @@ export const MainLayout: React.FC = () => {
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
-                    onClick={() => goToViewIndex(currentViewIndex - 1)}
+                    onClick={() => { goToViewIndex(currentViewIndex - 1); scrollViewportBy(-240); }}
                     disabled={!canGoLeft}
                     aria-label="Go to previous view"
                     className={`p-1.5 rounded-lg transition-all ${
@@ -245,7 +302,7 @@ export const MainLayout: React.FC = () => {
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
-                    onClick={() => goToViewIndex(currentViewIndex + 1)}
+                    onClick={() => { goToViewIndex(currentViewIndex + 1); scrollViewportBy(240); }}
                     disabled={!canGoRight}
                     aria-label="Go to next view"
                     className={`p-1.5 rounded-lg transition-all ${
@@ -429,7 +486,7 @@ export const MainLayout: React.FC = () => {
       >
         {/* Left Sidebar — Desktop only */}
         <div className="hidden md:flex flex-col w-64 bg-[#0d1a2e] border-r border-[#1e3248] flex-shrink-0">
-          <div className="flex-1 overflow-hidden">
+          <div className="flex-1 overflow-hidden min-h-0">
             {selectedServer && (
               <div className="relative">
                 <ServerSearchInput value={serverSearchQuery} onChange={setServerSearchQuery} />
