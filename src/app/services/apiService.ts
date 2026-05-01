@@ -171,6 +171,12 @@ class ApiService {
     this.clearToken();
   }
 
+  async logoutFromServer(): Promise<void> {
+    await this.request('/api/auth/logout', {
+      method: 'POST',
+    });
+  }
+
   // Server Management Methods
   async createServer(name: string, icon?: string): Promise<Server> {
     const response = await this.request<Server>('/api/servers', {

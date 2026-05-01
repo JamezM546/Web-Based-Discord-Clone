@@ -853,6 +853,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const logout = () => {
+    void apiService.logoutFromServer().catch((error: unknown) => {
+      console.error('Failed to notify backend during logout:', error);
+    });
     apiService.logout();
     setCurrentUser(null);
     setUsers([]);

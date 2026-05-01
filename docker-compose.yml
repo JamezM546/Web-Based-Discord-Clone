@@ -2,7 +2,6 @@ services:
   # PostgreSQL Database
   postgres:
     image: postgres:15
-    container_name: discord_clone_db
     restart: unless-stopped
     environment:
       POSTGRES_DB: discord_clone
@@ -23,12 +22,9 @@ services:
     build:
       context: ./simple-server
       dockerfile: Dockerfile
-    container_name: discord_clone_backend
     restart: unless-stopped
     ports:
       - "3001:3001"
-    env_file:
-      - ./simple-server/.env
     environment:
       - NODE_ENV=development
       - JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
@@ -39,10 +35,12 @@ services:
       - DATABASE_NAME=discord_clone
       - DATABASE_USER=postgres
       - DATABASE_PASSWORD=postgres123
-      # Groq API configuration (set GROQ_API_KEY in your local .env, do not commit secrets)
-      - GROQ_BASE_URL=https://api.groq.com
-      - GROQ_MODEL_SUMMARY=llama-3.3-70b-versatile
-      - GROQ_MODEL_PREVIEW=llama-3.1-8b-instant
+      # Groq API configuration. Leave GROQ_API_KEY empty to use the branch's
+      # non-fatal placeholder responses until a real key is provided.
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - GROQ_BASE_URL=${GROQ_BASE_URL:-https://api.groq.com}
+      - GROQ_MODEL_SUMMARY=${GROQ_MODEL_SUMMARY:-llama-3.3-70b-versatile}
+      - GROQ_MODEL_PREVIEW=${GROQ_MODEL_PREVIEW:-llama-3.1-8b-instant}
     volumes:
       - ./simple-server:/app
       - /app/node_modules
@@ -56,7 +54,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.frontend
-    container_name: discord_clone_frontend
     restart: unless-stopped
     ports:
       - "5173:5173"

@@ -1,5 +1,7 @@
 # Frontend Dockerfile
-ARG BASE_IMAGE=node:20-alpine
+# Default to a glibc-based image so Vite/Rollup native optional dependencies
+# match the Linux GNU binaries pinned by this repo.
+ARG BASE_IMAGE=node:20-bookworm-slim
 FROM ${BASE_IMAGE}
 
 WORKDIR /app
