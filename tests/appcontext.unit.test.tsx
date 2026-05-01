@@ -19,6 +19,7 @@ jest.mock('../src/app/services/apiService', () => ({
     login: jest.fn(),
     register: jest.fn(),
     logout: jest.fn(),
+    logoutFromServer: jest.fn(),
     createServer: jest.fn(),
     deleteServer: jest.fn(),
     updateServer: jest.fn(),
@@ -91,6 +92,7 @@ const resetApiMocks = () => {
     token: 'token',
   } as any);
   mockApi.logout.mockImplementation(() => {});
+  mockApi.logoutFromServer.mockResolvedValue(undefined as any);
   mockApi.createServer.mockResolvedValue({ id: 's-new', name: 'New Server', icon: '🚀', owner_id: 'u1' } as any);
   mockApi.deleteServer.mockResolvedValue(undefined as any);
   mockApi.updateServer.mockResolvedValue({ id: 's1', name: 'Updated Server', icon: '✨', owner_id: 'u1' } as any);
