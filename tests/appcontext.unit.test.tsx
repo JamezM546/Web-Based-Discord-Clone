@@ -37,6 +37,10 @@ jest.mock('../src/app/services/apiService', () => ({
     createDirectMessage: jest.fn(),
     updateStatus: jest.fn(),
     updateProfile: jest.fn(),
+    getChannelReadStates: jest.fn(),
+    getDmReadStates: jest.fn(),
+    markChannelRead: jest.fn(),
+    markDmRead: jest.fn(),
   },
 }));
 
@@ -124,6 +128,10 @@ const resetApiMocks = () => {
   } as any);
   mockApi.updateStatus.mockResolvedValue(baseCurrentUser as any);
   mockApi.updateProfile.mockResolvedValue(baseCurrentUser as any);
+  mockApi.getChannelReadStates.mockResolvedValue([]);
+  mockApi.getDmReadStates.mockResolvedValue([]);
+  mockApi.markChannelRead.mockResolvedValue(undefined as any);
+  mockApi.markDmRead.mockResolvedValue(undefined as any);
 };
 
 const wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -1119,9 +1127,6 @@ describe('AppContext Unit Tests', () => {
       // Provide some initial servers and channels
       (apiService.getServers as jest.Mock).mockResolvedValue([{ id: "s1", name: "Test Server" }]);
       (apiService.getChannels as jest.Mock).mockResolvedValue([{ id: "c1", server_id: "s1", name: "general" }]);
-      
-      // Mock potential background API call for read states
-      (apiService as any).markAsRead = jest.fn().mockResolvedValue({ success: true });
 
       // Default safe resolves for the rest
       (apiService.getDirectMessages as jest.Mock).mockResolvedValue([]);

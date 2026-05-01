@@ -11,6 +11,7 @@ const channelRoutes = require('./routes/channel');
 const messageRoutes = require('./routes/messages');
 const directMessageRoutes = require('./routes/directMessages');
 const summaryRoutes = require('./routes/summary');
+const readStateRoutes = require('./routes/readState');
 const userRoutes = require('./routes/users');
 const friendRoutes = require('./routes/friends');
 const inviteRoutes = require('./routes/serverInvites');
@@ -94,6 +95,9 @@ app.get('/api', (req, res) => {
         'POST /api/summaries/manual': 'Generate a manual AI summary for a channel or DM (protected)',
         'GET /api/summaries/preview': 'Get a What You Missed preview for a channel or DM (protected)'
       },
+      readState: {
+        'PUT /api/read-state': 'Sync read position to the backend for a channel or DM (protected)'
+      },
       search: {
         'GET /api/servers/search?q=': 'Search servers by name (protected)'
       },
@@ -148,8 +152,11 @@ app.use('/api/messages', messageRoutes);
 // Direct message routes
 app.use('/api/direct-messages', directMessageRoutes);
 
-// Summary routes (manual summary + What You Missed preview)
+// Summary routes: POST /api/summaries/manual, POST /api/summaries/manual/dms/:dmId
 app.use('/api/summaries', summaryRoutes);
+
+// Read state sync: PUT /api/read-state
+app.use('/api/read-state', readStateRoutes);
 
 // User routes (search, profile, status)
 app.use('/api/users', userRoutes);

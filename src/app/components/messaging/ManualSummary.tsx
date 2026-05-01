@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useApp } from '../../context/AppContext';
 import { apiService } from '../../services/apiService';
-import { Sparkles, X, Clock, MessageSquare, TrendingUp, Users, AlertCircle } from 'lucide-react';
+import { Sparkles, X, Clock, MessageSquare, TrendingUp, Users, RefreshCw, AlertCircle } from 'lucide-react';
 import { Message } from '../../types';
 
 interface ManualSummaryProps {
@@ -16,13 +16,10 @@ interface SummaryData {
   overview: string;
   keyTopics: string[];
   mostActiveUsers: { username: string; count: number }[];
-  importantMessages: Message[];
   timeframe: string;
   stats: {
     totalMessages: number;
     uniqueUsers: number;
-    questionsAsked: number;
-    decisionsMarked: number;
   };
 }
 
@@ -42,7 +39,12 @@ export const ManualSummary: React.FC<ManualSummaryProps> = ({ messages, channelI
   const [selectedHours, setSelectedHours] = useState<0.5 | 1 | 3>(3);
   const [isGenerating, setIsGenerating]   = useState(true);
   const [summaryData, setSummaryData]     = useState<SummaryData | null>(null);
+  const [hasError, setHasError]           = useState(false);
+  const [generatedAt, setGeneratedAt]     = useState<Date | null>(null);
   const [announcement, setAnnouncement]   = useState('');
+
+  // Incremented on every generate call; lets us discard results from stale requests
+  const generationIdRef = useRef(0);
 
   const dialogRef = useRef<HTMLDivElement>(null);
 
@@ -106,7 +108,12 @@ export const ManualSummary: React.FC<ManualSummaryProps> = ({ messages, channelI
 
   // ── Generation ────────────────────────────────────────────────────────────
   const generate = useCallback(async (hours: number) => {
+    // Stamp this call; if a newer call arrives before this one resolves we discard its result.
+    const myId = ++generationIdRef.current;
+
     setIsGenerating(true);
+    setHasError(false);
+    setSummaryData(null);
     setAnnouncement('Generating summary…');
 
     try {
@@ -116,24 +123,30 @@ export const ManualSummary: React.FC<ManualSummaryProps> = ({ messages, channelI
         hours,
       });
 
+      if (generationIdRef.current !== myId) return; // stale — a newer request is in flight
+
       setSummaryData(data as SummaryData);
+      setGeneratedAt(new Date());
       setAnnouncement(
         data.stats.totalMessages === 0
           ? 'No messages found in this time range.'
           : `Summary ready. ${data.stats.totalMessages} message${data.stats.totalMessages !== 1 ? 's' : ''} found.`
       );
     } catch (err) {
+      if (generationIdRef.current !== myId) return;
       console.error('Summary generation failed:', err);
+      setHasError(true);
       setAnnouncement('Failed to generate summary. Please try again.');
     } finally {
-      setIsGenerating(false);
+      if (generationIdRef.current === myId) setIsGenerating(false);
     }
   }, [channelId, dmId]);
 
   useEffect(() => { generate(3); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handlePreset = (hours: 0.5 | 1 | 3) => {
-    if (hours === selectedHours && !isGenerating) return;
+    // Allow re-triggering the same preset when there was an error (acts as retry)
+    if (hours === selectedHours && !isGenerating && !hasError) return;
     setSelectedHours(hours);
     generate(hours);
   };
@@ -248,7 +261,22 @@ export const ManualSummary: React.FC<ManualSummaryProps> = ({ messages, channelI
               </div>
             )}
 
-            {!isGenerating && summaryData?.stats.totalMessages === 0 && (
+            {!isGenerating && hasError && (
+              <div className="flex flex-col items-center justify-center gap-3 py-16" aria-hidden="true">
+                <AlertCircle className="size-10 text-red-400" aria-hidden="true" />
+                <p className="text-[#94a3b8] font-medium">Failed to generate summary</p>
+                <p className="text-[#475569] text-sm">Check your connection or API key and try again.</p>
+                <button
+                  onClick={() => generate(selectedHours)}
+                  className="flex items-center gap-1.5 mt-1 px-3 py-1.5 rounded-lg text-sm font-medium bg-[#06b6d4]/15 border border-[#06b6d4]/40 text-[#06b6d4] hover:bg-[#06b6d4]/25 transition-colors"
+                >
+                  <RefreshCw className="size-3.5" aria-hidden="true" />
+                  Retry
+                </button>
+              </div>
+            )}
+
+            {!isGenerating && !hasError && summaryData?.stats.totalMessages === 0 && (
               <div className="text-center py-16" aria-hidden="true">
                 <AlertCircle className="size-10 text-[#334155] mx-auto mb-3" aria-hidden="true" />
                 <p className="text-[#94a3b8] font-medium">No messages in this time range</p>
@@ -256,15 +284,13 @@ export const ManualSummary: React.FC<ManualSummaryProps> = ({ messages, channelI
               </div>
             )}
 
-            {!isGenerating && summaryData && summaryData.stats.totalMessages > 0 && (
+            {!isGenerating && !hasError && summaryData && summaryData.stats.totalMessages > 0 && (
               <>
                 {/* Stats */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 gap-3">
                   {[
-                    { label: 'Messages',     value: summaryData.stats.totalMessages,  Icon: MessageSquare },
-                    { label: 'Participants', value: summaryData.stats.uniqueUsers,     Icon: Users         },
-                    { label: 'Questions',    value: summaryData.stats.questionsAsked,  Icon: AlertCircle   },
-                    { label: 'Decisions',    value: summaryData.stats.decisionsMarked, Icon: TrendingUp    },
+                    { label: 'Messages',     value: summaryData.stats.totalMessages, Icon: MessageSquare },
+                    { label: 'Participants', value: summaryData.stats.uniqueUsers,    Icon: Users         },
                   ].map(({ label, value, Icon }) => (
                     <div key={label} className="bg-[#111e30] border border-[#1e3248] rounded-xl p-3.5">
                       <p className="flex items-center gap-1.5 text-[#475569] text-xs mb-1">
@@ -347,41 +373,6 @@ export const ManualSummary: React.FC<ManualSummaryProps> = ({ messages, channelI
                   </div>
                 )}
 
-                {/* Key Messages */}
-                {summaryData.importantMessages.length > 0 && (
-                  <div>
-                    <h3 className="flex items-center gap-2 text-[#e2e8f0] font-semibold mb-2.5">
-                      <AlertCircle className="size-4 text-[#06b6d4]" aria-hidden="true" />
-                      Key Messages
-                    </h3>
-                    <ul className="space-y-2">
-                      {summaryData.importantMessages.map(msg => {
-                        const author = users.find(u => u.id === msg.authorId);
-                        const displayName = author?.displayName || author?.username;
-                        return (
-                          <li
-                            key={msg.id}
-                            className="bg-[#111e30] border-l-4 border-l-[#06b6d4] border border-[#1e3248] rounded-xl p-3"
-                          >
-                            <div className="flex items-center gap-2 mb-1.5">
-                              {author && (
-                                <img src={author.avatar} alt="" aria-hidden="true" className="size-5 rounded-full" />
-                              )}
-                              <span className="text-[#e2e8f0] text-sm font-medium">{displayName}</span>
-                              <time
-                                dateTime={new Date(msg.timestamp).toISOString()}
-                                className="text-[#475569] text-xs"
-                              >
-                                {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                              </time>
-                            </div>
-                            <p className="text-[#94a3b8] text-sm">{msg.content}</p>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </div>
-                )}
               </>
             )}
           </div>
@@ -389,7 +380,9 @@ export const ManualSummary: React.FC<ManualSummaryProps> = ({ messages, channelI
           {/* Footer */}
           <div className="border-t border-[#1e3248] px-5 py-3 bg-[#0a1628] flex items-center justify-between flex-shrink-0">
             <p className="text-xs text-[#334155]" aria-hidden="true">
-              Showing {selectedPreset.label.toLowerCase()} of conversation
+              {generatedAt && !isGenerating
+                ? `Generated at ${generatedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · ${selectedPreset.label}`
+                : `Showing ${selectedPreset.label.toLowerCase()} of conversation`}
             </p>
             <button
               onClick={onClose}
