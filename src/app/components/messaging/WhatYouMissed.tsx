@@ -15,13 +15,16 @@ interface WhatYouMissedProps {
 const formatTimestamp = (date: Date) => {
   const now = new Date();
   const diff = now.getTime() - date.getTime();
+  const mins  = Math.floor(diff / (1000 * 60));
   const hours = Math.floor(diff / (1000 * 60 * 60));
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-  if (hours < 1) return 'just now';
+  const days  = Math.floor(diff / (1000 * 60 * 60 * 24));
+  if (mins  <  1) return 'just now';
+  if (mins  < 60) return `${mins}m ago`;
   if (hours < 24) return `${hours}h ago`;
-  if (days === 1) return 'yesterday';
+  if (days  ===1) return 'yesterday';
   return `${days}d ago`;
 };
+
 
 export const WhatYouMissed: React.FC<WhatYouMissedProps> = ({
   unreadMessages,
@@ -32,8 +35,11 @@ export const WhatYouMissed: React.FC<WhatYouMissedProps> = ({
 }) => {
   const { users, lastReadMessages } = useApp();
   const [isExpanded, setIsExpanded] = useState(false);
-  const [summary, setSummary] = useState<string>('');
+  const [highlights, setHighlights] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  const sinceKey = channelId || dmId || '';
+  const lastReadForKey = lastReadMessages[sinceKey];
 
   useEffect(() => {
     let cancelled = false;
@@ -41,25 +47,26 @@ export const WhatYouMissed: React.FC<WhatYouMissedProps> = ({
     const fetchPreview = async () => {
       setIsLoading(true);
       try {
-        const sinceKey = channelId || dmId || '';
-        const since = lastReadMessages[sinceKey]
-          ? new Date(lastReadMessages[sinceKey]).toISOString()
+        const since = lastReadForKey
+          ? new Date(lastReadForKey).toISOString()
           : undefined;
-
-        const preview = await apiService.getPreviewSummary({
+        const result = await apiService.getPreviewSummary({
           channelId: channelId || undefined,
           dmId: dmId || undefined,
           since,
         });
 
         if (!cancelled) {
-          setSummary(preview.summary || `${unreadMessages.length} new messages`);
+          const items: string[] = Array.isArray(result?.highlights) && result.highlights.length > 0
+            ? result.highlights
+            : typeof result?.summary === 'string' && result.summary
+            ? result.summary.split('\n').map((l: string) => l.trim()).filter((l: string) => l.length > 0)
+            : [];
+          setHighlights(items);
         }
       } catch (err) {
-        console.error('Preview fetch failed, falling back to local count:', err);
-        if (!cancelled) {
-          setSummary(`${unreadMessages.length} new message${unreadMessages.length !== 1 ? 's' : ''}`);
-        }
+        console.error('Preview fetch failed:', err);
+        if (!cancelled) setHighlights([]);
       } finally {
         if (!cancelled) setIsLoading(false);
       }
@@ -68,12 +75,12 @@ export const WhatYouMissed: React.FC<WhatYouMissedProps> = ({
     if (unreadMessages.length > 0 && (channelId || dmId)) {
       fetchPreview();
     } else {
-      setSummary('No recent messages.');
+      setHighlights([]);
       setIsLoading(false);
     }
 
     return () => { cancelled = true; };
-  }, [channelId, dmId, unreadMessages.length]);
+  }, [channelId, dmId, unreadMessages.length, lastReadForKey]);
 
   const lastReadTime = unreadMessages[0]?.timestamp;
 
@@ -152,8 +159,19 @@ export const WhatYouMissed: React.FC<WhatYouMissedProps> = ({
         <div id="wym-summary" className="px-4 pb-3 pt-0">
           {isLoading ? (
             <p className="text-[#475569] text-xs italic">Loading summary…</p>
+          ) : highlights.length > 0 ? (
+            <ul className="space-y-1 list-none">
+              {highlights.map((point, i) => (
+                <li key={i} className="flex items-start gap-1.5 text-[#64748b] text-xs leading-relaxed">
+                  <span className="text-[#06b6d4] flex-shrink-0 mt-0.5">•</span>
+                  <span>{point}</span>
+                </li>
+              ))}
+            </ul>
           ) : (
-            <p className="text-[#64748b] text-xs leading-relaxed">{summary}</p>
+            <p className="text-[#475569] text-xs italic">
+              {unreadMessages.length} new message{unreadMessages.length !== 1 ? 's' : ''} — no summary available.
+            </p>
           )}
 
           {/* Mark as read link */}

@@ -35,6 +35,8 @@ export const AddFriendDialog: React.FC<AddFriendDialogProps> = ({ open, onOpenCh
     const q = username.trim();
     if (q.length < 1) {
       setSearchResults([]);
+      setSelectedUserId(null);
+      setIsSearching(false);
       return;
     }
     setIsSearching(true);
@@ -101,7 +103,10 @@ export const AddFriendDialog: React.FC<AddFriendDialogProps> = ({ open, onOpenCh
             <Input
               id="username"
               value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              onChange={(e) => {
+                setUsername(e.target.value);
+                setSelectedUserId(null);
+              }}
               className="bg-[#060c18] border border-[#1e3248] text-[#e2e8f0] mt-2 focus-visible:ring-[#06b6d4]/50 placeholder:text-[#475569]"
               placeholder="Enter username"
             />

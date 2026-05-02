@@ -71,6 +71,40 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [isLoading, setIsLoading] = useState(true);
   const [friends, setFriends] = useState<User[]>([]);
 
+  // ── Helpers for per-user localStorage read-state ───────────────────────────
+  const readStateKey = (userId: string) => `lastReadMessages_${userId}`;
+
+  const loadReadState = (userId: string): Record<string, Date> => {
+    try {
+      const stored = localStorage.getItem(readStateKey(userId));
+      if (!stored) return {};
+      const parsed: Record<string, string> = JSON.parse(stored);
+      const result: Record<string, Date> = {};
+      for (const [k, v] of Object.entries(parsed)) {
+        const d = new Date(v);
+        if (!Number.isNaN(d.getTime())) result[k] = d;
+      }
+      return result;
+    } catch {
+      return {};
+    }
+  };
+
+  const saveReadState = (userId: string, state: Record<string, Date>) => {
+    try {
+      const serialisable: Record<string, string> = {};
+      for (const [k, d] of Object.entries(state)) {
+        serialisable[k] = d instanceof Date ? d.toISOString() : String(d);
+      }
+      localStorage.setItem(readStateKey(userId), JSON.stringify(serialisable));
+    } catch { /* localStorage unavailable */ }
+  };
+
+  // Persist whenever read state or current user changes
+  useEffect(() => {
+    if (currentUser?.id) saveReadState(currentUser.id, lastReadMessages);
+  }, [lastReadMessages, currentUser?.id]);
+
   // ---------------------------------------------------------------------------
   // Helpers
   // ---------------------------------------------------------------------------
@@ -292,6 +326,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             };
             setCurrentUser(user);
             upsertUsers([user]);
+            // Restore this user's persisted read state before rendering messages
+            setLastReadMessages(loadReadState(user.id));
 
             await Promise.all([
               fetchUserServers(),
@@ -404,6 +440,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         members: [currentUser.id],
       };
       setServers((prev) => [...prev, newServer]);
+      setSelectedServer(newServer);
+      setSelectedDM(null);
+      setSelectedChannel(null);
+      setReplyingTo(null);
       try {
         const newChannels = (await apiService.getChannels(newServer.id)) as any[];
         const mapped: Channel[] = newChannels.map((c: any) => ({
@@ -412,8 +452,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           serverId: c.server_id || c.serverId || newServer.id,
         }));
         setChannels((prev) => [...prev, ...mapped]);
+        setSelectedChannel(mapped[0] ?? null);
       } catch (_) { /* ignored */ }
-      setSelectedServer(newServer);
     } catch (error) {
       console.error('Failed to create server:', error);
     }
@@ -558,6 +598,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         const row = await apiService.createMessage({ content, channelId, dmId, replyToId, serverInviteId });
         mergeUsersFromMessageRows([row]);
         setMessages((prev) => [...prev, mapBackendMessageRowToFrontend(row)]);
+        // Mark as read immediately when you send — you've seen your own message.
+        const key = channelId || dmId;
+        if (key) setLastReadMessages((prev) => ({ ...prev, [key]: new Date() }));
         if (dmId) {
           setDirectMessages((prev) =>
             prev.map((dm) => (dm.id === dmId ? { ...dm, lastMessageTime: new Date() } : dm))
@@ -721,22 +764,27 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   // ---------------------------------------------------------------------------
-  // Read state (local for now — tracks unread per channel/DM)
+  // Read state — tracks unread per channel/DM in localStorage (per user)
+  // and syncs to the backend on every explicit markAsRead call.
   // ---------------------------------------------------------------------------
 
   const markAsRead = (channelId?: string, dmId?: string) => {
     const key = channelId || dmId;
-    if (key) {
-      setLastReadMessages((prev) => ({ ...prev, [key]: new Date() }));
-    }
+    if (!key) return;
+    setLastReadMessages((prev) => ({ ...prev, [key]: new Date() }));
+    // Persist to backend so summary/preview routes have an accurate "since" baseline.
+    // Fire-and-forget — UI should never be blocked by this network call.
+    // Optional chaining guards against test mocks that don't include this method.
+    apiService.syncReadState?.({ channelId, dmId });
   };
 
   const getUnreadCount = (channelId?: string, dmId?: string) => {
     const key = channelId || dmId || '';
     const lastRead = lastReadMessages[key];
-    const pool = channelId
+    const pool = (channelId
       ? messages.filter((m) => m.channelId === channelId)
-      : messages.filter((m) => m.dmId === dmId);
+      : messages.filter((m) => m.dmId === dmId)
+    ).filter((m) => m.authorId !== currentUser?.id); // never count own messages as unread
     if (!lastRead) return pool.length;
     return pool.filter((m) => new Date(m.timestamp).getTime() > new Date(lastRead).getTime()).length;
   };
@@ -744,9 +792,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const getUnreadMessages = (channelId?: string, dmId?: string) => {
     const key = channelId || dmId || '';
     const lastRead = lastReadMessages[key];
-    const pool = channelId
+    const pool = (channelId
       ? messages.filter((m) => m.channelId === channelId)
-      : messages.filter((m) => m.dmId === dmId);
+      : messages.filter((m) => m.dmId === dmId)
+    ).filter((m) => m.authorId !== currentUser?.id); // never count own messages as unread
     if (!lastRead) return pool;
     return pool.filter((m) => new Date(m.timestamp).getTime() > new Date(lastRead).getTime());
   };
@@ -769,6 +818,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       };
       setCurrentUser(user);
       upsertUsers([user]);
+      // Restore this user's persisted read state so WYM only fires for truly new messages
+      setLastReadMessages(loadReadState(user.id));
 
       await Promise.all([
         fetchUserServers(),
@@ -806,6 +857,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const logout = () => {
+    void apiService.logoutFromServer().catch((error: unknown) => {
+      console.error('Failed to notify backend during logout:', error);
+    });
     apiService.logout();
     setCurrentUser(null);
     setUsers([]);
@@ -819,6 +873,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setSelectedServer(null);
     setSelectedChannel(null);
     setSelectedDM(null);
+    // Clear in-memory read state but leave the per-user localStorage key intact
+    // so the same user's read positions are restored on next login.
     setLastReadMessages({});
   };
 
