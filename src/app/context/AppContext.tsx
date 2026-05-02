@@ -1,6 +1,31 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { User, Server, Channel, Message, FriendRequest, DirectMessage, ServerInvite } from '../types';
 import { apiService } from '../services/apiService';
+import { websocketService } from '../services/websocketService';
+
+/** Trailing slash can confuse some WS stacks; API Gateway URLs are normally `wss://…/stage` with no trailing `/`. */
+const WS_URL = (import.meta.env.VITE_WS_URL as string | undefined)?.trim().replace(/\/+$/, '') || '';
+
+function activeRoomIdFromSelection(channel: Channel | null, dm: DirectMessage | null): string | null {
+  if (channel?.id) return `channel:${channel.id}`;
+  if (dm?.id) return `dm:${dm.id}`;
+  return null;
+}
+
+function mapBackendMessageRowToFrontend(row: any): Message {
+  return {
+    id: row.id,
+    content: row.content,
+    authorId: row.author_id,
+    channelId: row.channel_id || undefined,
+    dmId: row.dm_id || undefined,
+    timestamp: new Date(row.timestamp),
+    edited: !!row.edited,
+    replyToId: row.reply_to_id || undefined,
+    serverInviteId: row.server_invite_id || undefined,
+    reactions: row.reactions || undefined,
+  };
+}
 
 interface AppContextType {
   currentUser: User | null;
@@ -50,6 +75,10 @@ interface AppContextType {
   setReplyingTo: (message: Message | null) => void;
   refreshFriends: () => Promise<void>;
   refreshFriendRequests: () => Promise<void>;
+  /** Users typing in the currently selected channel/DM (from WebSocket). */
+  typingPeers: { userId: string; username?: string }[];
+  notifyTypingStart: () => void;
+  notifyTypingStop: () => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -70,6 +99,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [friends, setFriends] = useState<User[]>([]);
+  const [typingPeers, setTypingPeers] = useState<{ userId: string; username?: string }[]>([]);
+  const selectionRef = useRef({
+    channel: null as Channel | null,
+    dm: null as DirectMessage | null,
+    user: null as User | null,
+  });
 
   // ── Helpers for per-user localStorage read-state ───────────────────────────
   const readStateKey = (userId: string) => `lastReadMessages_${userId}`;
@@ -105,22 +140,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (currentUser?.id) saveReadState(currentUser.id, lastReadMessages);
   }, [lastReadMessages, currentUser?.id]);
 
+  useEffect(() => {
+    selectionRef.current = {
+      channel: selectedChannel,
+      dm: selectedDM,
+      user: currentUser,
+    };
+  }, [selectedChannel, selectedDM, currentUser]);
+
   // ---------------------------------------------------------------------------
   // Helpers
   // ---------------------------------------------------------------------------
-
-  const mapBackendMessageRowToFrontend = (row: any): Message => ({
-    id: row.id,
-    content: row.content,
-    authorId: row.author_id,
-    channelId: row.channel_id || undefined,
-    dmId: row.dm_id || undefined,
-    timestamp: new Date(row.timestamp),
-    edited: !!row.edited,
-    replyToId: row.reply_to_id || undefined,
-    serverInviteId: row.server_invite_id || undefined,
-    reactions: row.reactions || undefined,
-  });
 
   const mergeUsersFromMessageRows = useCallback((rows: any[]) => {
     if (!rows || rows.length === 0) return;
@@ -157,6 +187,145 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       return Array.from(map.values());
     });
   }, []);
+
+  const typingClearTimeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+  const bumpDmPreviewFromMessageRow = useCallback((row: any) => {
+    const dmId = row.dm_id;
+    if (!dmId) return;
+    const ts = row.timestamp ? new Date(row.timestamp) : new Date();
+    setDirectMessages((prev) =>
+      prev.map((dm) => (dm.id === dmId ? { ...dm, lastMessageTime: ts } : dm))
+    );
+  }, []);
+
+  useEffect(() => {
+    if (import.meta.env.DEV && currentUser?.id && !WS_URL) {
+      console.warn(
+        '[realtime] VITE_WS_URL is not set — API Gateway WebSocket (auth / joinRoom) is disabled. ' +
+          'In Network → WS, `{"type":"connected"}` with a `?token=` URL is Vite HMR, not your backend. ' +
+          'Set VITE_WS_URL to the wss://…execute-api… URL from `serverless info`, restart the dev server.'
+      );
+    }
+  }, [currentUser?.id]);
+
+  useEffect(() => {
+    if (!WS_URL || !currentUser?.id) {
+      websocketService.disconnect();
+      return undefined;
+    }
+
+    websocketService.connect(WS_URL, apiService.getToken());
+    const unsub = websocketService.subscribe((raw) => {
+      const msg = raw as { type?: string; data?: Record<string, unknown> };
+      const { type, data } = msg;
+      if (!type) return;
+
+      const sel = selectionRef.current;
+      const selfId = sel.user?.id;
+      const activeRoom = activeRoomIdFromSelection(sel.channel, sel.dm);
+
+      if (type === 'typingStarted' || type === 'typingStopped') {
+        const roomId = data?.roomId as string | undefined;
+        const uid = data?.userId as string | undefined;
+        if (!roomId || !uid || uid === selfId) return;
+        if (roomId !== activeRoom) return;
+        if (type === 'typingStarted') {
+          const uname = data?.username as string | undefined;
+          setTypingPeers((prev) => {
+            if (prev.some((p) => p.userId === uid)) return prev;
+            return [...prev, { userId: uid, username: uname }];
+          });
+          const existing = typingClearTimeoutsRef.current.get(uid);
+          if (existing) clearTimeout(existing);
+          const t = setTimeout(() => {
+            typingClearTimeoutsRef.current.delete(uid);
+            setTypingPeers((prev) => prev.filter((p) => p.userId !== uid));
+          }, 6000);
+          typingClearTimeoutsRef.current.set(uid, t);
+        } else {
+          const t = typingClearTimeoutsRef.current.get(uid);
+          if (t) clearTimeout(t);
+          typingClearTimeoutsRef.current.delete(uid);
+          setTypingPeers((prev) => prev.filter((p) => p.userId !== uid));
+        }
+        return;
+      }
+
+      if (type === 'messageCreated' && data && (data as { message?: unknown }).message) {
+        const payload = data as { roomId?: string; message: any };
+        bumpDmPreviewFromMessageRow(payload.message);
+        const roomId = payload.roomId;
+        if (!roomId || roomId !== activeRoom) return;
+        mergeUsersFromMessageRows([payload.message]);
+        setMessages((prev) => {
+          const id = payload.message.id as string;
+          if (prev.some((m) => m.id === id)) return prev;
+          return [...prev, mapBackendMessageRowToFrontend(payload.message)];
+        });
+        return;
+      }
+
+      if (type === 'messageUpdated' && data && (data as { message?: unknown }).message) {
+        const payload = data as { roomId?: string; message: any };
+        const roomId = payload.roomId;
+        if (!roomId || roomId !== activeRoom) return;
+        mergeUsersFromMessageRows([payload.message]);
+        setMessages((prev) => {
+          const mapped = mapBackendMessageRowToFrontend(payload.message);
+          return prev.map((m) => (m.id === mapped.id ? { ...m, ...mapped } : m));
+        });
+        return;
+      }
+
+      if (type === 'messageDeleted' && data?.messageId) {
+        const roomId = data.roomId as string | undefined;
+        if (!roomId || roomId !== activeRoom) return;
+        const mid = data.messageId as string;
+        setMessages((prev) => prev.filter((m) => m.id !== mid));
+        return;
+      }
+
+      if (type === 'reactionToggled' && data?.messageId) {
+        const roomId = data.roomId as string | undefined;
+        if (!roomId || roomId !== activeRoom) return;
+        const mid = data.messageId as string;
+        const reactions = data.reactions as Message['reactions'];
+        if (!reactions) return;
+        setMessages((prev) =>
+          prev.map((m) => (m.id === mid ? { ...m, reactions } : m))
+        );
+        return;
+      }
+    });
+
+    return () => {
+      unsub();
+      websocketService.disconnect();
+    };
+  }, [currentUser?.id, mergeUsersFromMessageRows, bumpDmPreviewFromMessageRow]);
+
+  useEffect(() => {
+    if (!currentUser?.id || !WS_URL) return;
+    const room = activeRoomIdFromSelection(selectedChannel, selectedDM);
+    websocketService.syncActiveRoom(room);
+  }, [selectedChannel?.id, selectedDM?.id, currentUser?.id]);
+
+  useEffect(() => {
+    setTypingPeers([]);
+    typingClearTimeoutsRef.current.forEach((t) => clearTimeout(t));
+    typingClearTimeoutsRef.current.clear();
+  }, [selectedChannel?.id, selectedDM?.id]);
+
+  const notifyTypingStart = useCallback(() => {
+    const room = activeRoomIdFromSelection(selectedChannel, selectedDM);
+    if (room && websocketService.isAuthenticated()) websocketService.typingStart(room);
+  }, [selectedChannel?.id, selectedDM?.id]);
+
+  const notifyTypingStop = useCallback(() => {
+    const room = activeRoomIdFromSelection(selectedChannel, selectedDM);
+    if (room && websocketService.isAuthenticated()) websocketService.typingStop(room);
+  }, [selectedChannel?.id, selectedDM?.id]);
 
   // ---------------------------------------------------------------------------
   // Backend fetch helpers
@@ -932,6 +1101,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setReplyingTo,
         refreshFriends,
         refreshFriendRequests,
+        typingPeers,
+        notifyTypingStart,
+        notifyTypingStop,
       }}
     >
       {children}

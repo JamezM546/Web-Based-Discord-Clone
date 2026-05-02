@@ -7,7 +7,16 @@ import { ManualSummary } from './ManualSummary';
 import { Hash, Sparkles, MessageSquare } from 'lucide-react';
 
 export const MessageArea: React.FC = () => {
-  const { selectedChannel, selectedDM, messages, users, currentUser, getUnreadMessages, markAsRead } = useApp();
+  const {
+    selectedChannel,
+    selectedDM,
+    messages,
+    users,
+    currentUser,
+    getUnreadMessages,
+    markAsRead,
+    typingPeers,
+  } = useApp();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [showManualSummary, setShowManualSummary] = useState(false);
   const unreadStartRef = useRef<HTMLDivElement>(null);
@@ -92,36 +101,49 @@ export const MessageArea: React.FC = () => {
   return (
     <div className="flex-1 bg-[#060c18] flex flex-col min-h-0">
       {/* Header */}
-      <div className="h-12 px-4 flex items-center justify-between border-b border-[#1e3248] bg-[#0a1628] flex-shrink-0" role="banner">
-        <div className="flex items-center gap-2">
-          {selectedChannel && !selectedDM && (
-            <>
-              <div className="size-7 rounded-lg bg-[#06b6d4]/10 flex items-center justify-center border border-[#06b6d4]/20" aria-hidden="true">
-                <Hash className="size-3.5 text-[#06b6d4]" />
+      <div className="min-h-12 px-4 py-1.5 flex flex-col gap-1 border-b border-[#1e3248] bg-[#0a1628] flex-shrink-0" role="banner">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            {selectedChannel && !selectedDM && (
+              <>
+                <div className="size-7 rounded-lg bg-[#06b6d4]/10 flex items-center justify-center border border-[#06b6d4]/20 shrink-0" aria-hidden="true">
+                  <Hash className="size-3.5 text-[#06b6d4]" />
+                </div>
+                <h1 className="font-semibold text-[#e2e8f0] truncate">{selectedChannel.name}</h1>
+                <span className="text-[#475569] text-xs hidden sm:block shrink-0" aria-hidden="true">· Room</span>
+              </>
+            )}
+            {selectedDM && !selectedChannel && otherUser && (
+              <div className="flex items-center gap-2 min-w-0">
+                <img src={otherUser.avatar} alt="" aria-hidden="true" className="size-7 rounded-full ring-2 ring-[#1e3248] shrink-0" />
+                <h1 className="font-semibold text-[#e2e8f0] truncate">{otherUser.displayName || otherUser.username}</h1>
+                <span className="text-[#475569] text-xs hidden sm:block shrink-0" aria-hidden="true">· Direct Chat</span>
               </div>
-              <h1 className="font-semibold text-[#e2e8f0]">{selectedChannel.name}</h1>
-              <span className="text-[#475569] text-xs hidden sm:block" aria-hidden="true">· Room</span>
-            </>
-          )}
-          {selectedDM && !selectedChannel && otherUser && (
-            <div className="flex items-center gap-2">
-              <img src={otherUser.avatar} alt="" aria-hidden="true" className="size-7 rounded-full ring-2 ring-[#1e3248]" />
-              <h1 className="font-semibold text-[#e2e8f0]">{otherUser.displayName || otherUser.username}</h1>
-              <span className="text-[#475569] text-xs hidden sm:block" aria-hidden="true">· Direct Chat</span>
-            </div>
+            )}
+          </div>
+          {channelMessages.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowManualSummary(true)}
+              aria-label="Summarize conversation with AI"
+              className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#06b6d4]/10 hover:bg-[#06b6d4]/20 text-[#06b6d4] hover:text-[#67e8f9] transition-colors border border-[#06b6d4]/20"
+            >
+              <Sparkles className="size-3.5" aria-hidden="true" />
+              <span className="text-xs font-medium hidden sm:block">Summarize</span>
+            </button>
           )}
         </div>
 
-        {/* Summarize button */}
-        {channelMessages.length > 0 && (
-          <button
-            onClick={() => setShowManualSummary(true)}
-            aria-label="Summarize conversation with AI"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#06b6d4]/10 hover:bg-[#06b6d4]/20 text-[#06b6d4] hover:text-[#67e8f9] transition-colors border border-[#06b6d4]/20"
-          >
-            <Sparkles className="size-3.5" aria-hidden="true" />
-            <span className="text-xs font-medium hidden sm:block">Summarize</span>
-          </button>
+        {typingPeers.length > 0 && (
+          <p className="text-xs text-[#64748b] truncate" aria-live="polite">
+            {typingPeers
+              .map((p) => {
+                const u = users.find((x) => x.id === p.userId);
+                return u?.displayName || u?.username || p.username || 'Someone';
+              })
+              .join(', ')}{' '}
+            {typingPeers.length === 1 ? 'is typing…' : 'are typing…'}
+          </p>
         )}
       </div>
 

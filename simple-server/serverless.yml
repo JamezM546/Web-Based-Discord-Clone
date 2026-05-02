@@ -1,0 +1,133 @@
+# WebSocket API + DynamoDB tables for realtime fanout.
+# REST API remains on the existing Lambda (see `.github/workflows/deploy-aws-lambda.yml`); deploy this stack separately:
+#   cd simple-server && npm ci && npx serverless deploy
+#
+# After deploy: set REST Lambda env `WS_MANAGEMENT_API_ENDPOINT` and table names (see `serverless info` / AWS console).
+# Frontend: set Amplify env `VITE_WS_URL` to the wss:// URL from this stack.
+
+service: discord-clone-realtime
+
+frameworkVersion: '3'
+
+custom:
+  connectionsTable: ${self:service}-${sls:stage}-ws-connections
+  membershipsTable: ${self:service}-${sls:stage}-ws-room-memberships
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  stage: ${opt:stage, 'dev'}
+  region: ${opt:region, 'us-east-1'}
+  memorySize: 256
+  timeout: 30
+  environment:
+    JWT_SECRET: ${env:JWT_SECRET, ''}
+    DATABASE_URL: ${env:DATABASE_URL, ''}
+    WS_CONNECTIONS_TABLE: ${self:custom.connectionsTable}
+    WS_ROOM_MEMBERSHIPS_TABLE: ${self:custom.membershipsTable}
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:DeleteItem
+            - dynamodb:Query
+            - dynamodb:UpdateItem
+          Resource:
+            - !GetAtt WsConnectionsTable.Arn
+            - !GetAtt WsRoomMembershipsTable.Arn
+            - !Sub '${WsRoomMembershipsTable.Arn}/index/*'
+        - Effect: Allow
+          Action:
+            - execute-api:ManageConnections
+          Resource: '*'
+
+functions:
+  ws:
+    handler: wsHandler.handler
+    events:
+      - websocket:
+          route: $connect
+      - websocket:
+          route: $disconnect
+      # API uses RouteSelectionExpression $request.body.action — each action needs its own route
+      # or the message never reaches Lambda (client sees no authOk / joinOk).
+      - websocket:
+          route: $default
+      - websocket:
+          route: auth
+      - websocket:
+          route: joinRoom
+      - websocket:
+          route: leaveRoom
+      - websocket:
+          route: typingStart
+      - websocket:
+          route: typingStop
+
+resources:
+  Resources:
+    WsConnectionsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:custom.connectionsTable}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: connectionId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: connectionId
+            KeyType: HASH
+        TimeToLiveSpecification:
+          AttributeName: ttl
+          Enabled: true
+
+    WsRoomMembershipsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:custom.membershipsTable}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: roomId
+            AttributeType: S
+          - AttributeName: connectionId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: roomId
+            KeyType: HASH
+          - AttributeName: connectionId
+            KeyType: RANGE
+        GlobalSecondaryIndexes:
+          - IndexName: connectionId-index
+            KeySchema:
+              - AttributeName: connectionId
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+        TimeToLiveSpecification:
+          AttributeName: ttl
+          Enabled: true
+
+  Outputs:
+    WebSocketUrl:
+      Description: Browser WebSocket URL (use as VITE_WS_URL)
+      Value:
+        Fn::Sub:
+          - wss://${ApiId}.execute-api.${Region}.amazonaws.com/${Stage}
+          - ApiId: !Ref WebsocketsApi
+            Region: !Ref AWS::Region
+            Stage: ${sls:stage}
+    ManagementApiUrl:
+      Description: Set on REST Lambda as WS_MANAGEMENT_API_ENDPOINT (https, includes stage)
+      Value:
+        Fn::Sub:
+          - https://${ApiId}.execute-api.${Region}.amazonaws.com/${Stage}
+          - ApiId: !Ref WebsocketsApi
+            Region: !Ref AWS::Region
+            Stage: ${sls:stage}
+    WsConnectionsTableName:
+      Value: ${self:custom.connectionsTable}
+    WsRoomMembershipsTableName:
+      Value: ${self:custom.membershipsTable}

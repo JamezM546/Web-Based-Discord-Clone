@@ -23,6 +23,8 @@ const COPY_NAMES = [
   'routes',
   'services',
   'utils',
+  'realtime',
+  'prompts',
 ];
 
 function rimraf(dir) {

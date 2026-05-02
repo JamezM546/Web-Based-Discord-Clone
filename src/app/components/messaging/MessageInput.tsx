@@ -18,7 +18,42 @@ export const MessageInput: React.FC<MessageInputProps> = ({ channelId, dmId }) =
   const [selectedMentionIndex, setSelectedMentionIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const mentionDropdownRef = useRef<HTMLDivElement>(null);
-  const { sendMessage, selectedChannel, users, replyingTo, setReplyingTo, currentUser, selectedServer, selectedDM } = useApp();
+  const {
+    sendMessage,
+    selectedChannel,
+    users,
+    replyingTo,
+    setReplyingTo,
+    currentUser,
+    selectedServer,
+    selectedDM,
+    notifyTypingStart,
+    notifyTypingStop,
+  } = useApp();
+
+  const typingActiveRef = useRef(false);
+  const typingIdleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const scheduleTypingIdle = () => {
+    if (typingIdleTimerRef.current) clearTimeout(typingIdleTimerRef.current);
+    typingIdleTimerRef.current = setTimeout(() => {
+      typingIdleTimerRef.current = null;
+      if (typingActiveRef.current) {
+        typingActiveRef.current = false;
+        notifyTypingStop();
+      }
+    }, 2800);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (typingIdleTimerRef.current) clearTimeout(typingIdleTimerRef.current);
+      if (typingActiveRef.current) {
+        typingActiveRef.current = false;
+        notifyTypingStop();
+      }
+    };
+  }, [notifyTypingStop, selectedChannel?.id, selectedDM?.id]);
 
   const availableUsers = selectedServer
     ? users.filter(u => selectedServer.members.includes(u.id) && u.id !== currentUser?.id)
@@ -45,6 +80,14 @@ export const MessageInput: React.FC<MessageInputProps> = ({ channelId, dmId }) =
 
   const handleSend = () => {
     if (message.trim()) {
+      if (typingIdleTimerRef.current) {
+        clearTimeout(typingIdleTimerRef.current);
+        typingIdleTimerRef.current = null;
+      }
+      if (typingActiveRef.current) {
+        typingActiveRef.current = false;
+        notifyTypingStop();
+      }
       sendMessage(message, channelId, dmId, replyingTo?.id);
       setMessage('');
       setReplyingTo(null);
@@ -88,6 +131,23 @@ export const MessageInput: React.FC<MessageInputProps> = ({ channelId, dmId }) =
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setMessage(value);
+
+    if (value.trim().length > 0) {
+      if (!typingActiveRef.current) {
+        typingActiveRef.current = true;
+        notifyTypingStart();
+      }
+      scheduleTypingIdle();
+    } else {
+      if (typingIdleTimerRef.current) {
+        clearTimeout(typingIdleTimerRef.current);
+        typingIdleTimerRef.current = null;
+      }
+      if (typingActiveRef.current) {
+        typingActiveRef.current = false;
+        notifyTypingStop();
+      }
+    }
     const cursorPos = e.target.selectionStart || 0;
     const textBeforeCursor = value.substring(0, cursorPos);
     const atMatch = textBeforeCursor.match(/@(\w*)$/);

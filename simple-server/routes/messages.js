@@ -3,6 +3,12 @@ const { pool } = require('../config/database');
 const Channel = require('../models/Channel');
 const Message = require('../models/Message');
 const { authenticateToken } = require('../middleware/auth');
+const {
+  fanoutMessageCreated,
+  fanoutMessageUpdated,
+  fanoutMessageDeleted,
+  fanoutReactionToggled,
+} = require('../realtime/fanout');
 
 const router = express.Router();
 
@@ -191,6 +197,8 @@ router.post('/', authenticateToken, async (req, res) => {
     // Re-fetch with author display info
     const messageWithAuthor = await Message.findById(message.id);
 
+    void fanoutMessageCreated(messageWithAuthor);
+
     res.status(201).json({
       success: true,
       message: 'Message created successfully',
@@ -243,6 +251,8 @@ router.put('/:messageId', authenticateToken, async (req, res) => {
 
     const messageWithAuthor = await Message.findById(messageId);
 
+    void fanoutMessageUpdated(messageWithAuthor);
+
     res.status(200).json({
       success: true,
       message: 'Message updated successfully',
@@ -277,6 +287,9 @@ router.delete('/:messageId', authenticateToken, async (req, res) => {
       });
     }
 
+    const channelIdForFanout = accessRow.channel_id || null;
+    const dmIdForFanout = accessRow.dm_id || null;
+
     const deleted = await Message.delete(messageId);
     if (!deleted) {
       return res.status(404).json({
@@ -284,6 +297,12 @@ router.delete('/:messageId', authenticateToken, async (req, res) => {
         message: 'Message not found'
       });
     }
+
+    void fanoutMessageDeleted({
+      messageId,
+      channelId: channelIdForFanout,
+      dmId: dmIdForFanout,
+    });
 
     res.status(200).json({
       success: true,
@@ -347,6 +366,13 @@ router.post('/:messageId/reactions/toggle', authenticateToken, async (req, res) 
       emoji: r.emoji,
       users: (r.users || []).map((u) => u.id) // frontend expects `users: string[]`
     }));
+
+    void fanoutReactionToggled({
+      messageId,
+      channelId: accessRow.channel_id || null,
+      dmId: accessRow.dm_id || null,
+      reactions,
+    });
 
     res.status(200).json({
       success: true,
