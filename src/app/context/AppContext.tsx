@@ -440,6 +440,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         members: [currentUser.id],
       };
       setServers((prev) => [...prev, newServer]);
+      setSelectedServer(newServer);
+      setSelectedDM(null);
+      setSelectedChannel(null);
+      setReplyingTo(null);
       try {
         const newChannels = (await apiService.getChannels(newServer.id)) as any[];
         const mapped: Channel[] = newChannels.map((c: any) => ({
@@ -448,8 +452,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           serverId: c.server_id || c.serverId || newServer.id,
         }));
         setChannels((prev) => [...prev, ...mapped]);
+        setSelectedChannel(mapped[0] ?? null);
       } catch (_) { /* ignored */ }
-      setSelectedServer(newServer);
     } catch (error) {
       console.error('Failed to create server:', error);
     }
