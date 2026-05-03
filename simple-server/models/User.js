@@ -182,6 +182,41 @@ class User {
     }
   }
 
+  static async getStatusAudienceIds(userId) {
+    const query = `
+      WITH related_users AS (
+        SELECT $1::text AS user_id
+        UNION
+        SELECT CASE
+          WHEN fr.from_user_id = $1 THEN fr.to_user_id
+          ELSE fr.from_user_id
+        END AS user_id
+        FROM friend_requests fr
+        WHERE (fr.from_user_id = $1 OR fr.to_user_id = $1)
+          AND fr.status = 'accepted'
+        UNION
+        SELECT unnest(dm.participants) AS user_id
+        FROM direct_messages dm
+        WHERE $1 = ANY(dm.participants)
+        UNION
+        SELECT sm2.user_id
+        FROM server_members sm1
+        JOIN server_members sm2 ON sm1.server_id = sm2.server_id
+        WHERE sm1.user_id = $1
+      )
+      SELECT DISTINCT user_id
+      FROM related_users
+      WHERE user_id IS NOT NULL
+    `;
+
+    try {
+      const result = await pool.query(query, [userId]);
+      return result.rows.map((row) => row.user_id);
+    } catch (error) {
+      throw error;
+    }
+  }
+
   // Delete user account
   static async delete(id) {
     const query = 'DELETE FROM users WHERE id = $1';

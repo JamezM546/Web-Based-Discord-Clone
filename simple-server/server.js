@@ -2,7 +2,10 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const http = require('http');
 const { initializeDatabase } = require('./config/database');
+const { createLocalWebSocketServer } = require('./websocket/localServer');
+const { setRealtimeRuntime } = require('./websocket/gateway');
 
 // Import routes
 const authRoutes = require('./routes/auth');
@@ -184,14 +187,23 @@ const initAll = async () => {
   await seedDatabase();
 };
 
+const createHttpServer = () => {
+  const server = http.createServer(app);
+  const { runtime } = createLocalWebSocketServer({ server });
+  setRealtimeRuntime(runtime);
+  return server;
+};
+
 // Only start listening when run directly (not when imported by tests)
 if (require.main === module) {
-  app.listen(PORT, '0.0.0.0', async () => {
+  const server = createHttpServer();
+  server.listen(PORT, '0.0.0.0', async () => {
     console.log(`Simple server running on port ${PORT}`);
     console.log(`Health check: http://localhost:${PORT}/health`);
     console.log(`API endpoint: http://localhost:${PORT}/api`);
     console.log(`Interactive docs: http://localhost:${PORT}/api/docs`);
     console.log(`Auth endpoints: http://localhost:${PORT}/api/auth`);
+    console.log(`WebSocket endpoint: ws://localhost:${PORT}/ws`);
 
     try {
       await initAll();
@@ -202,4 +214,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { app, initAll };
+module.exports = { app, initAll, createHttpServer };

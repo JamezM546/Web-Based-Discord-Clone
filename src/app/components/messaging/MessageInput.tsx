@@ -18,7 +18,9 @@ export const MessageInput: React.FC<MessageInputProps> = ({ channelId, dmId }) =
   const [selectedMentionIndex, setSelectedMentionIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const mentionDropdownRef = useRef<HTMLDivElement>(null);
-  const { sendMessage, selectedChannel, users, replyingTo, setReplyingTo, currentUser, selectedServer, selectedDM } = useApp();
+  const typingTimeoutRef = useRef<number | null>(null);
+  const isTypingRef = useRef(false);
+  const { sendMessage, selectedChannel, users, replyingTo, setReplyingTo, currentUser, selectedServer, selectedDM, notifyTypingActivity } = useApp();
 
   const availableUsers = selectedServer
     ? users.filter(u => selectedServer.members.includes(u.id) && u.id !== currentUser?.id)
@@ -46,6 +48,10 @@ export const MessageInput: React.FC<MessageInputProps> = ({ channelId, dmId }) =
   const handleSend = () => {
     if (message.trim()) {
       sendMessage(message, channelId, dmId, replyingTo?.id);
+      if (isTypingRef.current) {
+        notifyTypingActivity({ channelId, dmId, isTyping: false });
+        isTypingRef.current = false;
+      }
       setMessage('');
       setReplyingTo(null);
     }
@@ -88,6 +94,26 @@ export const MessageInput: React.FC<MessageInputProps> = ({ channelId, dmId }) =
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setMessage(value);
+
+    if (typingTimeoutRef.current) {
+      window.clearTimeout(typingTimeoutRef.current);
+    }
+
+    if (value.trim()) {
+      if (!isTypingRef.current) {
+        notifyTypingActivity({ channelId, dmId, isTyping: true });
+        isTypingRef.current = true;
+      }
+
+      typingTimeoutRef.current = window.setTimeout(() => {
+        notifyTypingActivity({ channelId, dmId, isTyping: false });
+        isTypingRef.current = false;
+      }, 1200);
+    } else if (isTypingRef.current) {
+      notifyTypingActivity({ channelId, dmId, isTyping: false });
+      isTypingRef.current = false;
+    }
+
     const cursorPos = e.target.selectionStart || 0;
     const textBeforeCursor = value.substring(0, cursorPos);
     const atMatch = textBeforeCursor.match(/@(\w*)$/);
@@ -111,6 +137,16 @@ export const MessageInput: React.FC<MessageInputProps> = ({ channelId, dmId }) =
 
   const repliedAuthor = replyingTo ? users.find(u => u.id === replyingTo.authorId) : null;
   const mentionListboxId = 'mention-listbox';
+
+  useEffect(() => () => {
+    if (typingTimeoutRef.current) {
+      window.clearTimeout(typingTimeoutRef.current);
+    }
+
+    if (isTypingRef.current) {
+      notifyTypingActivity({ channelId, dmId, isTyping: false });
+    }
+  }, [channelId, dmId, notifyTypingActivity]);
 
   return (
     <div className="px-4 py-3 relative">

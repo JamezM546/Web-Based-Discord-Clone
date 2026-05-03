@@ -39,6 +39,11 @@ export interface MessageReaction {
   users: string[]; // array of user IDs who reacted with this emoji
 }
 
+export interface TypingUser {
+  userId: string;
+  username?: string | null;
+}
+
 export interface FriendRequest {
   id: string;
   fromUserId: string;

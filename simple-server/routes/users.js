@@ -2,8 +2,20 @@ const express = require('express');
 const User = require('../models/User');
 const { pool } = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
+const { getRealtimeRuntime } = require('../websocket/gateway');
 
 const router = express.Router();
+
+const publishRealtime = async (callback) => {
+  const runtime = getRealtimeRuntime();
+  if (!runtime) return;
+
+  try {
+    await callback(runtime);
+  } catch (error) {
+    console.error('Realtime publish failed:', error);
+  }
+};
 
 // GET /api/users/search?q=<username>
 router.get('/search', authenticateToken, async (req, res) => {
@@ -72,6 +84,13 @@ router.put('/me/status', authenticateToken, async (req, res) => {
 
     const user = await User.updateStatus(req.user.id, status);
     res.status(200).json({ success: true, data: { user } });
+    const recipients = await User.getStatusAudienceIds(req.user.id);
+    await publishRealtime((runtime) =>
+      runtime.publishUserStatusChanged({
+        recipients,
+        user,
+      })
+    );
   } catch (error) {
     console.error('Error updating status:', error);
     res.status(400).json({ success: false, message: error.message || 'Failed to update status' });
