@@ -38,7 +38,7 @@ interface AppContextType {
   deleteInviteCode: (serverId: string, inviteId: string) => Promise<void>;
   resolveInviteCode: (code: string) => Promise<any>;
   joinInviteByCode: (code: string) => Promise<any>;
-  createChannel: (serverId: string, name: string) => void;
+  createChannel: (serverId: string, name: string) => Promise<Channel>;
   updateChannel: (channelId: string, updates: { name?: string; position?: number }) => void;
   deleteChannel: (channelId: string) => void;
   sendMessage: (content: string, channelId?: string, dmId?: string, replyToId?: string, serverInviteId?: string) => void;
@@ -478,6 +478,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           id: channel.id,
           name: channel.name,
           serverId: channel.server_id || channel.serverId || serverId,
+          position: channel.position,
         }));
 
         setChannels((prev) => {
@@ -536,6 +537,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         id: c.id,
         name: c.name,
         serverId: c.server_id || c.serverId,
+        position: c.position,
       }));
 
       setChannels((prev) => {
@@ -742,6 +744,22 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     void fetchChannels([selectedServer.id]);
   }, [selectedServer?.id, currentUser?.id, fetchChannels]);
 
+  useEffect(() => {
+    if (!selectedServer?.id || selectedDM) return;
+
+    const serverChannels = channels
+      .filter((channel) => channel.serverId === selectedServer.id)
+      .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+
+    if (serverChannels.length === 0) return;
+
+    if (selectedChannel?.serverId === selectedServer.id) {
+      return;
+    }
+
+    setSelectedChannel(serverChannels[0]);
+  }, [channels, selectedChannel?.id, selectedChannel?.serverId, selectedDM?.id, selectedServer?.id]);
+
   // Load member user objects when a server is selected
   useEffect(() => {
     if (!selectedServer || !currentUser) return;
@@ -806,6 +824,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           id: c.id,
           name: c.name,
           serverId: c.server_id || c.serverId || newServer.id,
+          position: c.position,
         }));
         setChannels((prev) => [...prev, ...mapped]);
         setSelectedChannel(mapped[0] ?? null);
@@ -819,7 +838,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     try {
       await apiService.deleteServer(serverId);
       setServers((prev) => prev.filter((s) => s.id !== serverId));
-      if (selectedServer?.id === serverId) setSelectedServer(null);
+      if (selectedServer?.id === serverId) {
+        setSelectedServer(null);
+        setSelectedChannel(null);
+        setSelectedDM(null);
+        setMessages([]);
+        setReplyingTo(null);
+      } else if (selectedChannel?.serverId === serverId) {
+        setSelectedChannel(null);
+        setMessages([]);
+        setReplyingTo(null);
+      }
       setChannels((prev) => prev.filter((c) => c.serverId !== serverId));
     } catch (error) {
       console.error('Failed to delete server:', error);
@@ -831,7 +860,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     try {
       await apiService.leaveServer(serverId);
       setServers((prev) => prev.filter((s) => s.id !== serverId));
-      if (selectedServer?.id === serverId) setSelectedServer(null);
+      if (selectedServer?.id === serverId) {
+        setSelectedServer(null);
+        setSelectedChannel(null);
+        setSelectedDM(null);
+        setMessages([]);
+        setReplyingTo(null);
+      } else if (selectedChannel?.serverId === serverId) {
+        setSelectedChannel(null);
+        setMessages([]);
+        setReplyingTo(null);
+      }
       setChannels((prev) => prev.filter((c) => c.serverId !== serverId));
     } catch (error) {
       console.error('Failed to leave server:', error);
@@ -924,8 +963,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         id: cd.id,
         name: cd.name,
         serverId: cd.server_id || cd.serverId || serverId,
+        position: cd.position,
       };
-      setChannels((prev) => [...prev, newChannel]);
+      setChannels((prev) => {
+        const exists = prev.some((channel) => channel.id === newChannel.id);
+        return exists
+          ? prev.map((channel) => (channel.id === newChannel.id ? { ...channel, ...newChannel } : channel))
+          : [...prev, newChannel];
+      });
+      return newChannel;
     } catch (error) {
       console.error('Failed to create channel:', error);
       throw error;
@@ -942,6 +988,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           id: cd.id || channelId,
           name: cd.name || updates.name || '',
           serverId: cd.server_id || cd.serverId || (channels.find(c => c.id === channelId)?.serverId || ''),
+          position: cd.position ?? updates.position,
         };
         setChannels((prev) => prev.map((c) => (c.id === channelId ? { ...c, ...updated } : c)));
         if (selectedChannel?.id === channelId) setSelectedChannel((s) => s ? { ...s, ...updated } : s);

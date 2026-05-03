@@ -12,7 +12,10 @@ const InviteJoinPage: React.FC = () => {
     joinInviteByCode,
     currentUser,
     servers,
+    channels,
     setSelectedServer,
+    setSelectedChannel,
+    setSelectedDM,
     logout,
   } = useApp();
 
@@ -75,6 +78,9 @@ const InviteJoinPage: React.FC = () => {
 
     if (memberServer) {
       setSelectedServer(memberServer);
+      setSelectedDM(null);
+      const firstChannel = channels.find((channel) => channel.serverId === memberServer.id) ?? null;
+      setSelectedChannel(firstChannel);
       navigate('/channels');
       return;
     }
@@ -86,7 +92,7 @@ const InviteJoinPage: React.FC = () => {
       const joinedServer = result?.server;
 
       if (joinedServer?.id) {
-        const selectedServer =
+        const nextServer =
           servers.find((server) => server.id === joinedServer.id) || {
             id: joinedServer.id,
             name: joinedServer.name,
@@ -94,7 +100,10 @@ const InviteJoinPage: React.FC = () => {
             ownerId: joinedServer.owner_id || '',
             members: joinedServer.members || [],
           };
-        setSelectedServer(selectedServer);
+        setSelectedServer(nextServer);
+        setSelectedDM(null);
+        const firstChannel = channels.find((channel) => channel.serverId === nextServer.id) ?? null;
+        setSelectedChannel(firstChannel);
       }
 
       setMessage(result?.alreadyMember ? 'You are already a member of this server.' : 'Joined successfully. Opening server...');

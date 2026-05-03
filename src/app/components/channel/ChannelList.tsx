@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Hash, ChevronDown, Settings, Plus, UserPlus, LogOut } from 'lucide-react';
 import { CreateChannelDialog } from './CreateChannelDialog';
@@ -33,7 +33,7 @@ interface ChannelListProps {
 }
 
 export const ChannelList: React.FC<ChannelListProps> = ({ onChannelSelect }) => {
-  const { selectedServer, channels, selectedChannel, setSelectedChannel, setSelectedDM, currentUser, getUnreadCount, markAsRead, updateChannel, deleteChannel, leaveServer } = useApp();
+  const { selectedServer, channels, selectedChannel, setSelectedChannel, setSelectedDM, currentUser, getUnreadCount, markAsRead, updateChannel, deleteChannel, leaveServer, createChannel } = useApp();
   const [createChannelOpen, setCreateChannelOpen] = useState(false);
   const [serverSettingsOpen, setServerSettingsOpen] = useState(false);
   const [invitePeopleOpen, setInvitePeopleOpen] = useState(false);
@@ -41,11 +41,64 @@ export const ChannelList: React.FC<ChannelListProps> = ({ onChannelSelect }) => 
   const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
   const [leaveErrorMessage, setLeaveErrorMessage] = useState('');
   const [leaveErrorOpen, setLeaveErrorOpen] = useState(false);
+  const [isCreatingChannel, setIsCreatingChannel] = useState(false);
+  const [highlightedChannelId, setHighlightedChannelId] = useState<string | null>(null);
+  const previousChannelIdsRef = useRef<string[]>([]);
+  const channelRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const highlightTimeoutRef = useRef<number | null>(null);
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [renameName, setRenameName] = useState('');
+  const [channelToRename, setChannelToRename] = useState<string | null>(null);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [channelToDelete, setChannelToDelete] = useState<string | null>(null);
+
+  const serverChannels = useMemo(
+    () =>
+      channels
+        .filter((c) => c.serverId === selectedServer?.id)
+        .sort((a, b) => (a.position ?? 0) - (b.position ?? 0)),
+    [channels, selectedServer?.id]
+  );
+  const isOwner = selectedServer?.ownerId === currentUser?.id;
+
+  useEffect(() => {
+    const previousIds = previousChannelIdsRef.current;
+    const currentIds = serverChannels.map((channel) => channel.id);
+
+    if (previousIds.length > 0 && currentIds.length > previousIds.length) {
+      const addedIds = currentIds.filter((id) => !previousIds.includes(id));
+      const newestChannelId = addedIds[addedIds.length - 1] ?? null;
+      if (newestChannelId) {
+        setHighlightedChannelId(newestChannelId);
+        if (highlightTimeoutRef.current) {
+          window.clearTimeout(highlightTimeoutRef.current);
+        }
+        highlightTimeoutRef.current = window.setTimeout(() => {
+          setHighlightedChannelId((current) => (current === newestChannelId ? null : current));
+        }, 2500);
+      }
+    }
+
+    previousChannelIdsRef.current = currentIds;
+
+    return () => {
+      if (highlightTimeoutRef.current) {
+        window.clearTimeout(highlightTimeoutRef.current);
+        highlightTimeoutRef.current = null;
+      }
+    };
+  }, [serverChannels]);
+
+  useEffect(() => {
+    if (!highlightedChannelId) return;
+
+    const element = channelRefs.current[highlightedChannelId];
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [highlightedChannelId]);
 
   if (!selectedServer) return null;
-
-  const serverChannels = channels.filter((c) => c.serverId === selectedServer.id);
-  const isOwner = selectedServer.ownerId === currentUser?.id;
 
   const handleChannelClick = (channel: typeof channels[0]) => {
     setSelectedChannel(channel);
@@ -56,13 +109,6 @@ export const ChannelList: React.FC<ChannelListProps> = ({ onChannelSelect }) => 
       onChannelSelect();
     }
   };
-
-  const [renameOpen, setRenameOpen] = useState(false);
-  const [renameName, setRenameName] = useState('');
-  const [channelToRename, setChannelToRename] = useState<string | null>(null);
-
-  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
-  const [channelToDelete, setChannelToDelete] = useState<string | null>(null);
 
   const getLeaveErrorMessage = (error: unknown) => {
     const fallback = 'We could not leave this server right now. Please try again.';
@@ -93,6 +139,16 @@ export const ChannelList: React.FC<ChannelListProps> = ({ onChannelSelect }) => 
 
   const hasUnreadMessages = (channelId: string) => {
     return getUnreadCount(channelId) > 0;
+  };
+
+  const handleCreateChannel = async (serverId: string, name: string) => {
+    try {
+      setIsCreatingChannel(true);
+      const newChannel = await createChannel(serverId, name);
+      setHighlightedChannelId(newChannel.id);
+    } finally {
+      setIsCreatingChannel(false);
+    }
   };
 
   return (
@@ -166,13 +222,22 @@ export const ChannelList: React.FC<ChannelListProps> = ({ onChannelSelect }) => 
                 const unread = hasUnreadMessages(channel.id) && selectedChannel?.id !== channel.id;
                 const isSelected = selectedChannel?.id === channel.id;
                 const showControls = selectedServer.ownerId === currentUser?.id;
+                const isHighlighted = highlightedChannelId === channel.id;
                 return (
-                  <div key={channel.id} className="group flex items-center min-w-0">
+                  <div
+                    key={channel.id}
+                    ref={(element) => {
+                      channelRefs.current[channel.id] = element;
+                    }}
+                    className="group flex items-center min-w-0"
+                  >
                     <button
                       onClick={() => handleChannelClick(channel)}
                       className={`w-full min-w-0 px-3 py-2 rounded-lg flex items-center gap-2 transition-all text-left ${
                         isSelected
                           ? 'bg-[#06b6d4]/20 text-[#06b6d4] border border-[#06b6d4]/30'
+                          : isHighlighted
+                          ? 'bg-[#06b6d4]/10 text-[#cffafe] border border-[#06b6d4]/20 shadow-[0_0_0_1px_rgba(6,182,212,0.15)]'
                           : unread
                           ? 'text-[#e2e8f0] hover:bg-[#1a2d45]'
                           : 'text-[#64748b] hover:bg-[#1a2d45] hover:text-[#94a3b8]'
@@ -214,6 +279,8 @@ export const ChannelList: React.FC<ChannelListProps> = ({ onChannelSelect }) => 
         open={createChannelOpen}
         onOpenChange={setCreateChannelOpen}
         serverId={selectedServer.id}
+        onCreateChannel={handleCreateChannel}
+        isCreating={isCreatingChannel}
       />
 
       {selectedServer && (

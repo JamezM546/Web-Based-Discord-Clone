@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router';
 import { useApp } from '../../context/AppContext';
 import { Message } from '../../types';
 import { format, isToday, isYesterday } from 'date-fns';
@@ -35,6 +36,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, onScrollToMes
     return {
       url: match[1],
       code: match[2],
+      path: `/invite/${match[2]}`,
     };
   }, [message.content]);
 
@@ -129,12 +131,25 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, onScrollToMes
       }
 
       if (match[1]) {
+        const inviteMatch = match[1].match(/https?:\/\/[^\s]+\/invite\/([A-Za-z0-9]+)/i);
+        if (inviteMatch) {
+          parts.push(
+            <Link
+              key={match.index}
+              to={`/invite/${inviteMatch[1]}`}
+              className="text-[#67e8f9] underline underline-offset-2 hover:text-[#a5f3fc] break-all"
+            >
+              {match[1]}
+            </Link>
+          );
+          lastIndex = match.index + match[0].length;
+          continue;
+        }
+
         parts.push(
           <a
             key={match.index}
             href={match[1]}
-            target="_blank"
-            rel="noreferrer"
             className="text-[#67e8f9] underline underline-offset-2 hover:text-[#a5f3fc] break-all"
           >
             {match[1]}
@@ -294,10 +309,8 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, onScrollToMes
               </p>
 
               {inviteLinkMatch && inviteLinkPreview?.server && (
-                <a
-                  href={inviteLinkMatch.url}
-                  target="_blank"
-                  rel="noreferrer"
+                <Link
+                  to={inviteLinkMatch.path}
                   className="mt-2 block max-w-xs rounded-lg border border-[#1e3248] bg-[#0a1628] p-3 transition-colors hover:border-[#2a3f5a]"
                 >
                   <div className="flex items-center gap-2.5">
@@ -320,7 +333,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, onScrollToMes
                     </div>
                     <ExternalLink className="size-4 text-[#64748b] flex-shrink-0" aria-hidden="true" />
                   </div>
-                </a>
+                </Link>
               )}
 
               {/* Server Invite Card */}

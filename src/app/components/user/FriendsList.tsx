@@ -25,6 +25,12 @@ export const FriendsList: React.FC<FriendsListProps> = ({ searchQuery }) => {
   const [closingFriend, setClosingFriend] = useState<User | null>(null);
   const [isRemoving, setIsRemoving] = useState(false);
 
+  const closeRemoveDialog = () => {
+    if (isRemoving) return;
+    setClosingFriend(friendToRemove);
+    setFriendToRemove(null);
+  };
+
   const filteredFriends = friends.filter((friend) =>
     (friend.displayName || friend.username).toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -95,7 +101,7 @@ export const FriendsList: React.FC<FriendsListProps> = ({ searchQuery }) => {
                     {/* Visible status text is aria-hidden — status is already in the avatar alt */}
                     <div className="text-[#475569] text-xs" aria-hidden="true">{statusLabel}</div>
                   </div>
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                  <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all">
                     <button
                       onClick={() => createDirectMessage(friend.id)}
                       aria-label={`Send direct message to ${displayName}`}
@@ -120,9 +126,8 @@ export const FriendsList: React.FC<FriendsListProps> = ({ searchQuery }) => {
       <Dialog
         open={!!friendToRemove}
         onOpenChange={(open) => {
-          if (!open && !isRemoving) {
-            setClosingFriend(friendToRemove);
-            setFriendToRemove(null);
+          if (!open) {
+            closeRemoveDialog();
           } else if (open) {
             setClosingFriend(null);
           }
@@ -139,7 +144,7 @@ export const FriendsList: React.FC<FriendsListProps> = ({ searchQuery }) => {
             <Button
               variant="ghost"
               disabled={isRemoving}
-              onClick={() => setFriendToRemove(null)}
+              onClick={closeRemoveDialog}
               className="text-[#94a3b8] hover:text-[#e2e8f0] hover:bg-[#1a2d45]"
             >
               Cancel

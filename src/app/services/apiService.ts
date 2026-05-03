@@ -1,5 +1,6 @@
 const rawApiBase = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 const API_BASE_URL = rawApiBase.replace(/\/api\/?$/, '');
+const TOKEN_STORAGE_KEY = 'jwtToken';
 
 export interface ApiResponse<T = any> {
   success: boolean;
@@ -62,12 +63,24 @@ class ApiService {
   private token: string | null = null;
 
   constructor() {
-    this.token = localStorage.getItem('jwtToken');
+    const sessionToken = sessionStorage.getItem(TOKEN_STORAGE_KEY);
+    if (sessionToken) {
+      this.token = sessionToken;
+      return;
+    }
+
+    const legacyToken = localStorage.getItem(TOKEN_STORAGE_KEY);
+    if (legacyToken) {
+      this.token = legacyToken;
+      sessionStorage.setItem(TOKEN_STORAGE_KEY, legacyToken);
+      localStorage.removeItem(TOKEN_STORAGE_KEY);
+    }
   }
 
   setToken(token: string) {
     this.token = token;
-    localStorage.setItem('jwtToken', token);
+    sessionStorage.setItem(TOKEN_STORAGE_KEY, token);
+    localStorage.removeItem(TOKEN_STORAGE_KEY);
   }
 
   getToken(): string | null {
@@ -76,7 +89,8 @@ class ApiService {
 
   clearToken() {
     this.token = null;
-    localStorage.removeItem('jwtToken');
+    sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+    localStorage.removeItem(TOKEN_STORAGE_KEY);
   }
 
   private async request<T>(
