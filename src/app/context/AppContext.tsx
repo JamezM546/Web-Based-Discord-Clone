@@ -40,6 +40,7 @@ interface AppContextType {
   sendFriendRequest: (toUserId: string) => void;
   acceptFriendRequest: (requestId: string) => void;
   rejectFriendRequest: (requestId: string) => void;
+  unfriend: (userId: string) => void;
   getFriends: () => User[];
   createDirectMessage: (userId: string) => void;
   updateUserStatus: (status: User['status']) => void;
@@ -682,6 +683,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
+  const unfriend = async (userId: string) => {
+  try {
+    await apiService.unfriend(userId);
+    await fetchFriends();
+  } catch (error) {
+    console.error('Failed to unfriend:', error);
+  }
+};
+
   const getFriends = useCallback((): User[] => {
     return friends;
   }, [friends]);
@@ -922,6 +932,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         sendFriendRequest,
         acceptFriendRequest,
         rejectFriendRequest,
+        unfriend,
         getFriends,
         createDirectMessage,
         updateUserStatus,

@@ -1,20 +1,38 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { ScrollArea } from '../ui/scroll-area';
 import { StatusDot, getStatusLabel } from '../ui/StatusDot';
-import { MessageCircle } from 'lucide-react';
+import { MessageCircle, UserMinus } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../ui/dialog';
+import { Button } from '../ui/button';
+import { User } from '../../types';
 
 interface FriendsListProps {
   searchQuery: string;
 }
 
 export const FriendsList: React.FC<FriendsListProps> = ({ searchQuery }) => {
-  const { getFriends, createDirectMessage } = useApp();
+  const { getFriends, createDirectMessage, unfriend } = useApp();
   const friends = getFriends();
+  const [unfriendDialogOpen, setUnfriendDialogOpen] = useState(false);
+  const [friendToUnfriend, setFriendToUnfriend] = useState<User | null>(null);
 
   const filteredFriends = friends.filter((friend) =>
     (friend.displayName || friend.username).toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const handleUnfriendClick = (friend: User) => {
+    setFriendToUnfriend(friend);
+    setUnfriendDialogOpen(true);
+  };
+
+  const handleUnfriendConfirm = async () => {
+    if (friendToUnfriend) {
+      await unfriend(friendToUnfriend.id);
+      setUnfriendDialogOpen(false);
+      setFriendToUnfriend(null);
+    }
+  };
 
   return (
     <ScrollArea className="h-full flex-1 min-h-0 overflow-y-auto">
@@ -60,19 +78,56 @@ export const FriendsList: React.FC<FriendsListProps> = ({ searchQuery }) => {
                     {/* Visible status text is aria-hidden — status is already in the avatar alt */}
                     <div className="text-[#475569] text-xs" aria-hidden="true">{statusLabel}</div>
                   </div>
-                  <button
-                    onClick={() => createDirectMessage(friend.id)}
-                    aria-label={`Send direct message to ${displayName}`}
-                    className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-[#06b6d4]/20 rounded-lg transition-all"
-                  >
-                    <MessageCircle className="size-4 text-[#06b6d4]" aria-hidden="true" />
-                  </button>
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                    <button
+                      onClick={() => createDirectMessage(friend.id)}
+                      aria-label={`Send direct message to ${displayName}`}
+                      className="p-1.5 hover:bg-[#06b6d4]/20 rounded-lg transition-all"
+                    >
+                      <MessageCircle className="size-4 text-[#06b6d4]" aria-hidden="true" />
+                    </button>
+                    <button
+                      onClick={() => handleUnfriendClick(friend)}
+                      aria-label={`Unfriend ${displayName}`}
+                      className="p-1.5 hover:bg-red-500/20 rounded-lg transition-all"
+                    >
+                      <UserMinus className="size-4 text-red-400" aria-hidden="true" />
+                    </button>
+                  </div>
                 </li>
               );
             })}
           </ul>
         )}
       </div>
+    
+    {/* Unfriend Confirmation Dialog */}
+    <Dialog open={unfriendDialogOpen} onOpenChange={setUnfriendDialogOpen}>
+      <DialogContent className="bg-[#0d1a2e] border border-[#1e3248] text-[#e2e8f0]">
+        <DialogHeader>
+          <DialogTitle className="text-[#e2e8f0]">Unfriend {friendToUnfriend?.displayName || friendToUnfriend?.username}?</DialogTitle>
+          <DialogDescription className="text-[#475569]">
+            Are you sure you want to unfriend {friendToUnfriend?.displayName || friendToUnfriend?.username}? 
+            You can always send them a friend request again later.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button
+            onClick={() => setUnfriendDialogOpen(false)}
+            variant="ghost"
+            className="text-[#94a3b8] hover:text-[#e2e8f0] hover:bg-[#1a2d45]"
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleUnfriendConfirm}
+            className="bg-red-500 hover:bg-red-600 text-white border-none"
+          >
+            Unfriend
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
     </ScrollArea>
   );
 };
