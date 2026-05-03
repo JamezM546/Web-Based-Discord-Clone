@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '../ui/dialog';
 import { Button } from '../ui/button';
@@ -12,21 +12,35 @@ interface CreateChannelDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   serverId: string;
+  onCreateChannel?: (serverId: string, name: string) => Promise<void>;
+  isCreating?: boolean;
 }
 
-  export const CreateChannelDialog: React.FC<CreateChannelDialogProps> = ({
-    open,
-    onOpenChange,
-    serverId,
-  }) => {
-    const [name, setName] = useState('');
-    const { createChannel} = useApp();
+export const CreateChannelDialog: React.FC<CreateChannelDialogProps> = ({
+  open,
+  onOpenChange,
+  serverId,
+  onCreateChannel,
+  isCreating = false,
+}) => {
+  const [name, setName] = useState('');
+  const { createChannel } = useApp();
+
+  useEffect(() => {
+    if (open) {
+      setName('');
+    }
+  }, [open]);
 
   const handleCreate = async () => {
     if (name.trim()) {
       try {
         const formattedName = name.trim().toLowerCase().replace(/\s+/g, '-').slice(0, MAX_CHANNEL_NAME_LENGTH);
-        await createChannel(serverId, formattedName);
+        if (onCreateChannel) {
+          await onCreateChannel(serverId, formattedName);
+        } else {
+          await createChannel(serverId, formattedName);
+        }
         setName('');
         onOpenChange(false);
       } catch (error) {
@@ -49,7 +63,7 @@ interface CreateChannelDialogProps {
               Room Name
             </Label>
             <div className="relative mt-2">
-              <Hash className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-[#475569]" />
+              <Hash className="absolute left-3 top-3 size-4 text-[#475569]" />
               <Input
                 id="channel-name"
                 value={name}
@@ -58,9 +72,9 @@ interface CreateChannelDialogProps {
                 className="bg-[#060c18] border border-[#1e3248] text-[#e2e8f0] pl-9 focus-visible:ring-[#06b6d4]/50 placeholder:text-[#475569]"
                 placeholder="new-room"
               />
-            </div>
-            <div className="mt-2 text-right text-xs text-[#475569]">
-              {name.length}/{MAX_CHANNEL_NAME_LENGTH}
+              <div className="mt-2 text-right text-xs text-[#475569]">
+                {name.length}/{MAX_CHANNEL_NAME_LENGTH}
+              </div>
             </div>
           </div>
         </div>
@@ -73,8 +87,12 @@ interface CreateChannelDialogProps {
           >
             Cancel
           </Button>
-          <Button onClick={handleCreate} className="bg-[#06b6d4] hover:bg-[#0891b2] text-white border-none">
-            Create Room
+          <Button
+            onClick={handleCreate}
+            disabled={isCreating || !name.trim()}
+            className="bg-[#06b6d4] hover:bg-[#0891b2] text-white border-none disabled:opacity-50"
+          >
+            {isCreating ? 'Creating...' : 'Create Room'}
           </Button>
         </DialogFooter>
       </DialogContent>
