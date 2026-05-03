@@ -33,8 +33,10 @@ async function loadModule() {
 
 async function setup(initialStore?: Map<string, string>) {
   vi.resetModules();
-  const store = initialStore ?? new Map<string, string>();
-  vi.stubGlobal('localStorage', createStorage(store));
+  const localStore = new Map<string, string>();
+  const sessionStore = initialStore ?? new Map<string, string>();
+  vi.stubGlobal('localStorage', createStorage(localStore));
+  vi.stubGlobal('sessionStorage', createStorage(sessionStore));
   fetchMock = vi.fn();
   vi.stubGlobal('fetch', fetchMock);
   const mod = await loadModule();
@@ -51,25 +53,43 @@ afterEach(() => {
 
 describe('ApiService', () => {
   describe('constructor', () => {
-    it('reads jwtToken from localStorage on module load', async () => {
+    it('reads jwtToken from sessionStorage on module load', async () => {
       await setup(new Map([['jwtToken', 'preloaded']]));
       expect(apiService.getToken()).toBe('preloaded');
+    });
+
+    it('migrates a legacy jwtToken from localStorage into sessionStorage on module load', async () => {
+      vi.resetModules();
+      const localStore = new Map([['jwtToken', 'legacy-token']]);
+      const sessionStore = new Map<string, string>();
+      vi.stubGlobal('localStorage', createStorage(localStore));
+      vi.stubGlobal('sessionStorage', createStorage(sessionStore));
+      fetchMock = vi.fn();
+      vi.stubGlobal('fetch', fetchMock);
+      const mod = await loadModule();
+      apiService = mod.apiService;
+
+      expect(apiService.getToken()).toBe('legacy-token');
+      expect(sessionStorage.getItem('jwtToken')).toBe('legacy-token');
+      expect(localStorage.getItem('jwtToken')).toBeNull();
     });
   });
 
   describe('setToken, getToken, clearToken', () => {
-    it('setToken updates memory and localStorage', async () => {
+    it('setToken updates memory and sessionStorage', async () => {
       await setup();
       apiService.setToken('abc');
       expect(apiService.getToken()).toBe('abc');
-      expect(localStorage.getItem('jwtToken')).toBe('abc');
+      expect(sessionStorage.getItem('jwtToken')).toBe('abc');
+      expect(localStorage.getItem('jwtToken')).toBeNull();
     });
 
-    it('clearToken removes token from memory and localStorage', async () => {
+    it('clearToken removes token from memory and both storage layers', async () => {
       await setup();
       apiService.setToken('x');
       apiService.clearToken();
       expect(apiService.getToken()).toBeNull();
+      expect(sessionStorage.getItem('jwtToken')).toBeNull();
       expect(localStorage.getItem('jwtToken')).toBeNull();
     });
   });
