@@ -744,6 +744,22 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     void fetchChannels([selectedServer.id]);
   }, [selectedServer?.id, currentUser?.id, fetchChannels]);
 
+  useEffect(() => {
+    if (!selectedServer?.id || selectedDM) return;
+
+    const serverChannels = channels
+      .filter((channel) => channel.serverId === selectedServer.id)
+      .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+
+    if (serverChannels.length === 0) return;
+
+    if (selectedChannel?.serverId === selectedServer.id) {
+      return;
+    }
+
+    setSelectedChannel(serverChannels[0]);
+  }, [channels, selectedChannel?.id, selectedChannel?.serverId, selectedDM?.id, selectedServer?.id]);
+
   // Load member user objects when a server is selected
   useEffect(() => {
     if (!selectedServer || !currentUser) return;
