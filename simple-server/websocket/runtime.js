@@ -135,6 +135,34 @@ const createRealtimeRuntime = ({ store, sendToConnection }) => {
     );
   };
 
+  const publishFriendRequestCreated = async ({ request, users }) => {
+    if (!request?.to_user_id) return;
+
+    await publishUserEvent(request.to_user_id, {
+      type: 'friendRequestCreated',
+      data: {
+        request,
+        users: users || [],
+      },
+    });
+  };
+
+  const publishFriendRequestAccepted = async ({ request, users }) => {
+    if (!request?.from_user_id || !request?.to_user_id) return;
+
+    await Promise.all(
+      [request.from_user_id, request.to_user_id].map((userId) =>
+        publishUserEvent(userId, {
+          type: 'friendRequestAccepted',
+          data: {
+            request,
+            users: users || [],
+          },
+        })
+      )
+    );
+  };
+
   const runtime = {
     store: realtimeStore,
     requireAuthenticatedConnection,
@@ -147,6 +175,8 @@ const createRealtimeRuntime = ({ store, sendToConnection }) => {
     publishReactionToggled,
     publishUserEvent,
     publishUserStatusChanged,
+    publishFriendRequestCreated,
+    publishFriendRequestAccepted,
   };
 
   return runtime;

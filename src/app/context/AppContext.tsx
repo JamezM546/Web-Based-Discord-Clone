@@ -340,6 +340,67 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
         return;
       }
+      case 'friendRequestCreated': {
+        const request = event.data?.request;
+        if (!request?.id) return;
+
+        const eventUsers: User[] = (event.data?.users || []).map((user: any) => ({
+          id: user.id,
+          username: user.username,
+          displayName: user.display_name || user.displayName || undefined,
+          email: user.email || '',
+          avatar: user.avatar,
+          status: (user.status || 'offline') as User['status'],
+        }));
+        upsertUsers(eventUsers);
+
+        const mappedRequest: FriendRequest = {
+          id: request.id,
+          fromUserId: request.from_user_id,
+          toUserId: request.to_user_id,
+          status: request.status as FriendRequest['status'],
+        };
+
+        setFriendRequests((prev) => {
+          const existing = prev.find((item) => item.id === mappedRequest.id);
+          if (existing) {
+            return prev.map((item) => (item.id === mappedRequest.id ? mappedRequest : item));
+          }
+
+          return [mappedRequest, ...prev];
+        });
+        return;
+      }
+      case 'friendRequestAccepted': {
+        const request = event.data?.request;
+        if (!request?.id) return;
+
+        const eventUsers: User[] = (event.data?.users || []).map((user: any) => ({
+          id: user.id,
+          username: user.username,
+          displayName: user.display_name || user.displayName || undefined,
+          email: user.email || '',
+          avatar: user.avatar,
+          status: (user.status || 'offline') as User['status'],
+        }));
+        upsertUsers(eventUsers);
+
+        setFriendRequests((prev) => prev.filter((item) => item.id !== request.id));
+
+        const acceptedFriend = eventUsers.find((user) => user.id !== currentUser?.id);
+        if (acceptedFriend) {
+          setFriends((prev) => {
+            if (prev.some((friend) => friend.id === acceptedFriend.id)) {
+              return prev.map((friend) =>
+                friend.id === acceptedFriend.id ? { ...friend, ...acceptedFriend } : friend
+              );
+            }
+
+            return [...prev, acceptedFriend];
+          });
+        }
+        return;
+      }
       default:
         return;
     }

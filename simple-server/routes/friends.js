@@ -2,8 +2,20 @@ const express = require('express');
 const { pool } = require('../config/database');
 const User = require('../models/User');
 const { authenticateToken } = require('../middleware/auth');
+const { getRealtimeRuntime } = require('../websocket/gateway');
 
 const router = express.Router();
+
+const publishRealtime = async (callback) => {
+  const runtime = getRealtimeRuntime();
+  if (!runtime) return;
+
+  try {
+    await callback(runtime);
+  } catch (error) {
+    console.error('Realtime publish failed:', error);
+  }
+};
 
 // GET /api/friends  — list accepted friends
 router.get('/', authenticateToken, async (req, res) => {
@@ -57,6 +69,7 @@ router.post('/requests', authenticateToken, async (req, res) => {
     if (!targetUser) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
+    const senderUser = await User.findById(fromUserId);
 
     const existing = await pool.query(
       `SELECT id, status FROM friend_requests
@@ -83,6 +96,12 @@ router.post('/requests', authenticateToken, async (req, res) => {
     );
 
     res.status(201).json({ success: true, data: { request: result.rows[0] } });
+    await publishRealtime((runtime) =>
+      runtime.publishFriendRequestCreated({
+        request: result.rows[0],
+        users: [senderUser, targetUser].filter(Boolean),
+      })
+    );
   } catch (error) {
     console.error('Error sending friend request:', error);
     res.status(400).json({ success: false, message: error.message || 'Failed to send friend request' });
@@ -107,7 +126,19 @@ router.post('/requests/:requestId/accept', authenticateToken, async (req, res) =
       return res.status(404).json({ success: false, message: 'Friend request not found or already handled' });
     }
 
-    res.status(200).json({ success: true, data: { request: result.rows[0] } });
+    const acceptedRequest = result.rows[0];
+    const users = await Promise.all([
+      User.findById(acceptedRequest.from_user_id),
+      User.findById(acceptedRequest.to_user_id),
+    ]);
+
+    res.status(200).json({ success: true, data: { request: acceptedRequest } });
+    await publishRealtime((runtime) =>
+      runtime.publishFriendRequestAccepted({
+        request: acceptedRequest,
+        users: users.filter(Boolean),
+      })
+    );
   } catch (error) {
     console.error('Error accepting friend request:', error);
     res.status(500).json({ success: false, message: 'Failed to accept friend request' });

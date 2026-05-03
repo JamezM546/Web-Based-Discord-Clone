@@ -184,4 +184,79 @@ describe('Websocket realtime delivery', () => {
     openSockets.delete(receiver);
   });
 
+  test('publishes a friendRequestCreated event to the recipient user room', async () => {
+    const senderName = `wsfrsend${Date.now()}`;
+    const receiverName = `wsfrrecv${Date.now()}`;
+
+    const senderRes = await request.post('/api/auth/register').send({
+      username: senderName,
+      email: `${senderName}@test.com`,
+      password: 'pass1234',
+    });
+    const receiverRes = await request.post('/api/auth/register').send({
+      username: receiverName,
+      email: `${receiverName}@test.com`,
+      password: 'pass1234',
+    });
+
+    const receiverSocket = await connectAuthenticatedClient(receiverRes.body.data.token);
+    const friendRequestPromise = waitForEvent(receiverSocket, 'friendRequestCreated');
+
+    const sendRes = await request
+      .post('/api/friends/requests')
+      .set('Authorization', `Bearer ${senderRes.body.data.token}`)
+      .send({ toUserId: receiverRes.body.data.user.id });
+
+    expect(sendRes.status).toBe(201);
+
+    const event = await friendRequestPromise;
+    expect(event.data.request.to_user_id).toBe(receiverRes.body.data.user.id);
+    expect(event.data.request.from_user_id).toBe(senderRes.body.data.user.id);
+    expect(Array.isArray(event.data.users)).toBe(true);
+    expect(event.data.users.some((user) => user.id === senderRes.body.data.user.id)).toBe(true);
+
+    receiverSocket.close();
+    openSockets.delete(receiverSocket);
+  });
+
+  test('publishes a friendRequestAccepted event to the original sender user room', async () => {
+    const senderName = `wsfraccsend${Date.now()}`;
+    const receiverName = `wsfraccrecv${Date.now()}`;
+
+    const senderRes = await request.post('/api/auth/register').send({
+      username: senderName,
+      email: `${senderName}@test.com`,
+      password: 'pass1234',
+    });
+    const receiverRes = await request.post('/api/auth/register').send({
+      username: receiverName,
+      email: `${receiverName}@test.com`,
+      password: 'pass1234',
+    });
+
+    const senderSocket = await connectAuthenticatedClient(senderRes.body.data.token);
+    const acceptedPromise = waitForEvent(senderSocket, 'friendRequestAccepted');
+
+    const sendRes = await request
+      .post('/api/friends/requests')
+      .set('Authorization', `Bearer ${senderRes.body.data.token}`)
+      .send({ toUserId: receiverRes.body.data.user.id });
+
+    expect(sendRes.status).toBe(201);
+
+    const acceptRes = await request
+      .post(`/api/friends/requests/${sendRes.body.data.request.id}/accept`)
+      .set('Authorization', `Bearer ${receiverRes.body.data.token}`);
+
+    expect(acceptRes.status).toBe(200);
+
+    const event = await acceptedPromise;
+    expect(event.data.request.id).toBe(sendRes.body.data.request.id);
+    expect(event.data.request.status).toBe('accepted');
+    expect(event.data.users.some((user) => user.id === receiverRes.body.data.user.id)).toBe(true);
+
+    senderSocket.close();
+    openSockets.delete(senderSocket);
+  });
+
 });
