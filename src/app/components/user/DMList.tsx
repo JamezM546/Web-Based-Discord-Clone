@@ -12,6 +12,11 @@ interface DMListProps {
 export const DMList: React.FC<DMListProps> = ({ searchQuery, onDMSelect }) => {
   const { directMessages, users, currentUser, setSelectedDM, selectedDM, setSelectedChannel, messages, getUnreadCount, markAsRead } = useApp();
 
+  const truncateMessage = (message: string, maxLength: number = 30) => {
+    if (message.length <= maxLength) return message;
+    return message.substring(0, maxLength) + '...';
+  };
+
   const userDMs = directMessages.filter((dm) => dm.participants.includes(currentUser?.id || ''));
 
   const getDMUser = (dm: typeof directMessages[0]) => {
@@ -97,7 +102,7 @@ export const DMList: React.FC<DMListProps> = ({ searchQuery, onDMSelect }) => {
                         </div>
                         {lastMessage ? (
                           <div className={`text-xs truncate ${unread ? 'text-[#64748b]' : 'text-[#475569]'}`}>
-                            {lastMessage.content}
+                            {truncateMessage(lastMessage.content)}
                           </div>
                         ) : (
                           <div className="text-[#475569] text-xs">
