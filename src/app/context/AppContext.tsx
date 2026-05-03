@@ -30,7 +30,7 @@ interface AppContextType {
   sendServerInvite: (serverId: string, userId: string) => void;
   acceptServerInvite: (inviteId: string) => void;
   declineServerInvite: (inviteId: string) => void;
-  createChannel: (serverId: string, name: string) => void;
+  createChannel: (serverId: string, name: string) => Promise<Channel>;
   updateChannel: (channelId: string, updates: { name?: string; position?: number }) => void;
   deleteChannel: (channelId: string) => void;
   sendMessage: (content: string, channelId?: string, dmId?: string, replyToId?: string, serverInviteId?: string) => void;
@@ -492,7 +492,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // Channels
   // ---------------------------------------------------------------------------
 
-  const createChannel = async (serverId: string, name: string) => {
+  const createChannel = async (serverId: string, name: string): Promise<Channel> => {
     try {
       const backendResponse = (await apiService.createChannel(serverId, name)) as any;
       const cd = backendResponse?.data || backendResponse?.channel || backendResponse;
@@ -501,8 +501,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         id: cd.id,
         name: cd.name,
         serverId: cd.server_id || cd.serverId || serverId,
+        position: cd.position,
       };
       setChannels((prev) => [...prev, newChannel]);
+      return newChannel;
     } catch (error) {
       console.error('Failed to create channel:', error);
       throw error;

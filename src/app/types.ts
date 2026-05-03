@@ -19,6 +19,7 @@ export interface Channel {
   id: string;
   name: string;
   serverId: string;
+  position?: number;
 }
 
 export interface Message {
