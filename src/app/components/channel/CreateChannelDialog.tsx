@@ -6,6 +6,8 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Hash } from 'lucide-react';
 
+const MAX_CHANNEL_NAME_LENGTH = 25;
+
 interface CreateChannelDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -24,7 +26,7 @@ interface CreateChannelDialogProps {
   const handleCreate = async () => {
     if (name.trim() && name.length <= MAX_CHANNEL_NAME_LENGTH) {
       try {
-        const formattedName = name.toLowerCase().replace(/\s+/g, '-');
+        const formattedName = name.trim().toLowerCase().replace(/\s+/g, '-').slice(0, MAX_CHANNEL_NAME_LENGTH);
         await createChannel(serverId, formattedName);
         setName('');
         onOpenChange(false);
@@ -52,11 +54,8 @@ interface CreateChannelDialogProps {
               <Input
                 id="channel-name"
                 value={name}
-                onChange={(e) => {
-                  if (e.target.value.length <= MAX_CHANNEL_NAME_LENGTH) {
-                    setName(e.target.value);
-                  }
-                }}
+                onChange={(e) => setName(e.target.value.slice(0, MAX_CHANNEL_NAME_LENGTH))}
+                maxLength={MAX_CHANNEL_NAME_LENGTH}
                 className="bg-[#060c18] border border-[#1e3248] text-[#e2e8f0] pl-9 focus-visible:ring-[#06b6d4]/50 placeholder:text-[#475569]"
                 placeholder="new-room"
                 maxLength={MAX_CHANNEL_NAME_LENGTH}
@@ -64,6 +63,9 @@ interface CreateChannelDialogProps {
               <div className="mt-1 text-xs text-[#475569] text-right">
                 {name.length}/{MAX_CHANNEL_NAME_LENGTH}
               </div>
+            </div>
+            <div className="mt-2 text-right text-xs text-[#475569]">
+              {name.length}/{MAX_CHANNEL_NAME_LENGTH}
             </div>
           </div>
         </div>

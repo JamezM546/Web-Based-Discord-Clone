@@ -103,4 +103,21 @@ describe('Friends — POST send / accept / reject', () => {
 
     expect(res.status).toBe(400);
   });
+
+  test('DELETE /api/friends/:friendId removes an existing friend relationship', async () => {
+    const res = await request
+      .delete(`/api/friends/${receiverId}`)
+      .set('Authorization', `Bearer ${senderToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.removedUserId).toBe(receiverId);
+
+    const friendsRes = await request
+      .get('/api/friends')
+      .set('Authorization', `Bearer ${senderToken}`);
+
+    expect(friendsRes.status).toBe(200);
+    expect(friendsRes.body.data.friends.some((friend) => friend.id === receiverId)).toBe(false);
+  });
 });

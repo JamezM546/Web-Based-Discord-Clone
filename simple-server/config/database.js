@@ -230,6 +230,20 @@ const createTables = async () => {
       )
     `);
 
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS server_invite_codes (
+        id VARCHAR(255) PRIMARY KEY,
+        code VARCHAR(64) UNIQUE NOT NULL,
+        server_id VARCHAR(255) NOT NULL REFERENCES servers(id) ON DELETE CASCADE,
+        created_by VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        expires_at TIMESTAMP,
+        max_uses INTEGER DEFAULT 0,
+        uses_count INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     // Channel read state table (tracks last read timestamp per user/channel)
     await client.query(`
       CREATE TABLE IF NOT EXISTS channel_read_state (
@@ -328,6 +342,8 @@ const createTables = async () => {
     await client.query('CREATE INDEX IF NOT EXISTS idx_server_members_server_id ON server_members(server_id)');
     await client.query('CREATE INDEX IF NOT EXISTS idx_server_members_user_id ON server_members(user_id)');
     await client.query('CREATE INDEX IF NOT EXISTS idx_channels_server_id ON channels(server_id)');
+    await client.query('CREATE INDEX IF NOT EXISTS idx_server_invite_codes_server_id ON server_invite_codes(server_id)');
+    await client.query('CREATE INDEX IF NOT EXISTS idx_server_invite_codes_code ON server_invite_codes(code)');
     await client.query('CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)');
     await client.query('CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)');
     await client.query('CREATE INDEX IF NOT EXISTS idx_channel_read_state_user_channel ON channel_read_state(user_id, channel_id)');

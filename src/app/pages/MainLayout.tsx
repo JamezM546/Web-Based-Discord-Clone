@@ -24,7 +24,7 @@ export const MainLayout: React.FC = () => {
   const [createSpaceOpen, setCreateSpaceOpen] = useState(false);
   const [showPeoplePanel, setShowPeoplePanel] = useState(true);
   const [dmSearchQuery, setDmSearchQuery] = useState('');
-  const [mobileDMSidebarOpen, setMobileDMSidebarOpen] = useState(false);
+  const [mobileHomeTab, setMobileHomeTab] = useState<'dms' | 'friends'>('dms');
 
   // Swipe state
   const touchStartX = useRef<number | null>(null);
@@ -126,10 +126,7 @@ export const MainLayout: React.FC = () => {
   const handleHomeClick = () => {
     setSelectedServer(null);
     setSelectedChannel(null);
-    // Open mobile sidebar when switching to Direct Chats on mobile
-    if (window.innerWidth < 768) {
-      setMobileDMSidebarOpen(true);
-    }
+    setSelectedDM(null);
   };
 
   // Swipe handlers
@@ -388,18 +385,44 @@ export const MainLayout: React.FC = () => {
                       Direct Chats
                     </p>
                     <button
-                      onClick={() => { handleHomeClick(); setMobileMenuOpen(false); }}
+                      onClick={() => {
+                        setMobileHomeTab('dms');
+                        handleHomeClick();
+                        setMobileMenuOpen(false);
+                      }}
                       className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all ${
-                        !selectedServer ? 'text-white' : 'text-[#94a3b8] hover:text-[#e2e8f0] hover:bg-[#1a2d45]'
+                        !selectedServer && mobileHomeTab === 'dms'
+                          ? 'text-white'
+                          : 'text-[#94a3b8] hover:text-[#e2e8f0] hover:bg-[#1a2d45]'
                       }`}
                       style={
-                        !selectedServer
+                        !selectedServer && mobileHomeTab === 'dms'
                           ? { background: 'linear-gradient(135deg, #06b6d4, #0891b2)' }
                           : {}
                       }
                     >
                       <MessageSquare className="size-4" />
                       Direct Chats
+                    </button>
+                    <button
+                      onClick={() => {
+                        setMobileHomeTab('friends');
+                        handleHomeClick();
+                        setMobileMenuOpen(false);
+                      }}
+                      className={`mt-1 w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all ${
+                        !selectedServer && mobileHomeTab === 'friends'
+                          ? 'text-white'
+                          : 'text-[#94a3b8] hover:text-[#e2e8f0] hover:bg-[#1a2d45]'
+                      }`}
+                      style={
+                        !selectedServer && mobileHomeTab === 'friends'
+                          ? { background: 'linear-gradient(135deg, #06b6d4, #0891b2)' }
+                          : {}
+                      }
+                    >
+                      <Users className="size-4" />
+                      Friends
                     </button>
                   </div>
 
@@ -448,7 +471,7 @@ export const MainLayout: React.FC = () => {
                     {selectedServer ? (
                       <ChannelList onChannelSelect={() => setMobileMenuOpen(false)} />
                     ) : (
-                      <UserSidebar onDMSelect={() => setMobileMenuOpen(false)} />
+                      <UserSidebar onDMSelect={() => setMobileMenuOpen(false)} defaultTab={mobileHomeTab} />
                     )}
                   </div>
                   <UserProfile />
@@ -538,20 +561,36 @@ export const MainLayout: React.FC = () => {
               <Menu className="size-5" />
             </button>
 
+            <button
+              onClick={() => { goToViewIndex(currentViewIndex - 1); scrollViewportBy(-180); }}
+              disabled={!canGoLeft}
+              aria-label="Go to previous view"
+              className={`p-1.5 rounded-lg transition-all flex-shrink-0 ${
+                canGoLeft
+                  ? 'text-[#94a3b8] hover:text-[#e2e8f0] hover:bg-[#1a2d45]'
+                  : 'text-[#1e3248] cursor-not-allowed'
+              }`}
+            >
+              <ChevronLeft className="size-4" />
+            </button>
+
             {/* Scrollable space tabs — mirrors the desktop nav */}
             <div className="flex-1 min-w-0 overflow-hidden">
               <ScrollArea className="w-full">
                 <div className="flex items-center gap-1 py-1">
                   {/* Direct Chats */}
                   <button
-                    onClick={handleHomeClick}
+                    onClick={() => {
+                      setMobileHomeTab('dms');
+                      handleHomeClick();
+                    }}
                     aria-label="Direct Chats"
                     className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-sm whitespace-nowrap flex-shrink-0 transition-all ${
-                      !selectedServer
+                      !selectedServer && mobileHomeTab === 'dms'
                         ? 'text-white shadow-lg shadow-[#06b6d4]/20'
                         : 'text-[#94a3b8] hover:text-[#e2e8f0] hover:bg-[#1a2d45]'
                     }`}
-                    style={!selectedServer ? { background: 'linear-gradient(135deg, #06b6d4, #0891b2)' } : {}}
+                    style={!selectedServer && mobileHomeTab === 'dms' ? { background: 'linear-gradient(135deg, #06b6d4, #0891b2)' } : {}}
                   >
                     <MessageSquare className="size-3.5 flex-shrink-0" />
                     Chats
@@ -587,6 +626,19 @@ export const MainLayout: React.FC = () => {
               className="ml-2 p-2 rounded-lg bg-[#06b6d4] hover:bg-[#0891b2] text-white transition-all shadow-lg shadow-[#06b6d4]/20 flex-shrink-0"
             >
               <Plus className="size-4" />
+            </button>
+
+            <button
+              onClick={() => { goToViewIndex(currentViewIndex + 1); scrollViewportBy(180); }}
+              disabled={!canGoRight}
+              aria-label="Go to next view"
+              className={`p-1.5 rounded-lg transition-all flex-shrink-0 ${
+                canGoRight
+                  ? 'text-[#94a3b8] hover:text-[#e2e8f0] hover:bg-[#1a2d45]'
+                  : 'text-[#1e3248] cursor-not-allowed'
+              }`}
+            >
+              <ChevronRight className="size-4" />
             </button>
 
             {/* Right action: Toggle People (server) or Add Friend (DMs) */}

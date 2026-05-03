@@ -39,6 +39,11 @@ export interface MessageReaction {
   users: string[]; // array of user IDs who reacted with this emoji
 }
 
+export interface TypingUser {
+  userId: string;
+  username?: string | null;
+}
+
 export interface FriendRequest {
   id: string;
   fromUserId: string;
@@ -62,4 +67,15 @@ export interface ServerInvite {
   messageId?: string;
   serverName?: string;
   serverIcon?: string;
+}
+
+export interface InviteCode {
+  id: string;
+  code: string;
+  serverId: string;
+  createdBy: string;
+  createdAt: string;
+  expiresAt?: string | null;
+  maxUses: number;
+  usesCount: number;
 }

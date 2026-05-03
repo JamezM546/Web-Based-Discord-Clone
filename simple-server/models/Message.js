@@ -33,9 +33,10 @@ class Message {
   // Find message by ID
   static async findById(id) {
     const query = `
-      SELECT m.*, u.username, u.display_name, u.avatar
+      SELECT m.*, u.username, u.display_name, u.avatar, dm.participants
       FROM messages m
       JOIN users u ON m.author_id = u.id
+      LEFT JOIN direct_messages dm ON dm.id = m.dm_id
       WHERE m.id = $1
     `;
     
