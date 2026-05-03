@@ -2,14 +2,14 @@ import React from 'react';
 import { useApp } from '../../context/AppContext';
 import { ScrollArea } from '../ui/scroll-area';
 import { StatusDot, getStatusLabel } from '../ui/StatusDot';
-import { MessageCircle } from 'lucide-react';
+import { MessageCircle, UserMinus } from 'lucide-react';
 
 interface FriendsListProps {
   searchQuery: string;
 }
 
 export const FriendsList: React.FC<FriendsListProps> = ({ searchQuery }) => {
-  const { getFriends, createDirectMessage } = useApp();
+  const { getFriends, createDirectMessage, removeFriend } = useApp();
   const friends = getFriends();
 
   const filteredFriends = friends.filter((friend) =>
@@ -60,13 +60,22 @@ export const FriendsList: React.FC<FriendsListProps> = ({ searchQuery }) => {
                     {/* Visible status text is aria-hidden — status is already in the avatar alt */}
                     <div className="text-[#475569] text-xs" aria-hidden="true">{statusLabel}</div>
                   </div>
-                  <button
-                    onClick={() => createDirectMessage(friend.id)}
-                    aria-label={`Send direct message to ${displayName}`}
-                    className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-[#06b6d4]/20 rounded-lg transition-all"
-                  >
-                    <MessageCircle className="size-4 text-[#06b6d4]" aria-hidden="true" />
-                  </button>
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                    <button
+                      onClick={() => createDirectMessage(friend.id)}
+                      aria-label={`Send direct message to ${displayName}`}
+                      className="p-1.5 hover:bg-[#06b6d4]/20 rounded-lg transition-all"
+                    >
+                      <MessageCircle className="size-4 text-[#06b6d4]" aria-hidden="true" />
+                    </button>
+                    <button
+                      onClick={() => void removeFriend(friend.id)}
+                      aria-label={`Remove ${displayName} from friends`}
+                      className="p-1.5 hover:bg-red-500/15 rounded-lg transition-all"
+                    >
+                      <UserMinus className="size-4 text-red-400" aria-hidden="true" />
+                    </button>
+                  </div>
                 </li>
               );
             })}

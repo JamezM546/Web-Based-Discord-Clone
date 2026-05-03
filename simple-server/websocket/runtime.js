@@ -163,6 +163,22 @@ const createRealtimeRuntime = ({ store, sendToConnection }) => {
     );
   };
 
+  const publishFriendRemoved = async ({ userIds, users }) => {
+    if (!Array.isArray(userIds) || userIds.length === 0) return;
+
+    await Promise.all(
+      userIds.map((userId) =>
+        publishUserEvent(userId, {
+          type: 'friendRemoved',
+          data: {
+            userIds,
+            users: users || [],
+          },
+        })
+      )
+    );
+  };
+
   const publishServerInviteCreated = async (invite) => {
     if (!invite?.to_user_id) return;
 
@@ -188,6 +204,7 @@ const createRealtimeRuntime = ({ store, sendToConnection }) => {
     publishUserStatusChanged,
     publishFriendRequestCreated,
     publishFriendRequestAccepted,
+    publishFriendRemoved,
     publishServerInviteCreated,
   };
 

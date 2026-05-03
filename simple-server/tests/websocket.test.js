@@ -259,6 +259,59 @@ describe('Websocket realtime delivery', () => {
     openSockets.delete(senderSocket);
   });
 
+  test('publishes a friendRemoved event to both users when one removes the other', async () => {
+    const removerName = `wsfrremsend${Date.now()}`;
+    const removedName = `wsfrremrecv${Date.now()}`;
+
+    const removerRes = await request.post('/api/auth/register').send({
+      username: removerName,
+      email: `${removerName}@test.com`,
+      password: 'pass1234',
+    });
+    const removedRes = await request.post('/api/auth/register').send({
+      username: removedName,
+      email: `${removedName}@test.com`,
+      password: 'pass1234',
+    });
+
+    const sendRes = await request
+      .post('/api/friends/requests')
+      .set('Authorization', `Bearer ${removerRes.body.data.token}`)
+      .send({ toUserId: removedRes.body.data.user.id });
+
+    expect(sendRes.status).toBe(201);
+
+    const acceptRes = await request
+      .post(`/api/friends/requests/${sendRes.body.data.request.id}/accept`)
+      .set('Authorization', `Bearer ${removedRes.body.data.token}`);
+
+    expect(acceptRes.status).toBe(200);
+
+    const removerSocket = await connectAuthenticatedClient(removerRes.body.data.token);
+    const removedSocket = await connectAuthenticatedClient(removedRes.body.data.token);
+    const removerEventPromise = waitForEvent(removerSocket, 'friendRemoved');
+    const removedEventPromise = waitForEvent(removedSocket, 'friendRemoved');
+
+    const deleteRes = await request
+      .delete(`/api/friends/${removedRes.body.data.user.id}`)
+      .set('Authorization', `Bearer ${removerRes.body.data.token}`);
+
+    expect(deleteRes.status).toBe(200);
+
+    const [removerEvent, removedEvent] = await Promise.all([removerEventPromise, removedEventPromise]);
+    expect(removerEvent.data.userIds).toEqual(
+      expect.arrayContaining([removerRes.body.data.user.id, removedRes.body.data.user.id])
+    );
+    expect(removedEvent.data.userIds).toEqual(
+      expect.arrayContaining([removerRes.body.data.user.id, removedRes.body.data.user.id])
+    );
+
+    removerSocket.close();
+    removedSocket.close();
+    openSockets.delete(removerSocket);
+    openSockets.delete(removedSocket);
+  });
+
   test('publishes invite message and invite metadata to the recipient user room', async () => {
     const inviteeName = `wsinvite${Date.now()}`;
     const inviteeRes = await request.post('/api/auth/register').send({
