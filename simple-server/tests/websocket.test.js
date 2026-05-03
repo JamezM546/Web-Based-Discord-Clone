@@ -312,6 +312,46 @@ describe('Websocket realtime delivery', () => {
     openSockets.delete(removedSocket);
   });
 
+  test('publishes serverChannelsUpdated to the server room when channels change', async () => {
+    const receiver = await connectRealtimeClient(getToken(), 'server:s1');
+    const channelCreatedPromise = waitForEvent(receiver, 'serverChannelsUpdated');
+
+    const createRes = await request
+      .post('/api/channels')
+      .set('Authorization', `Bearer ${getToken()}`)
+      .send({ name: `ws-room-${Date.now()}`, serverId: 's1' });
+
+    expect(createRes.status).toBe(201);
+
+    const createdEvent = await channelCreatedPromise;
+    expect(createdEvent.data.serverId).toBe('s1');
+    expect(createdEvent.data.channels.some((channel) => channel.id === createRes.body.data.channel.id)).toBe(true);
+
+    const updatedPromise = waitForEvent(receiver, 'serverChannelsUpdated');
+    const updateRes = await request
+      .put(`/api/channels/${createRes.body.data.channel.id}`)
+      .set('Authorization', `Bearer ${getToken()}`)
+      .send({ name: 'renamed-room' });
+
+    expect(updateRes.status).toBe(200);
+
+    const updatedEvent = await updatedPromise;
+    expect(updatedEvent.data.channels.some((channel) => channel.name === 'renamed-room')).toBe(true);
+
+    const deletedPromise = waitForEvent(receiver, 'serverChannelsUpdated');
+    const deleteRes = await request
+      .delete(`/api/channels/${createRes.body.data.channel.id}`)
+      .set('Authorization', `Bearer ${getToken()}`);
+
+    expect(deleteRes.status).toBe(200);
+
+    const deletedEvent = await deletedPromise;
+    expect(deletedEvent.data.channels.some((channel) => channel.id === createRes.body.data.channel.id)).toBe(false);
+
+    receiver.close();
+    openSockets.delete(receiver);
+  });
+
   test('publishes invite message and invite metadata to the recipient user room', async () => {
     const inviteeName = `wsinvite${Date.now()}`;
     const inviteeRes = await request.post('/api/auth/register').send({

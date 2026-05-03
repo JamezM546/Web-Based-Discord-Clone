@@ -18,6 +18,7 @@ class WebSocketService {
   private reconnectDelayMs = 1500;
   private authenticated = false;
   private activeRoomId: string | null = null;
+  private serverRoomId: string | null = null;
   private queuedActions: Array<{ action: string; data?: Record<string, unknown> }> = [];
 
   connect(token: string) {
@@ -38,6 +39,7 @@ class WebSocketService {
     this.shouldReconnect = false;
     this.authenticated = false;
     this.activeRoomId = null;
+    this.serverRoomId = null;
     this.queuedActions = [];
 
     if (this.reconnectTimer) {
@@ -70,6 +72,18 @@ class WebSocketService {
     }
   }
 
+  setServerRoom(roomId: string | null) {
+    const previousRoomId = this.serverRoomId;
+    if (previousRoomId && previousRoomId !== roomId) {
+      this.sendAction('leaveRoom', { roomId: previousRoomId });
+    }
+
+    this.serverRoomId = roomId;
+    if (roomId) {
+      this.sendAction('joinRoom', { roomId });
+    }
+  }
+
   sendTypingStart(roomId: string) {
     this.sendAction('typingStart', { roomId });
   }
@@ -93,6 +107,9 @@ class WebSocketService {
         this.flushQueuedActions();
         if (this.activeRoomId) {
           this.sendAction('joinRoom', { roomId: this.activeRoomId });
+        }
+        if (this.serverRoomId) {
+          this.sendAction('joinRoom', { roomId: this.serverRoomId });
         }
       }
 

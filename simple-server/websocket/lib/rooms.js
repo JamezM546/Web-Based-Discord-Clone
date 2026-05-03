@@ -1,17 +1,20 @@
 const CHANNEL_ROOM_PREFIX = 'channel:';
 const DM_ROOM_PREFIX = 'dm:';
 const USER_ROOM_PREFIX = 'user:';
+const SERVER_ROOM_PREFIX = 'server:';
 
 const createChannelRoomId = (channelId) => `${CHANNEL_ROOM_PREFIX}${channelId}`;
 const createDmRoomId = (dmId) => `${DM_ROOM_PREFIX}${dmId}`;
 const createUserRoomId = (userId) => `${USER_ROOM_PREFIX}${userId}`;
+const createServerRoomId = (serverId) => `${SERVER_ROOM_PREFIX}${serverId}`;
 
 const isSupportedRoomId = (roomId) =>
   typeof roomId === 'string' &&
   (
     roomId.startsWith(CHANNEL_ROOM_PREFIX) ||
     roomId.startsWith(DM_ROOM_PREFIX) ||
-    roomId.startsWith(USER_ROOM_PREFIX)
+    roomId.startsWith(USER_ROOM_PREFIX) ||
+    roomId.startsWith(SERVER_ROOM_PREFIX)
   );
 
 const getMessageRoomId = (message) => {
@@ -30,6 +33,7 @@ module.exports = {
   createChannelRoomId,
   createDmRoomId,
   createUserRoomId,
+  createServerRoomId,
   getMessageRoomId,
   getMessageScope,
   isSupportedRoomId,
