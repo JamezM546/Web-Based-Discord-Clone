@@ -24,6 +24,7 @@ export const MainLayout: React.FC = () => {
   const [createSpaceOpen, setCreateSpaceOpen] = useState(false);
   const [showPeoplePanel, setShowPeoplePanel] = useState(true);
   const [dmSearchQuery, setDmSearchQuery] = useState('');
+  const [mobileDMSidebarOpen, setMobileDMSidebarOpen] = useState(false);
 
   // Swipe state
   const touchStartX = useRef<number | null>(null);
@@ -118,11 +119,17 @@ export const MainLayout: React.FC = () => {
     const firstChannel = channels.find(c => c.serverId === server.id) ?? null;
     setSelectedChannel(firstChannel);
     setSelectedDM(null);
+    // Close mobile sidebar when switching to a server
+    setMobileDMSidebarOpen(false);
   };
 
   const handleHomeClick = () => {
     setSelectedServer(null);
     setSelectedChannel(null);
+    // Open mobile sidebar when switching to Direct Chats on mobile
+    if (window.innerWidth < 768) {
+      setMobileDMSidebarOpen(true);
+    }
   };
 
   // Swipe handlers
@@ -225,7 +232,7 @@ export const MainLayout: React.FC = () => {
                 Spaces
               </span>
             </div>
-            <ScrollArea className="flex-1 spaces-scroll-area" viewportRef={spacesViewportRef}>
+            <ScrollArea className="flex-1 spaces-scroll-area" viewportRef={spacesViewportRef as React.RefObject<HTMLDivElement>}>
               <div className="flex items-center gap-1 py-1">
                 <TooltipProvider delayDuration={100}>
                   {userServers.map((server) => (
@@ -486,8 +493,26 @@ export const MainLayout: React.FC = () => {
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
-        {/* Left Sidebar — Desktop only */}
-        <div className="hidden md:flex flex-col w-64 bg-[#0d1a2e] border-r border-[#1e3248] flex-shrink-0">
+        {/* Left Sidebar — Desktop only, Mobile when no server selected */}
+        {!selectedServer && mobileDMSidebarOpen && (
+          /* Mobile backdrop for DM sidebar */
+          <div 
+            className="md:hidden absolute inset-0 z-10 bg-black/50"
+            onClick={() => setMobileDMSidebarOpen(false)}
+          />
+        )}
+        <div className={`${selectedServer ? 'hidden md:flex' : mobileDMSidebarOpen ? 'flex' : 'hidden md:flex'} flex-col w-64 bg-[#0d1a2e] border-r border-[#1e3248] flex-shrink-0 md:relative absolute inset-y-0 left-0 z-20 md:z-auto`}>
+          {/* Mobile close button */}
+          <div className="md:hidden flex items-center justify-between p-3 border-b border-[#1e3248]">
+            <span className="text-white font-semibold">Direct Chats</span>
+            <button
+              onClick={() => setMobileDMSidebarOpen(false)}
+              className="p-1.5 rounded-lg text-[#94a3b8] hover:text-white hover:bg-[#1a2d45] transition-all"
+              aria-label="Close sidebar"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
           <div className="flex-1 overflow-hidden min-h-0">
             {selectedServer && (
               <div className="relative">
@@ -495,9 +520,9 @@ export const MainLayout: React.FC = () => {
                 <ServerSearch searchQuery={serverSearchQuery} onSearchChange={setServerSearchQuery} />
               </div>
             )}
-            {selectedServer ? <ChannelList /> : <UserSidebar />}
+            {selectedServer ? <ChannelList /> : <UserSidebar onDMSelect={() => setMobileDMSidebarOpen(false)} />}
           </div>
-          <UserProfile />
+          {selectedServer && <UserProfile />}
         </div>
 
         {/* Chat Area */}

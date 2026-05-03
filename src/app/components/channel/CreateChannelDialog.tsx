@@ -18,10 +18,11 @@ interface CreateChannelDialogProps {
     serverId,
   }) => {
     const [name, setName] = useState('');
+    const MAX_CHANNEL_NAME_LENGTH = 25;
     const { createChannel} = useApp();
 
   const handleCreate = async () => {
-    if (name.trim()) {
+    if (name.trim() && name.length <= MAX_CHANNEL_NAME_LENGTH) {
       try {
         const formattedName = name.toLowerCase().replace(/\s+/g, '-');
         await createChannel(serverId, formattedName);
@@ -47,14 +48,22 @@ interface CreateChannelDialogProps {
               Room Name
             </Label>
             <div className="relative mt-2">
-              <Hash className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-[#475569]" />
+              <Hash className="absolute left-3 top-3 size-4 text-[#475569]" />
               <Input
                 id="channel-name"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => {
+                  if (e.target.value.length <= MAX_CHANNEL_NAME_LENGTH) {
+                    setName(e.target.value);
+                  }
+                }}
                 className="bg-[#060c18] border border-[#1e3248] text-[#e2e8f0] pl-9 focus-visible:ring-[#06b6d4]/50 placeholder:text-[#475569]"
                 placeholder="new-room"
+                maxLength={MAX_CHANNEL_NAME_LENGTH}
               />
+              <div className="mt-1 text-xs text-[#475569] text-right">
+                {name.length}/{MAX_CHANNEL_NAME_LENGTH}
+              </div>
             </div>
           </div>
         </div>
