@@ -57,6 +57,11 @@ const createRealtimeRuntime = ({ store, sendToConnection }) => {
     await broadcaster.broadcastToRoom(roomId, payload);
   };
 
+  const publishUserEvent = async (userId, payload) => {
+    if (!userId) return;
+    await publishRoomEvent(createUserRoomId(userId), payload);
+  };
+
   const publishMessageCreated = async (message) => {
     const scope = getMessageScope(message);
     await publishRoomEvent(scope.roomId, {
@@ -119,6 +124,17 @@ const createRealtimeRuntime = ({ store, sendToConnection }) => {
     });
   };
 
+  const publishUserStatusChanged = async ({ recipients, user }) => {
+    await Promise.all(
+      (recipients || []).map((recipientUserId) =>
+        publishUserEvent(recipientUserId, {
+          type: 'userStatusChanged',
+          data: { user },
+        })
+      )
+    );
+  };
+
   const runtime = {
     store: realtimeStore,
     requireAuthenticatedConnection,
@@ -129,6 +145,8 @@ const createRealtimeRuntime = ({ store, sendToConnection }) => {
     publishMessageUpdated,
     publishMessageDeleted,
     publishReactionToggled,
+    publishUserEvent,
+    publishUserStatusChanged,
   };
 
   return runtime;

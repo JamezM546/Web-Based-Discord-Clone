@@ -165,4 +165,23 @@ describe('Websocket realtime delivery', () => {
     openSockets.delete(receiver);
   });
 
+  test('publishes a userStatusChanged event to related users', async () => {
+    const receiver = await connectAuthenticatedClient(getSecondToken());
+    const statusChangedPromise = waitForEvent(receiver, 'userStatusChanged');
+
+    const res = await request
+      .put('/api/users/me/status')
+      .set('Authorization', `Bearer ${getToken()}`)
+      .send({ status: 'idle' });
+
+    expect(res.status).toBe(200);
+
+    const event = await statusChangedPromise;
+    expect(event.data.user.id).toBe(res.body.data.user.id);
+    expect(event.data.user.status).toBe('idle');
+
+    receiver.close();
+    openSockets.delete(receiver);
+  });
+
 });

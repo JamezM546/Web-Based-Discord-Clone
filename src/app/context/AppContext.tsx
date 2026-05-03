@@ -321,10 +321,29 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }));
         return;
       }
+      case 'userStatusChanged': {
+        const user = event.data?.user;
+        if (!user?.id) return;
+
+        const mappedUser: User = {
+          id: user.id,
+          username: user.username,
+          displayName: user.display_name || user.displayName || undefined,
+          email: user.email || '',
+          avatar: user.avatar,
+          status: (user.status || 'offline') as User['status'],
+        };
+
+        upsertUsers([mappedUser]);
+        if (currentUser?.id === mappedUser.id) {
+          setCurrentUser((prev) => (prev ? { ...prev, ...mappedUser } : prev));
+        }
+        return;
+      }
       default:
         return;
     }
-  }, [currentUser?.id, directMessages, fetchUserDirectMessages, mergeUsersFromMessageRows, upsertDirectMessage, upsertMessage]);
+  }, [currentUser?.id, directMessages, fetchUserDirectMessages, mergeUsersFromMessageRows, upsertDirectMessage, upsertMessage, upsertUsers]);
 
   // ---------------------------------------------------------------------------
   // Backend fetch helpers
