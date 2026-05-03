@@ -1,10 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Hash, ChevronDown, Settings, Plus, UserPlus, LogOut } from 'lucide-react';
 import { CreateChannelDialog } from './CreateChannelDialog';
 import { ServerSettings } from '../server/ServerSettings';
 import { InvitePeopleDialog } from '../server/InvitePeopleDialog';
-import { ScrollArea } from '../ui/scroll-area';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,6 +24,7 @@ import {
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
+import { ScrollArea } from '../ui/scroll-area';
 
 const MAX_CHANNEL_NAME_LENGTH = 25;
 
@@ -33,19 +33,44 @@ interface ChannelListProps {
 }
 
 export const ChannelList: React.FC<ChannelListProps> = ({ onChannelSelect }) => {
-  const { selectedServer, channels, selectedChannel, setSelectedChannel, setSelectedDM, currentUser, getUnreadCount, markAsRead, updateChannel, deleteChannel, leaveServer } = useApp();
+  const { selectedServer, channels, selectedChannel, setSelectedChannel, setSelectedDM, currentUser, getUnreadCount, markAsRead, updateChannel, deleteChannel, createChannel, leaveServer } = useApp();
   const [createChannelOpen, setCreateChannelOpen] = useState(false);
   const [serverSettingsOpen, setServerSettingsOpen] = useState(false);
   const [invitePeopleOpen, setInvitePeopleOpen] = useState(false);
   const [isLeavingServer, setIsLeavingServer] = useState(false);
+  const [isCreatingChannel, setIsCreatingChannel] = useState(false);
+  const [lastCreatedChannelId, setLastCreatedChannelId] = useState<string | null>(null);
+  const [previousChannelCount, setPreviousChannelCount] = useState<number | null>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const channelRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
   const [leaveErrorMessage, setLeaveErrorMessage] = useState('');
   const [leaveErrorOpen, setLeaveErrorOpen] = useState(false);
 
   if (!selectedServer) return null;
 
-  const serverChannels = channels.filter((c) => c.serverId === selectedServer.id);
+  const serverChannels = channels
+    .filter((c) => c.serverId === selectedServer.id)
+    .sort((a, b) => (a.position || 0) - (b.position || 0));
   const isOwner = selectedServer.ownerId === currentUser?.id;
+
+  // Track when channels are added to trigger scroll
+  useEffect(() => {
+    const currentCount = serverChannels.length;
+    // Initialize previous count on first render
+    if (previousChannelCount === null) {
+      setPreviousChannelCount(currentCount);
+      return;
+    }
+    
+    if (currentCount > previousChannelCount) {
+      // A new channel was added, scroll to it
+      // The new channel is at the new index (currentCount - 1) because count increased
+      const newChannel = serverChannels[currentCount - 1];
+      setLastCreatedChannelId(newChannel.id);
+    }
+    setPreviousChannelCount(currentCount);
+  }, [serverChannels.length, previousChannelCount]);
 
   const handleChannelClick = (channel: typeof channels[0]) => {
     setSelectedChannel(channel);
@@ -95,6 +120,40 @@ export const ChannelList: React.FC<ChannelListProps> = ({ onChannelSelect }) => 
     return getUnreadCount(channelId) > 0;
   };
 
+  // Auto-scroll to show newly created channel
+  useEffect(() => {
+    if (lastCreatedChannelId && scrollAreaRef.current) {
+      // Use native scrolling - scroll to bottom to show newest channel
+      // Wait for DOM to update and ScrollArea to recalculate dimensions
+      setTimeout(() => {
+        const viewport = scrollAreaRef.current;
+        if (viewport) {
+          // Force a reflow to ensure scroll dimensions are calculated
+          void viewport.offsetHeight;
+          viewport.scrollTo({
+            top: viewport.scrollHeight,
+            behavior: 'smooth'
+          });
+        }
+      }, 150); // Longer delay to ensure ScrollArea has time to recalculate
+      // Clear the highlight after delay
+      setTimeout(() => setLastCreatedChannelId(null), 2000);
+    }
+  }, [lastCreatedChannelId]);
+
+  const handleCreateChannel = async (serverId: string, name: string) => {
+    if (!name.trim()) return;
+
+    setIsCreatingChannel(true);
+    try {
+      await createChannel(serverId, name);
+    } catch (error) {
+      console.error('Failed to create channel:', error);
+    } finally {
+      setIsCreatingChannel(false);
+    }
+  };
+
   return (
     <>
       <div className="w-full bg-[#0d1a2e] flex flex-col h-full min-h-0">
@@ -142,11 +201,21 @@ export const ChannelList: React.FC<ChannelListProps> = ({ onChannelSelect }) => 
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <div className="px-3 pt-4 pb-2 border-b border-[#1e3248]">
-          <div className="flex items-center justify-between px-2">
-            <div className="flex items-center gap-1 text-xs text-[#475569] uppercase font-semibold tracking-wider">
-              <Hash className="size-3" />
-              Rooms
+        <ScrollArea className="flex-1 min-h-0">
+          <div className="px-3 py-2">
+            <div className="flex items-center justify-between px-2 mb-2">
+              <div className="flex items-center gap-1 text-xs text-[#475569] uppercase font-semibold tracking-wider">
+                <Hash className="size-3" />
+                Rooms
+              </div>
+              {isOwner && (
+                <button
+                  onClick={() => setCreateChannelOpen(true)}
+                  className="text-[#475569] hover:text-[#06b6d4] transition-colors"
+                >
+                  <Plus className="size-4" />
+                </button>
+              )}
             </div>
             {isOwner && (
               <button
@@ -156,19 +225,16 @@ export const ChannelList: React.FC<ChannelListProps> = ({ onChannelSelect }) => 
                 <Plus className="size-4" />
               </button>
             )}
-          </div>
-        </div>
-
-        <ScrollArea className="flex-1 min-h-0">
-          <div className="px-3 py-2">
             <div className="space-y-0.5">
-              {serverChannels.map((channel) => {
+              {serverChannels.map((channel, index) => {
                 const unread = hasUnreadMessages(channel.id) && selectedChannel?.id !== channel.id;
                 const isSelected = selectedChannel?.id === channel.id;
                 const showControls = selectedServer.ownerId === currentUser?.id;
+                const isNewlyCreated = channel.id === lastCreatedChannelId;
                 return (
                   <div key={channel.id} className="group flex items-center min-w-0">
                     <button
+                      ref={(el) => { channelRefs.current[channel.id] = el; }}
                       onClick={() => handleChannelClick(channel)}
                       className={`w-full min-w-0 px-3 py-2 rounded-lg flex items-center gap-2 transition-all text-left ${
                         isSelected
@@ -176,7 +242,7 @@ export const ChannelList: React.FC<ChannelListProps> = ({ onChannelSelect }) => 
                           : unread
                           ? 'text-[#e2e8f0] hover:bg-[#1a2d45]'
                           : 'text-[#64748b] hover:bg-[#1a2d45] hover:text-[#94a3b8]'
-                      }`}
+                      } ${isNewlyCreated ? 'animate-pulse bg-[#06b6d4]/10' : ''}`}
                     >
                       <Hash className={`size-4 flex-shrink-0 ${isSelected ? 'text-[#06b6d4]' : ''}`} />
                       <span className={`min-w-0 flex-1 text-sm truncate ${unread ? 'font-semibold' : ''}`}>
@@ -214,6 +280,8 @@ export const ChannelList: React.FC<ChannelListProps> = ({ onChannelSelect }) => 
         open={createChannelOpen}
         onOpenChange={setCreateChannelOpen}
         serverId={selectedServer.id}
+        onCreateChannel={handleCreateChannel}
+        isCreating={isCreatingChannel}
       />
 
       {selectedServer && (
