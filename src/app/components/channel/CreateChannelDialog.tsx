@@ -36,14 +36,12 @@ export const CreateChannelDialog: React.FC<CreateChannelDialogProps> = ({
   const handleCreate = async () => {
     if (name.trim()) {
       try {
-        const formattedName = name.toLowerCase().replace(/\s+/g, '-');
+        const formattedName = name.trim().toLowerCase().replace(/\s+/g, '-').slice(0, MAX_CHANNEL_NAME_LENGTH);
         if (onCreateChannel) {
           await onCreateChannel(serverId, formattedName);
         } else {
           await createChannel(serverId, formattedName);
         }
-        const formattedName = name.trim().toLowerCase().replace(/\s+/g, '-').slice(0, MAX_CHANNEL_NAME_LENGTH);
-        await createChannel(serverId, formattedName);
         setName('');
         onOpenChange(false);
       } catch (error) {

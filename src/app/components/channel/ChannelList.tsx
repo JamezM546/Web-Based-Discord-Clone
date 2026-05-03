@@ -24,6 +24,7 @@ import {
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
+import { ScrollArea } from '../ui/scroll-area';
 
 const MAX_CHANNEL_NAME_LENGTH = 25;
 
@@ -153,13 +154,6 @@ export const ChannelList: React.FC<ChannelListProps> = ({ onChannelSelect }) => 
     }
   };
 
-  const [renameOpen, setRenameOpen] = useState(false);
-  const [renameName, setRenameName] = useState('');
-  const [channelToRename, setChannelToRename] = useState<string | null>(null);
-
-  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
-  const [channelToDelete, setChannelToDelete] = useState<string | null>(null);
-
   return (
     <>
       <div className="w-full bg-[#0d1a2e] flex flex-col h-full min-h-0">
@@ -207,12 +201,8 @@ export const ChannelList: React.FC<ChannelListProps> = ({ onChannelSelect }) => 
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <div 
-          ref={scrollAreaRef} 
-          className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pb-20"
-          style={{ scrollBehavior: 'smooth' }}
-        >
-          <div className="px-3 py-4">
+        <ScrollArea className="flex-1 min-h-0">
+          <div className="px-3 py-2">
             <div className="flex items-center justify-between px-2 mb-2">
               <div className="flex items-center gap-1 text-xs text-[#475569] uppercase font-semibold tracking-wider">
                 <Hash className="size-3" />
@@ -235,11 +225,6 @@ export const ChannelList: React.FC<ChannelListProps> = ({ onChannelSelect }) => 
                 <Plus className="size-4" />
               </button>
             )}
-          </div>
-        </div>
-
-        <ScrollArea className="flex-1 min-h-0">
-          <div className="px-3 py-2">
             <div className="space-y-0.5">
               {serverChannels.map((channel, index) => {
                 const unread = hasUnreadMessages(channel.id) && selectedChannel?.id !== channel.id;
@@ -288,7 +273,7 @@ export const ChannelList: React.FC<ChannelListProps> = ({ onChannelSelect }) => 
               })}
             </div>
           </div>
-        </div>
+        </ScrollArea>
       </div>
 
       <CreateChannelDialog
