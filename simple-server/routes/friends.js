@@ -139,4 +139,43 @@ router.post('/requests/:requestId/reject', authenticateToken, async (req, res) =
   }
 });
 
+// DELETE /api/friends/:userId  — unfriend a user
+router.delete('/:userId', authenticateToken, async (req, res) => {
+  try {
+    const currentUserId = req.user.id;
+    const { userId } = req.params;
+
+    if (userId === currentUserId) {
+      return res.status(400).json({ success: false, message: 'Cannot unfriend yourself' });
+    }
+
+    // Check if they are actually friends
+    const friendshipCheck = await pool.query(
+      `SELECT id FROM friend_requests
+       WHERE ((from_user_id = $1 AND to_user_id = $2) OR (from_user_id = $2 AND to_user_id = $1))
+         AND status = 'accepted'`,
+      [currentUserId, userId]
+    );
+
+    if (friendshipCheck.rowCount === 0) {
+      return res.status(404).json({ success: false, message: 'Friendship not found' });
+    }
+
+    // Update the friend request status to 'rejected' to end the friendship
+    const result = await pool.query(
+      `UPDATE friend_requests
+       SET status = 'rejected', updated_at = CURRENT_TIMESTAMP
+       WHERE ((from_user_id = $1 AND to_user_id = $2) OR (from_user_id = $2 AND to_user_id = $1))
+         AND status = 'accepted'
+       RETURNING *`,
+      [currentUserId, userId]
+    );
+
+    res.status(200).json({ success: true, message: 'Friend removed successfully' });
+  } catch (error) {
+    console.error('Error unfriending user:', error);
+    res.status(500).json({ success: false, message: 'Failed to unfriend user' });
+  }
+});
+
 module.exports = router;
