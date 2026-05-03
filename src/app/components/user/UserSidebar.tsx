@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Search, X, MessageSquare, Users } from 'lucide-react';
 import { Input } from '../ui/input';
@@ -10,11 +10,17 @@ import { DMList } from './DMList';
 
 interface UserSidebarProps {
   onDMSelect?: () => void;
+  defaultTab?: 'dms' | 'friends';
 }
 
-export const UserSidebar: React.FC<UserSidebarProps> = ({ onDMSelect }) => {
+export const UserSidebar: React.FC<UserSidebarProps> = ({ onDMSelect, defaultTab = 'dms' }) => {
   const { selectedServer, friendRequests, currentUser } = useApp();
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeTab, setActiveTab] = useState<'dms' | 'friends'>(defaultTab);
+
+  useEffect(() => {
+    setActiveTab(defaultTab);
+  }, [defaultTab]);
 
   if (selectedServer) return null;
 
@@ -45,7 +51,7 @@ export const UserSidebar: React.FC<UserSidebarProps> = ({ onDMSelect }) => {
         </div>
       </div>
 
-      <Tabs defaultValue="dms" className="flex-1 flex flex-col h-full min-h-0">
+      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'dms' | 'friends')} className="flex-1 flex flex-col h-full min-h-0">
         <TabsList className="w-full bg-[#0d1a2e] border-b border-[#1e3248] rounded-none h-auto p-1 gap-1">
           <TabsTrigger
             value="dms"
