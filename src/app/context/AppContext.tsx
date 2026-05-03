@@ -43,6 +43,7 @@ interface AppContextType {
   sendFriendRequest: (toUserId: string) => void;
   acceptFriendRequest: (requestId: string) => void;
   rejectFriendRequest: (requestId: string) => void;
+  removeFriend: (friendId: string) => Promise<void>;
   getFriends: () => User[];
   createDirectMessage: (userId: string) => void;
   updateUserStatus: (status: User['status']) => void;
@@ -399,6 +400,26 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             return [...prev, acceptedFriend];
           });
         }
+        return;
+      }
+      case 'friendRemoved': {
+        const removedUserIds = Array.isArray(event.data?.userIds) ? event.data.userIds : [];
+        if (!currentUser?.id || removedUserIds.length === 0) return;
+
+        const removedFriendId = removedUserIds.find((userId: string) => userId !== currentUser.id);
+        if (!removedFriendId) return;
+
+        const eventUsers: User[] = (event.data?.users || []).map((user: any) => ({
+          id: user.id,
+          username: user.username,
+          displayName: user.display_name || user.displayName || undefined,
+          email: user.email || '',
+          avatar: user.avatar,
+          status: (user.status || 'offline') as User['status'],
+        }));
+        upsertUsers(eventUsers);
+
+        setFriends((prev) => prev.filter((friend) => friend.id !== removedFriendId));
         return;
       }
       case 'serverInviteCreated': {
@@ -960,6 +981,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
+  const removeFriend = async (friendId: string) => {
+    if (!currentUser) return;
+    try {
+      await apiService.removeFriend(friendId);
+      setFriends((prev) => prev.filter((friend) => friend.id !== friendId));
+    } catch (error) {
+      console.error('Failed to remove friend:', error);
+    }
+  };
+
   const getFriends = useCallback((): User[] => {
     return friends;
   }, [friends]);
@@ -1201,6 +1232,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         sendFriendRequest,
         acceptFriendRequest,
         rejectFriendRequest,
+        removeFriend,
         getFriends,
         createDirectMessage,
         updateUserStatus,

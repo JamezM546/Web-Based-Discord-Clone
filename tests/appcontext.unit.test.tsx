@@ -37,6 +37,7 @@ jest.mock('../src/app/services/apiService', () => ({
     sendFriendRequest: jest.fn(),
     acceptFriendRequest: jest.fn(),
     rejectFriendRequest: jest.fn(),
+    removeFriend: jest.fn(),
     createDirectMessage: jest.fn(),
     updateStatus: jest.fn(),
     updateProfile: jest.fn(),
@@ -147,6 +148,7 @@ const resetApiMocks = () => {
   mockApi.sendFriendRequest.mockResolvedValue(undefined as any);
   mockApi.acceptFriendRequest.mockResolvedValue(undefined as any);
   mockApi.rejectFriendRequest.mockResolvedValue(undefined as any);
+  mockApi.removeFriend.mockResolvedValue({ removedUserId: 'u2' } as any);
   mockApi.createDirectMessage.mockResolvedValue({
     id: 'dm-default',
     participants: ['u1', 'u2'],
@@ -1351,7 +1353,27 @@ describe('AppContext Unit Tests', () => {
       });
     });
 
-    test('35. setReplyingTo: should update the replyingTo state with a message or null', async () => {
+    test('35. removeFriend: should remove the friend from local state', async () => {
+      mockApi.getFriends.mockResolvedValue([
+        { id: "u2", username: "remove_me", status: "online" }
+      ]);
+      mockApi.removeFriend.mockResolvedValue({ removedUserId: "u2" } as any);
+
+      const { result } = renderHook(() => useApp(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.getFriends()).toHaveLength(1);
+      });
+
+      await act(async () => {
+        await result.current.removeFriend("u2");
+      });
+
+      expect(apiService.removeFriend).toHaveBeenCalledWith("u2");
+      expect(result.current.getFriends()).toHaveLength(0);
+    });
+
+    test('36. setReplyingTo: should update the replyingTo state with a message or null', async () => {
       const { result } = renderHook(() => useApp(), { wrapper });
 
       await waitFor(() => {

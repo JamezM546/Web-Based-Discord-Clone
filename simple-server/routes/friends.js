@@ -170,4 +170,56 @@ router.post('/requests/:requestId/reject', authenticateToken, async (req, res) =
   }
 });
 
+// DELETE /api/friends/:friendId — remove an existing friend relationship
+router.delete('/:friendId', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { friendId } = req.params;
+
+    if (!friendId || friendId === userId) {
+      return res.status(400).json({ success: false, message: 'A valid friend ID is required' });
+    }
+
+    const existing = await pool.query(
+      `SELECT id, from_user_id, to_user_id, status
+       FROM friend_requests
+       WHERE status = 'accepted'
+         AND (
+           (from_user_id = $1 AND to_user_id = $2) OR
+           (from_user_id = $2 AND to_user_id = $1)
+         )
+       LIMIT 1`,
+      [userId, friendId]
+    );
+
+    if (existing.rowCount === 0) {
+      return res.status(404).json({ success: false, message: 'Friend relationship not found' });
+    }
+
+    await pool.query(`DELETE FROM friend_requests WHERE id = $1`, [existing.rows[0].id]);
+
+    const users = await Promise.all([
+      User.findById(userId),
+      User.findById(friendId),
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        removedUserId: friendId,
+      },
+    });
+
+    await publishRealtime((runtime) =>
+      runtime.publishFriendRemoved({
+        userIds: [userId, friendId],
+        users: users.filter(Boolean),
+      })
+    );
+  } catch (error) {
+    console.error('Error removing friend:', error);
+    res.status(500).json({ success: false, message: 'Failed to remove friend' });
+  }
+});
+
 module.exports = router;

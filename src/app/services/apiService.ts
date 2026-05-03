@@ -444,6 +444,13 @@ class ApiService {
     return response.data?.request;
   }
 
+  async removeFriend(friendId: string): Promise<{ removedUserId?: string }> {
+    const response = await this.request<{ removedUserId?: string }>(`/api/friends/${friendId}`, {
+      method: 'DELETE',
+    });
+    return response.data || {};
+  }
+
   // Server invite endpoints
 
   async getPendingInvites(): Promise<any[]> {
