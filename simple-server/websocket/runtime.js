@@ -1,7 +1,7 @@
 const { createInMemoryRealtimeStore } = require('./lib/connections');
 const { createBroadcastService } = require('./lib/broadcast');
 const { getActionHandler, getRouteHandler } = require('./lib/routes');
-const { createUserRoomId, getMessageScope } = require('./lib/rooms');
+const { createServerRoomId, createUserRoomId, getMessageScope } = require('./lib/rooms');
 
 const createRealtimeRuntime = ({ store, sendToConnection }) => {
   const realtimeStore = store || createInMemoryRealtimeStore();
@@ -60,6 +60,11 @@ const createRealtimeRuntime = ({ store, sendToConnection }) => {
   const publishUserEvent = async (userId, payload) => {
     if (!userId) return;
     await publishRoomEvent(createUserRoomId(userId), payload);
+  };
+
+  const publishServerEvent = async (serverId, payload) => {
+    if (!serverId) return;
+    await publishRoomEvent(createServerRoomId(serverId), payload);
   };
 
   const publishMessageCreated = async (message) => {
@@ -190,6 +195,18 @@ const createRealtimeRuntime = ({ store, sendToConnection }) => {
     });
   };
 
+  const publishServerChannelsUpdated = async ({ serverId, channels }) => {
+    if (!serverId) return;
+
+    await publishServerEvent(serverId, {
+      type: 'serverChannelsUpdated',
+      data: {
+        serverId,
+        channels: channels || [],
+      },
+    });
+  };
+
   const runtime = {
     store: realtimeStore,
     requireAuthenticatedConnection,
@@ -206,6 +223,7 @@ const createRealtimeRuntime = ({ store, sendToConnection }) => {
     publishFriendRequestAccepted,
     publishFriendRemoved,
     publishServerInviteCreated,
+    publishServerChannelsUpdated,
   };
 
   return runtime;

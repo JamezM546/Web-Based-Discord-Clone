@@ -54,6 +54,7 @@ jest.mock('../src/app/services/websocketService', () => ({
     connect: jest.fn(),
     disconnect: jest.fn(),
     setActiveRoom: jest.fn(),
+    setServerRoom: jest.fn(),
     sendTypingStart: jest.fn(),
     sendTypingStop: jest.fn(),
   },
@@ -672,6 +673,22 @@ describe('AppContext Unit Tests', () => {
 
       await waitFor(() => {
         expect(websocketService.setActiveRoom).toHaveBeenCalledWith('dm:dm1');
+      });
+    });
+
+    test('16. subscribes to the selected server room for realtime channel updates', async () => {
+      const { result } = renderHook(() => useApp(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.currentUser?.id).toBe('u1');
+      });
+
+      act(() => {
+        result.current.setSelectedServer({ id: 's1', name: 'Test Server', icon: 'x', ownerId: 'u1', members: [] });
+      });
+
+      await waitFor(() => {
+        expect(websocketService.setServerRoom).toHaveBeenCalledWith('server:s1');
       });
     });
   });

@@ -138,6 +138,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return null;
   };
 
+  const getServerRoomId = (serverId?: string) => {
+    if (!serverId) return null;
+    return `server:${serverId}`;
+  };
+
   const upsertMessage = useCallback((message: Message) => {
     setMessages((prev) => {
       const existingIndex = prev.findIndex((m) => m.id === message.id);
@@ -448,10 +453,32 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         });
         return;
       }
+      case 'serverChannelsUpdated': {
+        const serverId = event.data?.serverId;
+        const rawChannels = Array.isArray(event.data?.channels) ? event.data.channels : [];
+        if (!serverId) return;
+
+        const mappedChannels: Channel[] = rawChannels.map((channel: any) => ({
+          id: channel.id,
+          name: channel.name,
+          serverId: channel.server_id || channel.serverId || serverId,
+        }));
+
+        setChannels((prev) => {
+          const otherServerChannels = prev.filter((channel) => channel.serverId !== serverId);
+          return [...otherServerChannels, ...mappedChannels];
+        });
+
+        if (selectedChannel?.serverId === serverId && selectedChannel?.id) {
+          const updatedSelectedChannel = mappedChannels.find((channel) => channel.id === selectedChannel.id) || null;
+          setSelectedChannel(updatedSelectedChannel);
+        }
+        return;
+      }
       default:
         return;
     }
-  }, [currentUser?.id, directMessages, fetchUserDirectMessages, mergeUsersFromMessageRows, upsertDirectMessage, upsertMessage, upsertUsers]);
+  }, [currentUser?.id, directMessages, fetchUserDirectMessages, mergeUsersFromMessageRows, selectedChannel?.id, selectedChannel?.serverId, upsertDirectMessage, upsertMessage, upsertUsers]);
 
   // ---------------------------------------------------------------------------
   // Backend fetch helpers
@@ -484,7 +511,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   }, []);
 
-  const fetchChannels = async (serverIds: string[]) => {
+  const fetchChannels = useCallback(async (serverIds: string[]) => {
+    if (serverIds.length === 0) return;
+
     try {
       const all = (await Promise.all(serverIds.map((id) => apiService.getChannels(id)))).flat() as any[];
       const transformed: Channel[] = all.map((c: any) => ({
@@ -492,12 +521,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         name: c.name,
         serverId: c.server_id || c.serverId,
       }));
-      setChannels(transformed);
+
+      setChannels((prev) => {
+        const serverIdSet = new Set(serverIds);
+        const untouchedChannels = prev.filter((channel) => !serverIdSet.has(channel.serverId));
+        return [...untouchedChannels, ...transformed];
+      });
     } catch (error) {
       console.error('Failed to fetch channels:', error);
-      setChannels([]);
+      if (serverIds.length === servers.length) {
+        setChannels([]);
+      }
     }
-  };
+  }, [servers.length]);
 
   const fetchFriends = useCallback(async () => {
     try {
@@ -680,6 +716,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       }
     };
   }, [selectedChannel?.id, selectedDM?.id]);
+
+  useEffect(() => {
+    websocketService.setServerRoom(getServerRoomId(selectedServer?.id));
+  }, [selectedServer?.id]);
+
+  useEffect(() => {
+    if (!selectedServer?.id || !currentUser) return;
+    void fetchChannels([selectedServer.id]);
+  }, [selectedServer?.id, currentUser?.id, fetchChannels]);
 
   // Load member user objects when a server is selected
   useEffect(() => {
