@@ -11,6 +11,16 @@ import {
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '../ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../ui/alert-dialog';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -30,6 +40,9 @@ export const ChannelList: React.FC<ChannelListProps> = ({ onChannelSelect }) => 
   const [previousChannelCount, setPreviousChannelCount] = useState<number | null>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const channelRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
+  const [leaveErrorMessage, setLeaveErrorMessage] = useState('');
+  const [leaveErrorOpen, setLeaveErrorOpen] = useState(false);
 
   if (!selectedServer) return null;
 
@@ -59,25 +72,44 @@ export const ChannelList: React.FC<ChannelListProps> = ({ onChannelSelect }) => 
   const handleChannelClick = (channel: typeof channels[0]) => {
     setSelectedChannel(channel);
     setSelectedDM(null);
-    markAsRead(channel.id);
+    // Don't markAsRead here — let WhatYouMissed show first.
+    // markAsRead is called when user dismisses the banner.
     if (onChannelSelect) {
       onChannelSelect();
     }
   };
 
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [renameName, setRenameName] = useState('');
+  const [channelToRename, setChannelToRename] = useState<string | null>(null);
+
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [channelToDelete, setChannelToDelete] = useState<string | null>(null);
+
+  const getLeaveErrorMessage = (error: unknown) => {
+    const fallback = 'We could not leave this server right now. Please try again.';
+    if (error instanceof Error && error.message) {
+      if (error.message.includes('Owner cannot leave the server')) {
+        return 'You own this server, so you cannot leave it directly. Delete the server first, or transfer ownership before leaving.';
+      }
+      return error.message;
+    }
+    return fallback;
+  };
+
   const handleLeaveServer = async () => {
     if (!selectedServer) return;
-    const confirmed = window.confirm(`Are you sure you want to leave "${selectedServer.name}"?`);
-    if (confirmed) {
-      try {
-        setIsLeavingServer(true);
-        await leaveServer(selectedServer.id);
-      } catch (error) {
-        console.error('Failed to leave server:', error);
-        alert('Failed to leave server. Try again.');
-      } finally {
-        setIsLeavingServer(false);
-      }
+    try {
+      setIsLeavingServer(true);
+      await leaveServer(selectedServer.id);
+      setLeaveConfirmOpen(false);
+    } catch (error) {
+      console.error('Failed to leave server:', error);
+      setLeaveConfirmOpen(false);
+      setLeaveErrorMessage(getLeaveErrorMessage(error));
+      setLeaveErrorOpen(true);
+    } finally {
+      setIsLeavingServer(false);
     }
   };
 
@@ -163,7 +195,7 @@ export const ChannelList: React.FC<ChannelListProps> = ({ onChannelSelect }) => 
             )}
             <div className="my-1 h-px bg-[#1e3248]" />
             <DropdownMenuItem
-              onClick={handleLeaveServer}
+              onClick={() => setLeaveConfirmOpen(true)}
               disabled={isLeavingServer}
               className="text-[#ef4444] hover:text-white hover:bg-[#7f1d1d] cursor-pointer"
             >
@@ -268,6 +300,49 @@ export const ChannelList: React.FC<ChannelListProps> = ({ onChannelSelect }) => 
           onOpenChange={setInvitePeopleOpen}
         />
       )}
+
+      <AlertDialog open={leaveConfirmOpen} onOpenChange={setLeaveConfirmOpen}>
+        <AlertDialogContent className="bg-[#0d1a2e] border border-[#1e3248] text-[#e2e8f0]">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Leave Server?</AlertDialogTitle>
+            <AlertDialogDescription className="text-[#94a3b8]">
+              {selectedServer
+                ? `You are about to leave "${selectedServer.name}". You will lose access to its channels and messages until someone invites you back.`
+                : 'You are about to leave this server.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="border-[#1e3248] bg-transparent text-[#94a3b8] hover:bg-[#1a2d45] hover:text-[#e2e8f0]">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleLeaveServer}
+              className="bg-red-600 text-white hover:bg-red-700"
+            >
+              {isLeavingServer ? 'Leaving...' : 'Leave Server'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Dialog open={leaveErrorOpen} onOpenChange={setLeaveErrorOpen}>
+        <DialogContent className="bg-[#0d1a2e] border border-[#1e3248] text-[#e2e8f0]">
+          <DialogHeader>
+            <DialogTitle>Unable to Leave Server</DialogTitle>
+            <DialogDescription className="text-[#94a3b8]">
+              {leaveErrorMessage}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              onClick={() => setLeaveErrorOpen(false)}
+              className="bg-[#06b6d4] hover:bg-[#0891b2] text-white border-none"
+            >
+              OK
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Rename dialog */}
       <Dialog open={renameOpen} onOpenChange={(v) => setRenameOpen(v)}>

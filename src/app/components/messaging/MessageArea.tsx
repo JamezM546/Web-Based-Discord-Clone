@@ -5,12 +5,10 @@ import { MessageInput } from './MessageInput';
 import { WhatYouMissed } from './WhatYouMissed';
 import { ManualSummary } from './ManualSummary';
 import { Hash, Sparkles, MessageSquare } from 'lucide-react';
-import { ScrollArea } from '../ui/scroll-area';
 
 export const MessageArea: React.FC = () => {
   const { selectedChannel, selectedDM, messages, users, currentUser, getUnreadMessages, markAsRead } = useApp();
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [dismissedSummaries, setDismissedSummaries] = useState<Record<string, boolean>>({});
   const [showManualSummary, setShowManualSummary] = useState(false);
   const unreadStartRef = useRef<HTMLDivElement>(null);
 
@@ -44,7 +42,9 @@ export const MessageArea: React.FC = () => {
     ? unreadMessages.slice(-100)
     : messagesFromLastHour.slice(-100);
 
-  const hasUnread = filteredUnreadMessages.length > 0;
+  // Require at least 3 unread messages before showing the WYM banner.
+  // Fewer messages aren't worth summarizing — the user can just read them.
+  const hasUnread = filteredUnreadMessages.length >= 3;
 
   if (!selectedChannel && !selectedDM) {
     return (
@@ -77,10 +77,8 @@ export const MessageArea: React.FC = () => {
 
   const handleDismissSummary = () => {
     if (selectedChannel) {
-      setDismissedSummaries((prev) => ({ ...prev, [selectedChannel.id]: true }));
       markAsRead(selectedChannel.id);
     } else if (selectedDM) {
-      setDismissedSummaries((prev) => ({ ...prev, [selectedDM.id]: true }));
       markAsRead(undefined, selectedDM.id);
     }
   };
@@ -128,7 +126,7 @@ export const MessageArea: React.FC = () => {
       </div>
 
       {/* What You Missed — fixed panel between header and messages */}
-      {hasUnread && !dismissedSummaries[selectedChannel?.id || selectedDM?.id] && (
+      {hasUnread && (
         <WhatYouMissed
           unreadMessages={filteredUnreadMessages}
           channelId={selectedChannel?.id}

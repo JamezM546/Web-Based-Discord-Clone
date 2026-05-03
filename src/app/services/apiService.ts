@@ -57,6 +57,7 @@ class HttpResponseError extends Error {
   }
 }
 
+
 class ApiService {
   private token: string | null = null;
 
@@ -168,6 +169,12 @@ class ApiService {
   // Logout method
   logout() {
     this.clearToken();
+  }
+
+  async logoutFromServer(): Promise<void> {
+    await this.request('/api/auth/logout', {
+      method: 'POST',
+    });
   }
 
   // Server Management Methods
@@ -343,10 +350,17 @@ class ApiService {
     hours?: number;
     maxMessages?: number;
   }): Promise<any> {
-    const response = await this.request<{ summary: any }>('/api/summaries/manual', {
+    const body: Record<string, any> = {};
+    if (payload.channelId) body.channelId = payload.channelId;
+    if (payload.dmId) body.dmId = payload.dmId;
+    if (payload.hours) body.hours = payload.hours;
+    if (payload.maxMessages) body.maxMessages = payload.maxMessages;
+
+    const response = await this.request<any>('/api/summaries/manual', {
       method: 'POST',
-      body: JSON.stringify(payload),
+      body: JSON.stringify(body),
     });
+
     return response.data?.summary;
   }
 
@@ -360,9 +374,7 @@ class ApiService {
     if (params.dmId) qs.set('dmId', params.dmId);
     if (params.since) qs.set('since', params.since);
 
-    const response = await this.request<{ preview: any }>(
-      `/api/summaries/preview?${qs.toString()}`
-    );
+    const response = await this.request<any>(`/api/summaries/preview?${qs.toString()}`);
     return response.data?.preview;
   }
 
@@ -472,6 +484,18 @@ class ApiService {
       `/api/servers/search?${qs.toString()}`
     );
     return response.data?.servers || [];
+  }
+
+  // Read state sync — fire-and-forget; errors are logged but do not throw
+  async syncReadState(params: { channelId?: string; dmId?: string }): Promise<void> {
+    try {
+      await this.request('/api/read-state', {
+        method: 'PUT',
+        body: JSON.stringify(params),
+      });
+    } catch (err) {
+      console.warn('[syncReadState] Failed to sync read state to backend:', err);
+    }
   }
 }
 

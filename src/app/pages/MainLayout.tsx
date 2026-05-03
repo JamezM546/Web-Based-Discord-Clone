@@ -255,26 +255,28 @@ export const MainLayout: React.FC = () => {
                       </TooltipContent>
                     </Tooltip>
                   ))}
-
-                  {/* Add new space */}
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        onClick={() => setCreateSpaceOpen(true)}
-                        aria-label="Create a new Space"
-                        className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-sm text-[#94a3b8] hover:text-[#06b6d4] hover:bg-[#1a2d45] transition-all flex-shrink-0"
-                      >
-                        <Plus className="size-4" />
-                        <span className="hidden lg:block">New Space</span>
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom">
-                      <p>Create a Space</p>
-                    </TooltipContent>
-                  </Tooltip>
                 </TooltipProvider>
               </div>
             </ScrollArea>
+            <div className="ml-2 pl-2 flex-shrink-0 border-l border-[#1e3248]">
+              <TooltipProvider delayDuration={100}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => setCreateSpaceOpen(true)}
+                      aria-label="Create a new Space"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-white bg-[#06b6d4] hover:bg-[#0891b2] transition-all shadow-lg shadow-[#06b6d4]/20"
+                    >
+                      <Plus className="size-4" />
+                      <span className="hidden lg:block whitespace-nowrap">New Space</span>
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    <p>Create a Space</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
           </div>
 
           {/* Swipe nav arrows — desktop hint */}
@@ -554,6 +556,13 @@ export const MainLayout: React.FC = () => {
                 </div>
               </ScrollArea>
             </div>
+            <button
+              onClick={() => setCreateSpaceOpen(true)}
+              aria-label="Create a new Space"
+              className="ml-2 p-2 rounded-lg bg-[#06b6d4] hover:bg-[#0891b2] text-white transition-all shadow-lg shadow-[#06b6d4]/20 flex-shrink-0"
+            >
+              <Plus className="size-4" />
+            </button>
 
             {/* Right action: Toggle People (server) or Add Friend (DMs) */}
             {selectedServer ? (
