@@ -2,6 +2,7 @@ import { createBrowserRouter, Outlet } from 'react-router';
 import { LoginForm } from './components/auth/LoginForm';
 import { RegisterForm } from './components/auth/RegisterForm';
 import { MainLayout } from './pages/MainLayout';
+import InviteJoinPage from './pages/InviteJoinPage';
 import MockupsPage from './pages/MockupsPage';
 import { AppProvider, useApp } from './context/AppContext';
 
@@ -75,6 +76,10 @@ export const router = createBrowserRouter([
       {
         path: '/register',
         element: <RegisterForm />,
+      },
+      {
+        path: '/invite/:code',
+        element: <InviteJoinPage />,
       },
       {
         path: '/channels',

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { User, Server, Channel, Message, FriendRequest, DirectMessage, ServerInvite, TypingUser } from '../types';
+import { User, Server, Channel, Message, FriendRequest, DirectMessage, ServerInvite, TypingUser, InviteCode } from '../types';
 import { apiService } from '../services/apiService';
 import { RealtimeEnvelope, websocketService } from '../services/websocketService';
 
@@ -33,6 +33,11 @@ interface AppContextType {
   sendServerInvite: (serverId: string, userId: string) => void;
   acceptServerInvite: (inviteId: string) => void;
   declineServerInvite: (inviteId: string) => void;
+  getInviteCodes: (serverId: string) => Promise<InviteCode[]>;
+  createInviteCode: (serverId: string, opts?: { maxUses?: number; expiresAt?: string | Date }) => Promise<InviteCode>;
+  deleteInviteCode: (serverId: string, inviteId: string) => Promise<void>;
+  resolveInviteCode: (code: string) => Promise<any>;
+  joinInviteByCode: (code: string) => Promise<any>;
   createChannel: (serverId: string, name: string) => void;
   updateChannel: (channelId: string, updates: { name?: string; position?: number }) => void;
   deleteChannel: (channelId: string) => void;
@@ -142,6 +147,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (!serverId) return null;
     return `server:${serverId}`;
   };
+
+  const mapInviteCodeRowToFrontend = useCallback((row: any): InviteCode => ({
+    id: row.id,
+    code: row.code,
+    serverId: row.server_id || row.serverId,
+    createdBy: row.created_by || row.createdBy,
+    createdAt: row.created_at || row.createdAt,
+    expiresAt: row.expires_at || row.expiresAt || null,
+    maxUses: Number(row.max_uses ?? row.maxUses ?? 0),
+    usesCount: Number(row.uses_count ?? row.usesCount ?? 0),
+  }), []);
 
   const upsertMessage = useCallback((message: Message) => {
     setMessages((prev) => {
@@ -868,6 +884,33 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
+  const getInviteCodes = useCallback(async (serverId: string): Promise<InviteCode[]> => {
+    const rows = await apiService.getInviteCodes(serverId);
+    return rows.map((row: any) => mapInviteCodeRowToFrontend(row));
+  }, [mapInviteCodeRowToFrontend]);
+
+  const createInviteCode = useCallback(async (
+    serverId: string,
+    opts?: { maxUses?: number; expiresAt?: string | Date }
+  ): Promise<InviteCode> => {
+    const row = await apiService.createInviteCode(serverId, opts);
+    return mapInviteCodeRowToFrontend(row);
+  }, [mapInviteCodeRowToFrontend]);
+
+  const deleteInviteCode = useCallback(async (serverId: string, inviteId: string) => {
+    await apiService.deleteInviteCode(serverId, inviteId);
+  }, []);
+
+  const resolveInviteCode = useCallback(async (code: string) => {
+    return apiService.resolveInviteCode(code);
+  }, []);
+
+  const joinInviteByCode = useCallback(async (code: string) => {
+    const response = await apiService.joinInviteByCode(code);
+    await fetchUserServers();
+    return response;
+  }, [fetchUserServers]);
+
   // ---------------------------------------------------------------------------
   // Channels
   // ---------------------------------------------------------------------------
@@ -1267,6 +1310,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         sendServerInvite,
         acceptServerInvite,
         declineServerInvite,
+        getInviteCodes,
+        createInviteCode,
+        deleteInviteCode,
+        resolveInviteCode,
+        joinInviteByCode,
         createChannel,
         updateChannel,
         deleteChannel,
