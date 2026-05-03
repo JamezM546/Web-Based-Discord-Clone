@@ -3,6 +3,7 @@ const { pool } = require('../config/database');
 const Channel = require('../models/Channel');
 const Message = require('../models/Message');
 const { authenticateToken } = require('../middleware/auth');
+const { getRealtimeRuntime } = require('../websocket/gateway');
 
 const router = express.Router();
 
@@ -58,6 +59,17 @@ const attachReactionsToMessages = async (messages) => {
     ...m,
     reactions: reactionsByMessageId[m.id] || [],
   }));
+};
+
+const publishRealtime = async (callback) => {
+  const runtime = getRealtimeRuntime();
+  if (!runtime) return;
+
+  try {
+    await callback(runtime);
+  } catch (error) {
+    console.error('Realtime publish failed:', error);
+  }
 };
 
 // Get messages for a channel
@@ -196,6 +208,8 @@ router.post('/', authenticateToken, async (req, res) => {
       message: 'Message created successfully',
       data: { message: messageWithAuthor }
     });
+
+    await publishRealtime((runtime) => runtime.publishMessageCreated(messageWithAuthor));
   } catch (error) {
     console.error('Error creating message:', error);
     res.status(400).json({
@@ -248,6 +262,8 @@ router.put('/:messageId', authenticateToken, async (req, res) => {
       message: 'Message updated successfully',
       data: { message: messageWithAuthor }
     });
+
+    await publishRealtime((runtime) => runtime.publishMessageUpdated(messageWithAuthor));
   } catch (error) {
     console.error('Error editing message:', error);
     res.status(400).json({
@@ -277,6 +293,7 @@ router.delete('/:messageId', authenticateToken, async (req, res) => {
       });
     }
 
+    const messageToDelete = await Message.findById(messageId);
     const deleted = await Message.delete(messageId);
     if (!deleted) {
       return res.status(404).json({
@@ -289,6 +306,10 @@ router.delete('/:messageId', authenticateToken, async (req, res) => {
       success: true,
       message: 'Message deleted successfully'
     });
+
+    if (messageToDelete) {
+      await publishRealtime((runtime) => runtime.publishMessageDeleted(messageToDelete));
+    }
   } catch (error) {
     console.error('Error deleting message:', error);
     res.status(500).json({
@@ -353,6 +374,16 @@ router.post('/:messageId/reactions/toggle', authenticateToken, async (req, res) 
       message: 'Reaction updated',
       data: { messageId, reactions, added }
     });
+
+    await publishRealtime((runtime) =>
+      runtime.publishReactionToggled({
+        message: accessRow,
+        reactions,
+        added,
+        emoji: emojiNormalized,
+        userId,
+      })
+    );
   } catch (error) {
     console.error('Error toggling reaction:', error);
     res.status(400).json({

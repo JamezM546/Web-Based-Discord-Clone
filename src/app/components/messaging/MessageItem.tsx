@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Message } from '../../types';
 import { format, isToday, isYesterday } from 'date-fns';
-import { MoreVertical, Edit2, Trash2, Smile, Plus, Reply, CornerUpLeft } from 'lucide-react';
+import { MoreVertical, Edit2, Trash2, Smile, Plus, Reply, CornerUpLeft, ExternalLink, Link as LinkIcon } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,11 +21,22 @@ interface MessageItemProps {
 }
 
 export const MessageItem: React.FC<MessageItemProps> = ({ message, onScrollToMessage }) => {
-  const { users, currentUser, editMessage, deleteMessage, toggleReaction, messages, setReplyingTo, serverInvites, servers, acceptServerInvite, declineServerInvite } = useApp();
+  const { users, currentUser, editMessage, deleteMessage, toggleReaction, messages, setReplyingTo, serverInvites, servers, selectedDM, acceptServerInvite, declineServerInvite, resolveInviteCode } = useApp();
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(message.content);
   const [reactionPickerOpen, setReactionPickerOpen] = useState(false);
   const [hoverReactionPickerOpen, setHoverReactionPickerOpen] = useState(false);
+  const [inviteLinkPreview, setInviteLinkPreview] = useState<any>(null);
+
+  const inviteLinkMatch = useMemo(() => {
+    const match = message.content.match(/(https?:\/\/[^\s]+\/invite\/([A-Za-z0-9]+))/i);
+    if (!match) return null;
+
+    return {
+      url: match[1],
+      code: match[2],
+    };
+  }, [message.content]);
 
   const author = users.find((u) => u.id === message.authorId);
   const isOwnMessage = message.authorId === currentUser?.id;
@@ -39,9 +50,49 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, onScrollToMes
       (serverInvite.serverName ? { id: serverInvite.serverId, name: serverInvite.serverName, icon: serverInvite.serverIcon || '📁', ownerId: '', members: [] } : null)
     : null;
   const isInviteRecipient = serverInvite && currentUser && serverInvite.toUserId === currentUser.id;
+  const invitedUser =
+    (serverInvite ? users.find((u) => u.id === serverInvite.toUserId) : null) ||
+    (isOwnMessage && selectedDM
+      ? users.find((u) => selectedDM.participants.includes(u.id) && u.id !== currentUser?.id)
+      : null);
+  const fallbackInviteTarget = message.content.replace(/^invited you to join\s+/i, '').trim();
+  const inviteDisplayContent =
+    isOwnMessage && message.serverInviteId && invitedUser
+      ? `You invited ${invitedUser.displayName || invitedUser.username} to join ${
+          invitedServer ? `${invitedServer.name} ${invitedServer.icon || ''}`.trim() : fallbackInviteTarget
+        }`.trim()
+      : message.content;
 
   const authorDisplayName = author?.displayName || author?.username;
   const repliedAuthorDisplayName = repliedAuthor?.displayName || repliedAuthor?.username;
+
+  useEffect(() => {
+    if (!inviteLinkMatch || message.serverInviteId) {
+      setInviteLinkPreview(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadInvitePreview = async () => {
+      try {
+        const data = await resolveInviteCode(inviteLinkMatch.code);
+        if (!cancelled) {
+          setInviteLinkPreview(data);
+        }
+      } catch {
+        if (!cancelled) {
+          setInviteLinkPreview(null);
+        }
+      }
+    };
+
+    void loadInvitePreview();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [inviteLinkMatch, message.serverInviteId, resolveInviteCode]);
 
   const handleEdit = () => {
     if (editContent.trim() && editContent !== message.content) {
@@ -67,30 +118,45 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, onScrollToMes
   };
 
   const renderMessageContent = (content: string) => {
-    const mentionRegex = /@(\w+)/g;
+    const tokenRegex = /(https?:\/\/[^\s]+)|@(\w+)/g;
     const parts: React.ReactNode[] = [];
     let lastIndex = 0;
     let match;
 
-    while ((match = mentionRegex.exec(content)) !== null) {
+    while ((match = tokenRegex.exec(content)) !== null) {
       if (match.index > lastIndex) {
         parts.push(content.substring(lastIndex, match.index));
       }
-      const mentionedUsername = match[1];
-      const mentionedUser = users.find(u => u.username.toLowerCase() === mentionedUsername.toLowerCase());
-      const isMentioningCurrentUser = mentionedUser?.id === currentUser?.id;
-      parts.push(
-        <span
-          key={match.index}
-          className={`${
-            isMentioningCurrentUser
-              ? 'bg-[#06b6d4] text-white px-1.5 py-0.5 rounded-md text-sm font-medium'
-              : 'bg-[#06b6d4]/15 text-[#06b6d4] px-1.5 py-0.5 rounded-md text-sm hover:bg-[#06b6d4]/25 cursor-pointer'
-          }`}
-        >
-          @{mentionedUsername}
-        </span>
-      );
+
+      if (match[1]) {
+        parts.push(
+          <a
+            key={match.index}
+            href={match[1]}
+            target="_blank"
+            rel="noreferrer"
+            className="text-[#67e8f9] underline underline-offset-2 hover:text-[#a5f3fc] break-all"
+          >
+            {match[1]}
+          </a>
+        );
+      } else {
+        const mentionedUsername = match[2];
+        const mentionedUser = users.find((u) => u.username.toLowerCase() === mentionedUsername.toLowerCase());
+        const isMentioningCurrentUser = mentionedUser?.id === currentUser?.id;
+        parts.push(
+          <span
+            key={match.index}
+            className={`${
+              isMentioningCurrentUser
+                ? 'bg-[#06b6d4] text-white px-1.5 py-0.5 rounded-md text-sm font-medium'
+                : 'bg-[#06b6d4]/15 text-[#06b6d4] px-1.5 py-0.5 rounded-md text-sm hover:bg-[#06b6d4]/25 cursor-pointer'
+            }`}
+          >
+            @{mentionedUsername}
+          </span>
+        );
+      }
       lastIndex = match.index + match[0].length;
     }
 
@@ -224,8 +290,38 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, onScrollToMes
                 their text content naturally as part of the paragraph.
               */}
               <p className="text-[#b0bec5] text-sm break-words leading-relaxed">
-                {renderMessageContent(message.content)}
+                {renderMessageContent(inviteDisplayContent)}
               </p>
+
+              {inviteLinkMatch && inviteLinkPreview?.server && (
+                <a
+                  href={inviteLinkMatch.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-2 block max-w-xs rounded-lg border border-[#1e3248] bg-[#0a1628] p-3 transition-colors hover:border-[#2a3f5a]"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className="text-2xl" aria-hidden="true">
+                      {inviteLinkPreview.server.icon || '📁'}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1 text-xs uppercase tracking-wider text-[#475569]">
+                        <LinkIcon className="size-3" />
+                        Invite Link
+                      </div>
+                      <div className="text-sm font-semibold text-[#e2e8f0] truncate">
+                        {inviteLinkPreview.server.name}
+                      </div>
+                      <div className="text-xs text-[#94a3b8]">
+                        {inviteLinkPreview.invite?.creator?.displayName || inviteLinkPreview.invite?.creator?.username
+                          ? `Shared by ${inviteLinkPreview.invite?.creator?.displayName || inviteLinkPreview.invite?.creator?.username}`
+                          : 'Open invite'}
+                      </div>
+                    </div>
+                    <ExternalLink className="size-4 text-[#64748b] flex-shrink-0" aria-hidden="true" />
+                  </div>
+                </a>
+              )}
 
               {/* Server Invite Card */}
               {serverInvite && invitedServer && isInviteRecipient && serverInvite.status === 'pending' && (

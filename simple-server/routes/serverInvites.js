@@ -1,9 +1,22 @@
 const express = require('express');
 const { pool } = require('../config/database');
 const Server = require('../models/Server');
+const Message = require('../models/Message');
 const { authenticateToken } = require('../middleware/auth');
+const { getRealtimeRuntime } = require('../websocket/gateway');
 
 const router = express.Router();
+
+const publishRealtime = async (callback) => {
+  const runtime = getRealtimeRuntime();
+  if (!runtime) return;
+
+  try {
+    await callback(runtime);
+  } catch (error) {
+    console.error('Realtime publish failed:', error);
+  }
+};
 
 // GET /api/invites/pending  — invites sent TO the current user
 router.get('/pending', authenticateToken, async (req, res) => {
@@ -118,6 +131,11 @@ router.post('/', authenticateToken, async (req, res) => {
     );
 
     res.status(201).json({ success: true, data: { invite: result.rows[0] } });
+    const message = await Message.findById(msgId);
+    if (message) {
+      await publishRealtime((runtime) => runtime.publishMessageCreated(message));
+    }
+    await publishRealtime((runtime) => runtime.publishServerInviteCreated(result.rows[0]));
   } catch (error) {
     console.error('Error creating server invite:', error);
     res.status(400).json({ success: false, message: error.message || 'Failed to create invite' });

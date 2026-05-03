@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 import { useApp } from '../../context/AppContext';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -13,6 +13,7 @@ export const LoginForm: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useApp();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,7 +29,13 @@ export const LoginForm: React.FC = () => {
     try {
       const success = await login(email, password);
       if (success) {
-        navigate('/channels');
+        const params = new URLSearchParams(location.search);
+        const redirect = params.get('redirect');
+        if (redirect) {
+          navigate(redirect, { state: location.state });
+        } else {
+          navigate('/channels');
+        }
       } else {
         setError('Invalid email or password');
       }
