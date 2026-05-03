@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '../ui/dialog';
 import { Button } from '../ui/button';
@@ -12,19 +12,36 @@ interface CreateChannelDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   serverId: string;
+  onCreateChannel?: (serverId: string, name: string) => Promise<void>;
+  isCreating?: boolean;
 }
 
-  export const CreateChannelDialog: React.FC<CreateChannelDialogProps> = ({
-    open,
-    onOpenChange,
-    serverId,
-  }) => {
-    const [name, setName] = useState('');
-    const { createChannel} = useApp();
+export const CreateChannelDialog: React.FC<CreateChannelDialogProps> = ({
+  open,
+  onOpenChange,
+  serverId,
+  onCreateChannel,
+  isCreating = false,
+}) => {
+  const [name, setName] = useState('');
+  const { createChannel } = useApp();
+
+  // Reset name when dialog opens
+  useEffect(() => {
+    if (open) {
+      setName('');
+    }
+  }, [open]);
 
   const handleCreate = async () => {
     if (name.trim()) {
       try {
+        const formattedName = name.toLowerCase().replace(/\s+/g, '-');
+        if (onCreateChannel) {
+          await onCreateChannel(serverId, formattedName);
+        } else {
+          await createChannel(serverId, formattedName);
+        }
         const formattedName = name.trim().toLowerCase().replace(/\s+/g, '-').slice(0, MAX_CHANNEL_NAME_LENGTH);
         await createChannel(serverId, formattedName);
         setName('');
@@ -73,8 +90,8 @@ interface CreateChannelDialogProps {
           >
             Cancel
           </Button>
-          <Button onClick={handleCreate} className="bg-[#06b6d4] hover:bg-[#0891b2] text-white border-none">
-            Create Room
+          <Button onClick={handleCreate} disabled={isCreating || !name.trim()} className="bg-[#06b6d4] hover:bg-[#0891b2] text-white border-none disabled:opacity-50 disabled:cursor-not-allowed">
+            {isCreating ? 'Creating...' : 'Create Room'}
           </Button>
         </DialogFooter>
       </DialogContent>
