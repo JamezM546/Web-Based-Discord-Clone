@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { User, Server, Channel, Message, FriendRequest, DirectMessage, ServerInvite } from '../types';
+import { User, Server, Channel, Message, FriendRequest, DirectMessage, ServerInvite, TypingUser } from '../types';
 import { apiService } from '../services/apiService';
+import { RealtimeEnvelope, websocketService } from '../services/websocketService';
 
 interface AppContextType {
   currentUser: User | null;
@@ -16,6 +17,8 @@ interface AppContextType {
   selectedDM: DirectMessage | null;
   lastReadMessages: Record<string, Date>;
   replyingTo: Message | null;
+  getTypingUsers: (channelId?: string, dmId?: string) => User[];
+  notifyTypingActivity: (params: { channelId?: string; dmId?: string; isTyping: boolean }) => void;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<boolean>;
   register: (username: string, email: string, password: string) => Promise<boolean>;
@@ -70,6 +73,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [friends, setFriends] = useState<User[]>([]);
+  const [typingUsersByRoom, setTypingUsersByRoom] = useState<Record<string, TypingUser[]>>({});
+  const sortDirectMessagesByActivity = useCallback((items: DirectMessage[]) => {
+    return [...items].sort(
+      (a, b) => new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime()
+    );
+  }, []);
 
   // ── Helpers for per-user localStorage read-state ───────────────────────────
   const readStateKey = (userId: string) => `lastReadMessages_${userId}`;
@@ -122,6 +131,33 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     reactions: row.reactions || undefined,
   });
 
+  const getRoomId = (channelId?: string, dmId?: string) => {
+    if (channelId) return `channel:${channelId}`;
+    if (dmId) return `dm:${dmId}`;
+    return null;
+  };
+
+  const upsertMessage = useCallback((message: Message) => {
+    setMessages((prev) => {
+      const existingIndex = prev.findIndex((m) => m.id === message.id);
+      if (existingIndex === -1) {
+        return [...prev, message];
+      }
+
+      return prev.map((m) => (m.id === message.id ? { ...m, ...message } : m));
+    });
+  }, []);
+
+  const upsertDirectMessage = useCallback((dm: DirectMessage) => {
+    setDirectMessages((prev) => {
+      const next = prev.some((item) => item.id === dm.id)
+        ? prev.map((item) => (item.id === dm.id ? { ...item, ...dm } : item))
+        : [...prev, dm];
+
+      return sortDirectMessagesByActivity(next);
+    });
+  }, [sortDirectMessagesByActivity]);
+
   const mergeUsersFromMessageRows = useCallback((rows: any[]) => {
     if (!rows || rows.length === 0) return;
 
@@ -157,6 +193,138 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       return Array.from(map.values());
     });
   }, []);
+
+  const fetchUserDirectMessages = useCallback(async () => {
+    try {
+      const dmRows = await apiService.getDirectMessages();
+      const mapped: DirectMessage[] = (dmRows || []).map((row: any) => ({
+        id: row.id,
+        participants: row.participants,
+        lastMessageTime: new Date(row.last_message_time),
+      }));
+      setDirectMessages(sortDirectMessagesByActivity(mapped));
+
+      const otherUsers: User[] = (dmRows || [])
+        .filter((r: any) => r.other_user_id && r.username)
+        .map((r: any) => ({
+          id: r.other_user_id,
+          username: r.username,
+          displayName: r.display_name || undefined,
+          email: '',
+          avatar: r.avatar,
+          status: (r.status || 'online') as User['status'],
+        }));
+      upsertUsers(otherUsers);
+    } catch (error) {
+      console.error('Failed to fetch direct messages:', error);
+    }
+  }, [sortDirectMessagesByActivity, upsertUsers]);
+
+  const getTypingUsers = useCallback((channelId?: string, dmId?: string) => {
+    const roomId = getRoomId(channelId, dmId);
+    if (!roomId) return [];
+
+    const typingUsers = typingUsersByRoom[roomId] || [];
+    return typingUsers
+      .map((typingUser) => users.find((u) => u.id === typingUser.userId))
+      .filter((user): user is User => !!user);
+  }, [typingUsersByRoom, users]);
+
+  const notifyTypingActivity = useCallback((params: { channelId?: string; dmId?: string; isTyping: boolean }) => {
+    const roomId = getRoomId(params.channelId, params.dmId);
+    if (!roomId) return;
+
+    if (params.isTyping) {
+      websocketService.sendTypingStart(roomId);
+      return;
+    }
+
+    websocketService.sendTypingStop(roomId);
+  }, []);
+
+  const handleRealtimeEvent = useCallback((event: RealtimeEnvelope) => {
+    switch (event.type) {
+      case 'messageCreated': {
+        const row = event.data?.message;
+        if (!row) return;
+        mergeUsersFromMessageRows([row]);
+        upsertMessage(mapBackendMessageRowToFrontend(row));
+
+        if (row.dm_id) {
+          const existingDm = directMessages.find((dm) => dm.id === row.dm_id);
+          if (existingDm) {
+            upsertDirectMessage({
+              ...existingDm,
+              lastMessageTime: new Date(row.timestamp),
+            });
+          } else {
+            void fetchUserDirectMessages();
+          }
+        }
+        return;
+      }
+      case 'messageUpdated': {
+        const row = event.data?.message;
+        if (!row) return;
+        mergeUsersFromMessageRows([row]);
+        upsertMessage(mapBackendMessageRowToFrontend(row));
+        return;
+      }
+      case 'messageDeleted': {
+        const messageId = event.data?.messageId;
+        if (!messageId) return;
+        setMessages((prev) => prev.filter((message) => message.id !== messageId));
+        return;
+      }
+      case 'reactionToggled': {
+        const messageId = event.data?.messageId;
+        if (!messageId) return;
+        setMessages((prev) =>
+          prev.map((message) =>
+            message.id === messageId
+              ? { ...message, reactions: event.data?.reactions || [] }
+              : message
+          )
+        );
+        return;
+      }
+      case 'typingStarted': {
+        const roomId = event.data?.roomId;
+        const userId = event.data?.userId;
+        if (!roomId || !userId || userId === currentUser?.id) return;
+
+        setTypingUsersByRoom((prev) => {
+          const roomUsers = prev[roomId] || [];
+          if (roomUsers.some((user) => user.userId === userId)) return prev;
+
+          return {
+            ...prev,
+            [roomId]: [
+              ...roomUsers,
+              {
+                userId,
+                username: event.data?.username || null,
+              },
+            ],
+          };
+        });
+        return;
+      }
+      case 'typingStopped': {
+        const roomId = event.data?.roomId;
+        const userId = event.data?.userId;
+        if (!roomId || !userId) return;
+
+        setTypingUsersByRoom((prev) => ({
+          ...prev,
+          [roomId]: (prev[roomId] || []).filter((user) => user.userId !== userId),
+        }));
+        return;
+      }
+      default:
+        return;
+    }
+  }, [currentUser?.id, directMessages, fetchUserDirectMessages, mergeUsersFromMessageRows, upsertDirectMessage, upsertMessage]);
 
   // ---------------------------------------------------------------------------
   // Backend fetch helpers
@@ -203,32 +371,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setChannels([]);
     }
   };
-
-  const fetchUserDirectMessages = useCallback(async () => {
-    try {
-      const dmRows = await apiService.getDirectMessages();
-      const mapped: DirectMessage[] = (dmRows || []).map((row: any) => ({
-        id: row.id,
-        participants: row.participants,
-        lastMessageTime: new Date(row.last_message_time),
-      }));
-      setDirectMessages(mapped);
-
-      const otherUsers: User[] = (dmRows || [])
-        .filter((r: any) => r.other_user_id && r.username)
-        .map((r: any) => ({
-          id: r.other_user_id,
-          username: r.username,
-          displayName: r.display_name || undefined,
-          email: '',
-          avatar: r.avatar,
-          status: (r.status || 'online') as User['status'],
-        }));
-      upsertUsers(otherUsers);
-    } catch (error) {
-      console.error('Failed to fetch direct messages:', error);
-    }
-  }, [upsertUsers]);
 
   const fetchFriends = useCallback(async () => {
     try {
@@ -347,6 +489,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     checkAuth();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => websocketService.subscribe(handleRealtimeEvent), [handleRealtimeEvent]);
+
+  useEffect(() => {
+    const token = apiService.getToken();
+    if (!currentUser || !token) {
+      websocketService.disconnect();
+      return;
+    }
+
+    websocketService.connect(token);
+    return () => {
+      websocketService.disconnect();
+    };
+  }, [currentUser?.id]);
+
   // ---------------------------------------------------------------------------
   // Fetch messages when room changes
   // ---------------------------------------------------------------------------
@@ -385,6 +542,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     void run();
     return () => { cancelled = true; };
   }, [selectedChannel?.id, selectedDM?.id, currentUser?.id, mergeUsersFromMessageRows]);
+
+  useEffect(() => {
+    const roomId = getRoomId(selectedChannel?.id, selectedDM?.id);
+    websocketService.setActiveRoom(roomId);
+
+    return () => {
+      if (roomId) {
+        websocketService.sendTypingStop(roomId);
+      }
+    };
+  }, [selectedChannel?.id, selectedDM?.id]);
 
   // Load member user objects when a server is selected
   useEffect(() => {
@@ -597,14 +765,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       try {
         const row = await apiService.createMessage({ content, channelId, dmId, replyToId, serverInviteId });
         mergeUsersFromMessageRows([row]);
-        setMessages((prev) => [...prev, mapBackendMessageRowToFrontend(row)]);
+        upsertMessage(mapBackendMessageRowToFrontend(row));
         // Mark as read immediately when you send — you've seen your own message.
         const key = channelId || dmId;
         if (key) setLastReadMessages((prev) => ({ ...prev, [key]: new Date() }));
         if (dmId) {
-          setDirectMessages((prev) =>
-            prev.map((dm) => (dm.id === dmId ? { ...dm, lastMessageTime: new Date() } : dm))
-          );
+          const existingDm = directMessages.find((dm) => dm.id === dmId);
+          if (existingDm) {
+            upsertDirectMessage({
+              ...existingDm,
+              lastMessageTime: new Date(),
+            });
+          }
         }
       } catch (error) {
         console.error('Failed to send message:', error);
@@ -715,10 +887,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           participants: dmRow.participants,
           lastMessageTime: new Date(dmRow.last_message_time),
         };
-        setDirectMessages((prev) => {
-          if (prev.some((d) => d.id === newDM.id)) return prev;
-          return [...prev, newDM];
-        });
+        upsertDirectMessage(newDM);
         if (dmRow.other_user_id && dmRow.username) {
           upsertUsers([{
             id: dmRow.other_user_id,
@@ -861,6 +1030,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       console.error('Failed to notify backend during logout:', error);
     });
     apiService.logout();
+    websocketService.disconnect();
     setCurrentUser(null);
     setUsers([]);
     setServers([]);
@@ -873,6 +1043,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setSelectedServer(null);
     setSelectedChannel(null);
     setSelectedDM(null);
+    setTypingUsersByRoom({});
     // Clear in-memory read state but leave the per-user localStorage key intact
     // so the same user's read positions are restored on next login.
     setLastReadMessages({});
@@ -898,6 +1069,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         selectedDM,
         lastReadMessages,
         replyingTo,
+        getTypingUsers,
+        notifyTypingActivity,
         isLoading,
         login,
         register,
