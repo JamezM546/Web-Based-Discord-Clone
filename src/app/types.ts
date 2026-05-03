@@ -68,3 +68,14 @@ export interface ServerInvite {
   serverName?: string;
   serverIcon?: string;
 }
+
+export interface InviteCode {
+  id: string;
+  code: string;
+  serverId: string;
+  createdBy: string;
+  createdAt: string;
+  expiresAt?: string | null;
+  maxUses: number;
+  usesCount: number;
+}
