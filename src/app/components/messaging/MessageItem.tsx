@@ -21,7 +21,7 @@ interface MessageItemProps {
 }
 
 export const MessageItem: React.FC<MessageItemProps> = ({ message, onScrollToMessage }) => {
-  const { users, currentUser, editMessage, deleteMessage, toggleReaction, messages, setReplyingTo, serverInvites, servers, acceptServerInvite, declineServerInvite } = useApp();
+  const { users, currentUser, editMessage, deleteMessage, toggleReaction, messages, setReplyingTo, serverInvites, servers, selectedDM, acceptServerInvite, declineServerInvite } = useApp();
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(message.content);
   const [reactionPickerOpen, setReactionPickerOpen] = useState(false);
@@ -39,6 +39,18 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, onScrollToMes
       (serverInvite.serverName ? { id: serverInvite.serverId, name: serverInvite.serverName, icon: serverInvite.serverIcon || '📁', ownerId: '', members: [] } : null)
     : null;
   const isInviteRecipient = serverInvite && currentUser && serverInvite.toUserId === currentUser.id;
+  const invitedUser =
+    (serverInvite ? users.find((u) => u.id === serverInvite.toUserId) : null) ||
+    (isOwnMessage && selectedDM
+      ? users.find((u) => selectedDM.participants.includes(u.id) && u.id !== currentUser?.id)
+      : null);
+  const fallbackInviteTarget = message.content.replace(/^invited you to join\s+/i, '').trim();
+  const inviteDisplayContent =
+    isOwnMessage && message.serverInviteId && invitedUser
+      ? `You invited ${invitedUser.displayName || invitedUser.username} to join ${
+          invitedServer ? `${invitedServer.name} ${invitedServer.icon || ''}`.trim() : fallbackInviteTarget
+        }`.trim()
+      : message.content;
 
   const authorDisplayName = author?.displayName || author?.username;
   const repliedAuthorDisplayName = repliedAuthor?.displayName || repliedAuthor?.username;
@@ -224,7 +236,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, onScrollToMes
                 their text content naturally as part of the paragraph.
               */}
               <p className="text-[#b0bec5] text-sm break-words leading-relaxed">
-                {renderMessageContent(message.content)}
+                {renderMessageContent(inviteDisplayContent)}
               </p>
 
               {/* Server Invite Card */}

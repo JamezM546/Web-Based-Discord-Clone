@@ -259,4 +259,32 @@ describe('Websocket realtime delivery', () => {
     openSockets.delete(senderSocket);
   });
 
+  test('publishes invite message and invite metadata to the recipient user room', async () => {
+    const inviteeName = `wsinvite${Date.now()}`;
+    const inviteeRes = await request.post('/api/auth/register').send({
+      username: inviteeName,
+      email: `${inviteeName}@test.com`,
+      password: 'pass1234',
+    });
+
+    const inviteeSocket = await connectAuthenticatedClient(inviteeRes.body.data.token);
+    const messagePromise = waitForEvent(inviteeSocket, 'messageCreated');
+    const invitePromise = waitForEvent(inviteeSocket, 'serverInviteCreated');
+
+    const res = await request
+      .post('/api/invites')
+      .set('Authorization', `Bearer ${getToken()}`)
+      .send({ serverId: 's1', toUserId: inviteeRes.body.data.user.id });
+
+    expect(res.status).toBe(201);
+
+    const [messageEvent, inviteEvent] = await Promise.all([messagePromise, invitePromise]);
+    expect(messageEvent.data.message.server_invite_id || messageEvent.data.message.serverInviteId).toBe(res.body.data.invite.id);
+    expect(inviteEvent.data.invite.id).toBe(res.body.data.invite.id);
+    expect(inviteEvent.data.invite.to_user_id).toBe(inviteeRes.body.data.user.id);
+
+    inviteeSocket.close();
+    openSockets.delete(inviteeSocket);
+  });
+
 });

@@ -401,6 +401,32 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
         return;
       }
+      case 'serverInviteCreated': {
+        const invite = event.data?.invite;
+        if (!invite?.id) return;
+
+        const mappedInvite: ServerInvite = {
+          id: invite.id,
+          serverId: invite.server_id,
+          fromUserId: invite.from_user_id,
+          toUserId: invite.to_user_id,
+          status: invite.status as ServerInvite['status'],
+          timestamp: new Date(invite.created_at),
+          messageId: invite.message_id || undefined,
+          serverName: invite.server_name || undefined,
+          serverIcon: invite.server_icon || undefined,
+        };
+
+        setServerInvites((prev) => {
+          const existing = prev.find((item) => item.id === mappedInvite.id);
+          if (existing) {
+            return prev.map((item) => (item.id === mappedInvite.id ? mappedInvite : item));
+          }
+
+          return [mappedInvite, ...prev];
+        });
+        return;
+      }
       default:
         return;
     }

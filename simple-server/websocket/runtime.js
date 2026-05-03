@@ -163,6 +163,17 @@ const createRealtimeRuntime = ({ store, sendToConnection }) => {
     );
   };
 
+  const publishServerInviteCreated = async (invite) => {
+    if (!invite?.to_user_id) return;
+
+    await publishUserEvent(invite.to_user_id, {
+      type: 'serverInviteCreated',
+      data: {
+        invite,
+      },
+    });
+  };
+
   const runtime = {
     store: realtimeStore,
     requireAuthenticatedConnection,
@@ -177,6 +188,7 @@ const createRealtimeRuntime = ({ store, sendToConnection }) => {
     publishUserStatusChanged,
     publishFriendRequestCreated,
     publishFriendRequestAccepted,
+    publishServerInviteCreated,
   };
 
   return runtime;
