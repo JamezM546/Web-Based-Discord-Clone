@@ -95,7 +95,7 @@ export const FriendsList: React.FC<FriendsListProps> = ({ searchQuery }) => {
                     {/* Visible status text is aria-hidden — status is already in the avatar alt */}
                     <div className="text-[#475569] text-xs" aria-hidden="true">{statusLabel}</div>
                   </div>
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                  <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all">
                     <button
                       onClick={() => createDirectMessage(friend.id)}
                       aria-label={`Send direct message to ${displayName}`}

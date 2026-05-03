@@ -819,7 +819,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     try {
       await apiService.deleteServer(serverId);
       setServers((prev) => prev.filter((s) => s.id !== serverId));
-      if (selectedServer?.id === serverId) setSelectedServer(null);
+      if (selectedServer?.id === serverId) {
+        setSelectedServer(null);
+        setSelectedChannel(null);
+        setSelectedDM(null);
+        setMessages([]);
+        setReplyingTo(null);
+      } else if (selectedChannel?.serverId === serverId) {
+        setSelectedChannel(null);
+        setMessages([]);
+        setReplyingTo(null);
+      }
       setChannels((prev) => prev.filter((c) => c.serverId !== serverId));
     } catch (error) {
       console.error('Failed to delete server:', error);
@@ -831,7 +841,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     try {
       await apiService.leaveServer(serverId);
       setServers((prev) => prev.filter((s) => s.id !== serverId));
-      if (selectedServer?.id === serverId) setSelectedServer(null);
+      if (selectedServer?.id === serverId) {
+        setSelectedServer(null);
+        setSelectedChannel(null);
+        setSelectedDM(null);
+        setMessages([]);
+        setReplyingTo(null);
+      } else if (selectedChannel?.serverId === serverId) {
+        setSelectedChannel(null);
+        setMessages([]);
+        setReplyingTo(null);
+      }
       setChannels((prev) => prev.filter((c) => c.serverId !== serverId));
     } catch (error) {
       console.error('Failed to leave server:', error);
