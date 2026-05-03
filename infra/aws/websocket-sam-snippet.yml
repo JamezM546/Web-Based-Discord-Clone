@@ -1,0 +1,105 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: WebSocket infra (example SAM snippet) — replace CodeUri and adjust names/roles as needed
+
+Globals:
+  Function:
+    Timeout: 10
+
+Resources:
+  WebSocketConnectionsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: WebSocketConnections
+      AttributeDefinitions:
+        - AttributeName: connectionId
+          AttributeType: S
+        - AttributeName: roomId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: connectionId
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+      GlobalSecondaryIndexes:
+        - IndexName: roomId-index
+          KeySchema:
+            - AttributeName: roomId
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+
+  WsConnectFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: wsConnect
+      Handler: connect.handler
+      Runtime: nodejs18.x
+      CodeUri: simple-server/ws/
+      Environment:
+        Variables:
+          CONNECTIONS_TABLE: !Ref WebSocketConnectionsTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref WebSocketConnectionsTable
+
+  WsDisconnectFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: wsDisconnect
+      Handler: disconnect.handler
+      Runtime: nodejs18.x
+      CodeUri: simple-server/ws/
+      Environment:
+        Variables:
+          CONNECTIONS_TABLE: !Ref WebSocketConnectionsTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref WebSocketConnectionsTable
+
+  # Note: The WebSocket API is created separately; SAM can create Api event for WebSocket using "Api" event type.
+  WebSocketApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: ChatWebSocketApi
+      ProtocolType: WEBSOCKET
+      RouteSelectionExpression: $request.body.action
+      StageName: prod
+      DefinitionBody:
+        openapi: 3.0.1
+        x-amazon-apigateway-integration: {}
+
+  # Attach `$connect` and `$disconnect` routes to Lambda functions
+  WsConnectEventBinding:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: wsConnectBinding
+      Handler: connect.handler
+      Runtime: nodejs18.x
+      CodeUri: simple-server/ws/
+      Events:
+        WebSocketConnect:
+          Type: Api
+          Properties:
+            Path: $connect
+            Method: POST
+            RestApiId: !Ref WebSocketApi
+
+  WsDisconnectEventBinding:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: wsDisconnectBinding
+      Handler: disconnect.handler
+      Runtime: nodejs18.x
+      CodeUri: simple-server/ws/
+      Events:
+        WebSocketDisconnect:
+          Type: Api
+          Properties:
+            Path: $disconnect
+            Method: POST
+            RestApiId: !Ref WebSocketApi
+
+Outputs:
+  WebSocketApiUrl:
+    Description: WebSocket API URL
+    Value: !Sub "${WebSocketApi}.execute-api.${AWS::Region}.amazonaws.com/prod"

@@ -1,0 +1,36 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowDynamoDBConnectionsTable",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:PutItem",
+        "dynamodb:DeleteItem",
+        "dynamodb:Query",
+        "dynamodb:Scan",
+        "dynamodb:GetItem",
+        "dynamodb:UpdateItem"
+      ],
+      "Resource": "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/WebSocketConnections"
+    },
+    {
+      "Sid": "AllowManageConnections",
+      "Effect": "Allow",
+      "Action": [
+        "execute-api:ManageConnections"
+      ],
+      "Resource": "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:*/*/@connections/*"
+    },
+    {
+      "Sid": "AllowCloudWatchLogs",
+      "Effect": "Allow",
+      "Action": [
+        "logs:CreateLogGroup",
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+      ],
+      "Resource": "*"
+    }
+  ]
+}

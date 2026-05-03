@@ -50,6 +50,7 @@ interface AppContextType {
   setReplyingTo: (message: Message | null) => void;
   refreshFriends: () => Promise<void>;
   refreshFriendRequests: () => Promise<void>;
+  addReceivedMessage: (message: any) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -557,7 +558,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       try {
         const row = await apiService.createMessage({ content, channelId, dmId, replyToId, serverInviteId });
         mergeUsersFromMessageRows([row]);
-        setMessages((prev) => [...prev, mapBackendMessageRowToFrontend(row)]);
+        // Don't add to state here - let WebSocket broadcast be the source of truth
+        // setMessages((prev) => [...prev, mapBackendMessageRowToFrontend(row)]);
         if (dmId) {
           setDirectMessages((prev) =>
             prev.map((dm) => (dm.id === dmId ? { ...dm, lastMessageTime: new Date() } : dm))
@@ -823,6 +825,56 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   // ---------------------------------------------------------------------------
+  // WebSocket message handler
+  // ---------------------------------------------------------------------------
+
+  const addReceivedMessage = useCallback((backendMessage: any) => {
+    console.log('[AppContext] addReceivedMessage called with:', backendMessage);
+    if (!backendMessage || !backendMessage.id) return;
+
+    // Transform backend message to frontend format
+    const frontendMessage: Message = {
+      id: backendMessage.id,
+      content: backendMessage.content,
+      authorId: backendMessage.author_id,
+      channelId: backendMessage.channel_id || undefined,
+      dmId: backendMessage.dm_id || undefined,
+      timestamp: new Date(backendMessage.timestamp),
+      edited: !!backendMessage.edited,
+      replyToId: backendMessage.reply_to_id || undefined,
+      serverInviteId: backendMessage.server_invite_id || undefined,
+      reactions: backendMessage.reactions || undefined,
+    };
+
+    // Add user if not already in list
+    if (backendMessage.author_id && backendMessage.username) {
+      const user: User = {
+        id: backendMessage.author_id,
+        username: backendMessage.username,
+        displayName: backendMessage.display_name || undefined,
+        email: '',
+        avatar: backendMessage.avatar,
+        status: (backendMessage.status || 'online') as User['status'],
+      };
+      setUsers((prev) => {
+        const exists = prev.find(u => u.id === user.id);
+        return exists ? prev : [...prev, user];
+      });
+    }
+
+    // Add message to state, deduplicating by ID
+    setMessages((prev) => {
+      const exists = prev.find(m => m.id === frontendMessage.id);
+      if (exists) {
+        console.log('[AppContext] Message already exists (dedup)', frontendMessage.id);
+        return prev;
+      }
+      console.log('[AppContext] Adding new message', frontendMessage.id);
+      return [...prev, frontendMessage];
+    });
+  }, []);
+
+  // ---------------------------------------------------------------------------
   // Provider
   // ---------------------------------------------------------------------------
 
@@ -876,6 +928,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setReplyingTo,
         refreshFriends,
         refreshFriendRequests,
+        addReceivedMessage,
       }}
     >
       {children}

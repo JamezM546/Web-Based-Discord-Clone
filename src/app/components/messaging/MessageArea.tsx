@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { useWebSocket } from '../../hooks/useWebSocket';
 import { MessageItem } from './MessageItem';
 import { MessageInput } from './MessageInput';
 import { WhatYouMissed } from './WhatYouMissed';
@@ -8,11 +9,21 @@ import { Hash, Sparkles, MessageSquare } from 'lucide-react';
 import { ScrollArea } from '../ui/scroll-area';
 
 export const MessageArea: React.FC = () => {
-  const { selectedChannel, selectedDM, messages, users, currentUser, getUnreadMessages, markAsRead } = useApp();
+  const { selectedChannel, selectedDM, messages, users, currentUser, getUnreadMessages, markAsRead, addReceivedMessage } = useApp();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [dismissedSummaries, setDismissedSummaries] = useState<Record<string, boolean>>({});
   const [showManualSummary, setShowManualSummary] = useState(false);
   const unreadStartRef = useRef<HTMLDivElement>(null);
+
+  // WebSocket integration for real-time messaging
+  const { isConnected, joinRoom, leaveRoom } = useWebSocket({
+    onMessageCreate: (event) => {
+      console.log('[MessageArea] Received message:create event', event);
+      if (event.data && event.data.message) {
+        addReceivedMessage(event.data.message);
+      }
+    }
+  });
 
   const scrollToMessage = (messageId: string) => {
     const element = document.getElementById(`message-${messageId}`);
@@ -30,6 +41,52 @@ export const MessageArea: React.FC = () => {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
+
+  // Join/leave room when selected channel or DM changes
+  useEffect(() => {
+    if (isConnected) {
+      if (selectedChannel) {
+        console.log('[MessageArea] Joining channel room:', selectedChannel.id);
+        joinRoom(`channel:${selectedChannel.id}`);
+        return () => {
+          console.log('[MessageArea] Leaving channel room:', selectedChannel.id);
+          leaveRoom(`channel:${selectedChannel.id}`);
+        };
+      } else if (selectedDM) {
+        console.log('[MessageArea] Joining DM room:', selectedDM.id);
+        joinRoom(`dm:${selectedDM.id}`);
+        return () => {
+          console.log('[MessageArea] Leaving DM room:', selectedDM.id);
+          leaveRoom(`dm:${selectedDM.id}`);
+        };
+      }
+    }
+  }, [isConnected, selectedChannel, selectedDM, joinRoom, leaveRoom]);
+
+  console.log('[MessageArea] WS isConnected:', isConnected);
+
+  // Join/leave room when selected channel or DM changes
+  useEffect(() => {
+    if (isConnected) {
+      if (selectedChannel) {
+        console.log('[MessageArea] Joining channel room:', selectedChannel.id);
+        joinRoom(`channel:${selectedChannel.id}`);
+        return () => {
+          console.log('[MessageArea] Leaving channel room:', selectedChannel.id);
+          leaveRoom(`channel:${selectedChannel.id}`);
+        };
+      } else if (selectedDM) {
+        console.log('[MessageArea] Joining DM room:', selectedDM.id);
+        joinRoom(`dm:${selectedDM.id}`);
+        return () => {
+          console.log('[MessageArea] Leaving DM room:', selectedDM.id);
+          leaveRoom(`dm:${selectedDM.id}`);
+        };
+      }
+    }
+  }, [isConnected, selectedChannel, selectedDM, joinRoom, leaveRoom]);
+
+  console.log('[MessageArea] WS isConnected:', isConnected);
 
   const unreadMessages = selectedChannel
     ? getUnreadMessages(selectedChannel.id)

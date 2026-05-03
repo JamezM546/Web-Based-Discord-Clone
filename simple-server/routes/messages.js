@@ -191,6 +191,19 @@ router.post('/', authenticateToken, async (req, res) => {
     // Re-fetch with author display info
     const messageWithAuthor = await Message.findById(message.id);
 
+    // Broadcast to connected WebSocket clients (best-effort)
+    try {
+      const { publishToRoom } = require('../ws/publisher');
+      const roomId = messageWithAuthor.channel_id ? `channel:${messageWithAuthor.channel_id}` : `dm:${messageWithAuthor.dm_id}`;
+      const domain = process.env.WS_API_DOMAIN; // '{api-id}.execute-api.{region}.amazonaws.com'
+      const stage = process.env.WS_API_STAGE || 'prod';
+      const payload = { type: 'message:create', data: { roomId, message: messageWithAuthor } };
+      // publishToRoom returns number of connections attempted
+      publishToRoom(domain, stage, roomId, payload).catch(err => console.warn('WS publish failed', err && err.message));
+    } catch (err) {
+      console.warn('WebSocket publisher unavailable', err && err.message);
+    }
+
     res.status(201).json({
       success: true,
       message: 'Message created successfully',
