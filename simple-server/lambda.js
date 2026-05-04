@@ -5,11 +5,24 @@
 require('dotenv').config();
 const serverless = require('serverless-http');
 const { app, initAll } = require('./server');
+const { setRealtimeRuntime } = require('./websocket/gateway');
+const { createAwsRealtimeRuntime, isAwsRealtimeEnabled } = require('./websocket/awsRuntime');
 
 let initPromise;
+let runtimeInitialized = false;
+
+function ensureRealtimeRuntime() {
+  if (runtimeInitialized || !isAwsRealtimeEnabled()) {
+    return;
+  }
+
+  setRealtimeRuntime(createAwsRealtimeRuntime());
+  runtimeInitialized = true;
+}
 
 function ensureInit() {
   if (!initPromise) {
+    ensureRealtimeRuntime();
     initPromise = initAll();
   }
   return initPromise;

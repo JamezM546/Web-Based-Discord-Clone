@@ -6,7 +6,7 @@ module.exports = async ({ connectionId, data, runtime }) => {
     throw new Error('A valid roomId is required');
   }
 
-  const connection = runtime.requireAuthenticatedConnection(connectionId);
+  const connection = await runtime.requireAuthenticatedConnection(connectionId);
   await runtime.broadcastToRoom(
     roomId,
     {

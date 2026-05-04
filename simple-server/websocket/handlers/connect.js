@@ -1,5 +1,5 @@
 module.exports = async ({ connectionId, runtime }) => {
-  runtime.store.registerConnection(connectionId);
+  await runtime.store.registerConnection(connectionId);
   return {
     type: 'connectionReady',
     data: {

@@ -1,6 +1,6 @@
 const createBroadcastService = ({ store, sendToConnection, onDeliveryFailure }) => {
   const broadcastToRoom = async (roomId, payload, options = {}) => {
-    const members = store.getRoomMembers(roomId);
+    const members = await store.getRoomMembers(roomId);
     const excludedConnectionId = options.excludeConnectionId || null;
 
     await Promise.all(

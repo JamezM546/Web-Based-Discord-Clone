@@ -5,7 +5,7 @@ name: Deploy frontend via AWS Amplify
 on:
   push:
     branches:
-      - main
+      - dev
   workflow_dispatch:
 
 jobs:
@@ -24,6 +24,7 @@ jobs:
       - name: Install and build (sanity-check before Amplify build)
         env:
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
+          VITE_WS_URL: ${{ secrets.VITE_WS_URL }}
         run: |
           npm ci
           npm run build

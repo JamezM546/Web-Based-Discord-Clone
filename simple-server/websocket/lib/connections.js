@@ -18,7 +18,7 @@ const createInMemoryRealtimeStore = () => {
   };
 
   return {
-    registerConnection(connectionId, metadata = {}) {
+    async registerConnection(connectionId, metadata = {}) {
       connections.set(connectionId, {
         connectionId,
         authenticated: false,
@@ -28,11 +28,11 @@ const createInMemoryRealtimeStore = () => {
       return connections.get(connectionId);
     },
 
-    getConnection(connectionId) {
+    async getConnection(connectionId) {
       return connections.get(connectionId) || null;
     },
 
-    authenticateConnection(connectionId, authData) {
+    async authenticateConnection(connectionId, authData) {
       const current = connections.get(connectionId);
       if (!current) return null;
 
@@ -47,14 +47,14 @@ const createInMemoryRealtimeStore = () => {
       return next;
     },
 
-    removeConnection(connectionId) {
-      const rooms = this.removeConnectionMemberships(connectionId);
+    async removeConnection(connectionId) {
+      const rooms = await this.removeConnectionMemberships(connectionId);
       connections.delete(connectionId);
       connectionRooms.delete(connectionId);
       return rooms;
     },
 
-    addConnectionToRoom(roomId, connectionId, membershipData = {}) {
+    async addConnectionToRoom(roomId, connectionId, membershipData = {}) {
       getRoomConnectionSet(roomId).add(connectionId);
       getConnectionRoomSet(connectionId).add(roomId);
 
@@ -70,7 +70,7 @@ const createInMemoryRealtimeStore = () => {
       return next;
     },
 
-    removeConnectionFromRoom(roomId, connectionId) {
+    async removeConnectionFromRoom(roomId, connectionId) {
       const roomSet = roomMembers.get(roomId);
       if (roomSet) {
         roomSet.delete(connectionId);
@@ -88,17 +88,17 @@ const createInMemoryRealtimeStore = () => {
       }
     },
 
-    removeConnectionMemberships(connectionId) {
+    async removeConnectionMemberships(connectionId) {
       const rooms = Array.from(connectionRooms.get(connectionId) || []);
-      rooms.forEach((roomId) => this.removeConnectionFromRoom(roomId, connectionId));
+      await Promise.all(rooms.map((roomId) => this.removeConnectionFromRoom(roomId, connectionId)));
       return rooms;
     },
 
-    getRoomMembers(roomId) {
+    async getRoomMembers(roomId) {
       return Array.from(roomMembers.get(roomId) || []).map((connectionId) => connections.get(connectionId)).filter(Boolean);
     },
 
-    listConnectionRooms(connectionId) {
+    async listConnectionRooms(connectionId) {
       return Array.from(connectionRooms.get(connectionId) || []);
     },
   };
