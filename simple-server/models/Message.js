@@ -33,9 +33,10 @@ class Message {
   // Find message by ID
   static async findById(id) {
     const query = `
-      SELECT m.*, u.username, u.display_name, u.avatar
+      SELECT m.*, u.username, u.display_name, u.avatar, dm.participants
       FROM messages m
       JOIN users u ON m.author_id = u.id
+      LEFT JOIN direct_messages dm ON dm.id = m.dm_id
       WHERE m.id = $1
     `;
     
@@ -69,6 +70,25 @@ class Message {
     try {
       const result = await pool.query(query, values);
       return result.rows.reverse(); // Reverse to get chronological order
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Get messages for a channel since a given timestamp
+  static async findSinceChannelId(channelId, since, limit = 50) {
+    const query = `
+      SELECT m.*, u.username, u.display_name, u.avatar
+      FROM messages m
+      JOIN users u ON m.author_id = u.id
+      WHERE m.channel_id = $1 AND m.timestamp > $2
+      ORDER BY m.timestamp ASC
+      LIMIT $3
+    `;
+
+    try {
+      const result = await pool.query(query, [channelId, since, limit]);
+      return result.rows;
     } catch (error) {
       throw error;
     }
@@ -272,6 +292,73 @@ class Message {
     try {
       const result = await pool.query(query, [channelId]);
       return parseInt(result.rows[0].count);
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Get unread message statistics for a channel since a given timestamp
+  static async getUnreadStats(channelId, since) {
+    const query = `
+      SELECT 
+        COUNT(*) as count,
+        MIN(timestamp) as first_unread_at,
+        MAX(timestamp) as last_unread_at
+      FROM messages
+      WHERE channel_id = $1 AND timestamp > $2
+    `;
+
+    try {
+      const result = await pool.query(query, [channelId, since]);
+      const row = result.rows[0];
+      return {
+        unreadCount: parseInt(row.count),
+        firstUnreadAt: row.first_unread_at,
+        lastUnreadAt: row.last_unread_at
+      };
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Get unread message statistics for a direct message since a given timestamp
+  static async getDmUnreadStats(dmId, since) {
+    const query = `
+      SELECT 
+        COUNT(*) as count,
+        MIN(timestamp) as first_unread_at,
+        MAX(timestamp) as last_unread_at
+      FROM messages
+      WHERE dm_id = $1 AND timestamp > $2
+    `;
+
+    try {
+      const result = await pool.query(query, [dmId, since]);
+      const row = result.rows[0];
+      return {
+        unreadCount: parseInt(row.count),
+        firstUnreadAt: row.first_unread_at,
+        lastUnreadAt: row.last_unread_at
+      };
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Fetch DM messages after a given timestamp (ascending time order)
+  static async findSinceDmId(dmId, since, limit = 50) {
+    const query = `
+      SELECT m.*, u.username, u.display_name, u.avatar
+      FROM messages m
+      JOIN users u ON m.author_id = u.id
+      WHERE m.dm_id = $1 AND m.timestamp > $2
+      ORDER BY m.timestamp ASC
+      LIMIT $3
+    `;
+
+    try {
+      const result = await pool.query(query, [dmId, since, limit]);
+      return result.rows;
     } catch (error) {
       throw error;
     }

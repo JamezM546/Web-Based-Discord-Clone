@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { Server } from '../../types';
+import { InviteCode, Server } from '../../types';
 import {
   Dialog,
   DialogContent,
@@ -10,7 +10,7 @@ import {
 } from '../ui/dialog';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
-import { X, Check } from 'lucide-react';
+import { X, Check, Copy, Link as LinkIcon } from 'lucide-react';
 
 interface InvitePeopleDialogProps {
   open: boolean;
@@ -23,11 +23,14 @@ export const InvitePeopleDialog: React.FC<InvitePeopleDialogProps> = ({
   onOpenChange,
   server,
 }) => {
-  const { users, sendServerInvite, currentUser, getFriends } = useApp();
+  const { users, sendServerInvite, getFriends, getInviteCodes, createInviteCode } = useApp();
   const [usernameInput, setUsernameInput] = useState('');
   const [selectedUsernames, setSelectedUsernames] = useState<string[]>([]);
   const [error, setError] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [inviteCodes, setInviteCodes] = useState<InviteCode[]>([]);
+  const [inviteLoading, setInviteLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
   
   // Get friends who are not already members
   const friends = getFriends();
@@ -42,6 +45,50 @@ export const InvitePeopleDialog: React.FC<InvitePeopleDialogProps> = ({
         (f.displayName && f.displayName.toLowerCase().startsWith(usernameInput.toLowerCase()))
       ).filter(f => !selectedUsernames.includes(f.username))
     : [];
+
+  const primaryInviteLink = useMemo(() => {
+    const primaryCode = inviteCodes[0]?.code;
+    if (!primaryCode || typeof window === 'undefined') return '';
+    return `${window.location.origin}/invite/${primaryCode}`;
+  }, [inviteCodes]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    let cancelled = false;
+
+    const loadInviteCodes = async () => {
+      try {
+        setInviteLoading(true);
+        const existingCodes = await getInviteCodes(server.id);
+        if (cancelled) return;
+
+        if (existingCodes.length > 0) {
+          setInviteCodes(existingCodes);
+          return;
+        }
+
+        const created = await createInviteCode(server.id);
+        if (!cancelled) {
+          setInviteCodes([created]);
+        }
+      } catch (loadError) {
+        if (!cancelled) {
+          console.error('Failed to load invite links:', loadError);
+        }
+      } finally {
+        if (!cancelled) {
+          setInviteLoading(false);
+        }
+      }
+    };
+
+    void loadInviteCodes();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [createInviteCode, getInviteCodes, open, server.id]);
 
   const handleAddUsername = () => {
     const trimmedUsername = usernameInput.trim();
@@ -121,7 +168,20 @@ export const InvitePeopleDialog: React.FC<InvitePeopleDialogProps> = ({
     setUsernameInput('');
     setError('');
     setShowSuggestions(false);
+    setCopied(false);
     onOpenChange(false);
+  };
+
+  const handleCopyInviteLink = async () => {
+    if (!primaryInviteLink) return;
+
+    try {
+      await navigator.clipboard.writeText(primaryInviteLink);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch (copyError) {
+      console.error('Failed to copy invite link:', copyError);
+    }
   };
 
   return (
@@ -250,6 +310,37 @@ export const InvitePeopleDialog: React.FC<InvitePeopleDialogProps> = ({
               No friends available to invite. All friends are already members.
             </div>
           )}
+
+          <div className="rounded-xl border border-[#1e3248] bg-[#111e30] p-3 space-y-3">
+            <div>
+              <div className="text-xs font-semibold text-[#64748b] uppercase tracking-wider mb-1">
+                Invite Link
+              </div>
+              <p className="text-xs text-[#94a3b8]">
+                Share a direct join link for this server.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <div className="relative flex-1 min-w-0">
+                <LinkIcon className="size-4 text-[#475569] absolute left-3 top-1/2 -translate-y-1/2" />
+                <Input
+                  value={inviteLoading ? 'Creating invite link...' : primaryInviteLink}
+                  readOnly
+                  className="bg-[#060c18] border border-[#1e3248] text-[#cbd5e1] pl-9 pr-3"
+                  placeholder="Invite link will appear here"
+                />
+              </div>
+              <Button
+                type="button"
+                disabled={!primaryInviteLink || inviteLoading}
+                onClick={() => void handleCopyInviteLink()}
+                className="bg-[#1a2d45] hover:bg-[#223a58] text-[#e2e8f0] border border-[#1e3248]"
+              >
+                <Copy className="size-4 mr-2" />
+                {copied ? 'Copied' : 'Copy'}
+              </Button>
+            </div>
+          </div>
 
           {/* Action Buttons */}
           <div className="flex justify-end gap-2 pt-2">

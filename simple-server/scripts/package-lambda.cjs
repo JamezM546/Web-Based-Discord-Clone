@@ -14,15 +14,19 @@ const ZIP_PATH = path.join(ROOT, 'lambda-deploy.zip');
 const COPY_NAMES = [
   'lambda.js',
   'server.js',
+  'websocket-lambda.js',
+  'websocket.js',
   'package.json',
   'package-lock.json',
   'docs.html',
   'config',
   'middleware',
   'models',
+  'prompts',
   'routes',
   'services',
   'utils',
+  'websocket',
 ];
 
 function rimraf(dir) {

@@ -1,6 +1,6 @@
 # AWS deployment — next phases (step-by-step)
 
-This guide picks up where the **local Docker app** leaves off. The repository already includes a **Lambda handler** (`simple-server/lambda.js`), **packaging** (`npm run package:lambda`), **Amplify build config** (`amplify.yml`), and **GitHub Actions** under `.github/workflows/`. Your job is to **create and wire** AWS resources and secrets.
+This guide picks up where the **local Docker app** leaves off. The repository already includes a **REST Lambda handler** (`simple-server/lambda.js`), a **websocket Lambda handler** (`simple-server/websocket-lambda.js`), **packaging** (`npm run package:lambda`), **Amplify build config** (`amplify.yml`), and **GitHub Actions** under `.github/workflows/`. Your job is to **create and wire** AWS resources and secrets.
 
 For a short overview, see the **P6** section in the [root README](../README.md).
 
@@ -85,6 +85,32 @@ Special characters in the password must be **URL-encoded**.
 
 6. **Test** — Add a test event or use API Gateway (next phase). **CloudWatch Logs** show connection and init errors.
 
+### Websocket Lambda
+
+1. **Create function** — Author from scratch, runtime **Node.js 20.x**.
+2. **Handler** — `websocket-lambda.handler`
+3. **Package upload** — Reuse the same package bundle:
+
+   ```bash
+   cd simple-server
+   npm ci
+   npm run package:lambda
+   ```
+
+   Upload **`simple-server/lambda-deploy.zip`** to the websocket Lambda as well.
+
+4. **Environment variables**:
+
+   | Variable | Purpose |
+   |----------|---------|
+   | `JWT_SECRET` | Verifies websocket auth tokens |
+   | `AWS_REGION` | Required for API Gateway Management API calls |
+   | `WEBSOCKET_API_ID` | API Gateway WebSocket API id |
+   | `WEBSOCKET_STAGE` | WebSocket API stage, e.g. `prod` |
+   | `WS_CONNECTIONS_TABLE` | DynamoDB table for connection state |
+   | `WS_ROOM_MEMBERSHIPS_TABLE` | DynamoDB table for room memberships |
+   | `WS_CONNECTION_ROOMS_INDEX` | Optional reverse lookup GSI name; defaults to `connectionId-roomId-index` |
+
 ---
 
 ## Phase 3 — API Gateway (REST)
@@ -100,6 +126,38 @@ Special characters in the password must be **URL-encoded**.
 
 ---
 
+## Phase 3B — API Gateway (WebSocket)
+
+1. Create an **API Gateway WebSocket API**.
+2. Add routes:
+   - `$connect`
+   - `$disconnect`
+   - `$default`
+3. Point all three routes to the websocket Lambda using Lambda proxy integration.
+4. Deploy the WebSocket API to a stage such as `prod`.
+5. Copy the WebSocket URL:
+
+   ```text
+   wss://<websocket-api-id>.execute-api.<region>.amazonaws.com/<stage>
+   ```
+
+6. Create DynamoDB tables:
+   - `ws_connections`
+     - partition key: `connectionId`
+   - `ws_room_memberships`
+     - partition key: `roomId`
+     - sort key: `connectionId`
+     - GSI:
+       - name: `connectionId-roomId-index`
+       - partition key: `connectionId`
+       - sort key: `roomId`
+
+7. Grant websocket Lambda permissions for:
+   - DynamoDB read/write on both tables
+   - `execute-api:ManageConnections` on the websocket API
+
+---
+
 ## Phase 4 — AWS Amplify (frontend)
 
 1. **Amplify Hosting** → **Host web app** → Connect **GitHub** → select repo and branch.
@@ -108,6 +166,7 @@ Special characters in the password must be **URL-encoded**.
 
    - `VITE_API_URL` = **API Gateway invoke URL** (same stage you deployed), e.g. `https://xxxx.execute-api.region.amazonaws.com/prod`  
      (No trailing slash required if your client joins paths correctly; match what `src/app/services/apiService.ts` expects.)
+   - `VITE_WS_URL` = **WebSocket API URL**, e.g. `wss://xxxx.execute-api.region.amazonaws.com/prod`
 
 4. **Redeploy** after changing env vars (rebuild picks up Vite env at build time).
 
@@ -139,20 +198,21 @@ Special characters in the password must be **URL-encoded**.
 
    - `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`
    - `LAMBDA_FUNCTION_NAME`
-   - `AMPLIFY_APP_ID`, `AMPLIFY_BRANCH` (e.g. `main`)
-   - Optional: `VITE_API_URL` for the **deploy-aws-amplify** workflow build step
+   - `AMPLIFY_APP_ID`, `AMPLIFY_BRANCH` (e.g. `dev`)
+   - `WS_LAMBDA_FUNCTION_NAME`
+   - `VITE_API_URL`
+   - `VITE_WS_URL`
 
 2. **IAM** — Use a user or role with **least privilege**: e.g. `lambda:UpdateFunctionCode`, `amplify:StartJob`, and read-only where possible. Prefer **OIDC** over long-lived keys if you advance beyond the course baseline ([GitHub docs](https://docs.github.com/en/actions/security-guides/using-secrets-in-github-actions)).
 
 3. **Workflows** (already in repo):
 
    - `run-integration-tests.yml` — runs on pushes/PRs with a **Postgres service**.
-   - `deploy-aws-lambda.yml` — on push to **`main`**, packages and updates Lambda.
-   - `deploy-aws-amplify.yml` — on push to **`main`**, builds and triggers **Amplify** `start-job`.
+   - `deploy-aws-lambda.yml` — on push to **`dev`**, packages and updates the REST Lambda.
+   - `deploy-aws-websocket-lambda.yml` — on push to **`dev`**, packages and updates the websocket Lambda.
+   - `deploy-aws-amplify.yml` — on push to **`dev`**, builds and triggers **Amplify** `start-job`.
 
-   Adjust branch names in the YAML if your default branch is not `main`.
-
-4. **Branch protection** — Require PR + passing checks (including integration tests) before merge to **`main`**, per assignment.
+4. **Branch protection** — Require PR + passing checks (including integration tests) before merge to **`dev`**, if `dev` is now your deploy branch.
 
 ---
 
@@ -181,10 +241,12 @@ Special characters in the password must be **URL-encoded**.
 | Item | Path |
 |------|------|
 | Lambda entry | `simple-server/lambda.js` |
+| Websocket Lambda entry | `simple-server/websocket-lambda.js` |
 | Package script | `simple-server/scripts/package-lambda.cjs` → `npm run package:lambda` |
 | DB pool + Lambda guard | `simple-server/config/database.js` |
 | Amplify build | `amplify.yml` |
+| Websocket runtime | `simple-server/websocket/runtime.js` |
 | Integration spec | `docs/INTEGRATION_TEST_SPEC.md` |
-| Workflows | `.github/workflows/run-integration-tests.yml`, `deploy-aws-lambda.yml`, `deploy-aws-amplify.yml` |
+| Workflows | `.github/workflows/run-integration-tests.yml`, `deploy-aws-lambda.yml`, `deploy-aws-websocket-lambda.yml`, `deploy-aws-amplify.yml` |
 
 When this guide is complete for your team, you should have a **public Amplify URL**, a working **API Gateway → Lambda** backend, and a **Postgres** instance referenced by **`DATABASE_URL`**.

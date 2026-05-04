@@ -4,7 +4,7 @@ name: Deploy backend to AWS Lambda
 on:
   push:
     branches:
-      - main
+      - dev
   workflow_dispatch:
 
 jobs:
@@ -35,6 +35,13 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Validate deploy secrets
+        run: |
+          if [ -z "${{ secrets.LAMBDA_FUNCTION_NAME }}" ]; then
+            echo "Missing required GitHub secret: LAMBDA_FUNCTION_NAME"
+            exit 1
+          fi
 
       - name: Update Lambda function code
         run: >

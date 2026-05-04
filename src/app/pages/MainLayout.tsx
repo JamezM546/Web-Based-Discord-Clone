@@ -9,10 +9,9 @@ import { AddFriendDialog } from '../components/user/AddFriendDialog';
 import { ServerSearchInput, ServerSearch } from '../components/search/ServerSearch';
 import { MemberList } from '../components/server/MemberList';
 import { CreateServerDialog } from '../components/server/CreateServerDialog';
-import { UserPlus, Plus, Home, Menu, Users, MessageSquare, Zap, ChevronLeft, ChevronRight, Search, X } from 'lucide-react';
+import { UserPlus, Plus, Menu, Users, MessageSquare, Zap, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '../components/ui/button';
-import { Input } from '../components/ui/input';
-import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from '../components/ui/sheet';
+import { Sheet, SheetContent, SheetTitle, SheetDescription } from '../components/ui/sheet';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../components/ui/tooltip';
 import { ScrollArea } from '../components/ui/scroll-area';
 
@@ -22,13 +21,54 @@ export const MainLayout: React.FC = () => {
   const [serverSearchQuery, setServerSearchQuery] = useState('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [createSpaceOpen, setCreateSpaceOpen] = useState(false);
-  const [showPeoplePanel, setShowPeoplePanel] = useState(true);
-  const [dmSearchQuery, setDmSearchQuery] = useState('');
+  const [showPeoplePanel, setShowPeoplePanel] = useState(false);
+  const [mobileHomeTab, setMobileHomeTab] = useState<'dms' | 'friends'>('dms');
 
   // Swipe state
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
   const swipeAreaRef = useRef<HTMLDivElement>(null);
+  const spacesViewportRef = useRef<HTMLDivElement | null>(null);
+  // selector to find the spaces viewport if ref isn't wired up
+  const spacesViewportSelector = '.spaces-scroll-area [data-slot="scroll-area-viewport"]';
+
+  // enable vertical wheel -> horizontal scroll for the spaces ScrollArea
+  React.useEffect(() => {
+    const handler = (e: WheelEvent) => {
+      const el = (e.target as Element) || null;
+      if (!el) return;
+      // only handle events that originate inside the spaces area
+      const inSpaces = el.closest && el.closest('.spaces-scroll-area');
+      if (!inSpaces) return;
+      // convert mostly-vertical wheel motion into horizontal scroll for the spaces strip
+      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+      e.preventDefault();
+      const vp = getVisibleSpacesViewport();
+      if (vp) vp.scrollBy({ left: e.deltaY, behavior: 'auto' });
+    };
+    document.addEventListener('wheel', handler, { passive: false });
+    return () => document.removeEventListener('wheel', handler as EventListener);
+  }, []);
+
+  const scrollViewportBy = (delta: number) => {
+    const vp = getVisibleSpacesViewport();
+    if (!vp) return;
+    vp.scrollBy({ left: delta, behavior: 'smooth' });
+  };
+
+  const getVisibleSpacesViewport = (): HTMLElement | null => {
+    // prefer ref
+    const refVp = spacesViewportRef.current as HTMLElement | null;
+    if (refVp && refVp.offsetParent !== null && (refVp.clientWidth || refVp.clientHeight)) return refVp;
+    // otherwise search all matching viewports and pick the first visible one
+    const nodes = Array.from(document.querySelectorAll(spacesViewportSelector)) as HTMLElement[];
+    for (const n of nodes) {
+      if (n.offsetParent !== null && (n.clientWidth || n.clientHeight)) return n;
+      const s = getComputedStyle(n);
+      if (s.display !== 'none' && s.visibility !== 'hidden' && (n.clientWidth || n.clientHeight)) return n;
+    }
+    return null;
+  };
 
   if (!currentUser) {
     return <Navigate to="/login" replace />;
@@ -54,6 +94,22 @@ export const MainLayout: React.FC = () => {
       setSelectedChannel(firstChannel);
       setSelectedDM(null);
     }
+
+    // After changing the selected view, ensure the corresponding tab (or the Add button)
+    // is visible inside the spaces ScrollArea viewport.
+    requestAnimationFrame(() => {
+      const vp = getVisibleSpacesViewport();
+      if (!vp) return;
+      const target = view.type === 'home'
+        ? vp.querySelector('[aria-label="Direct Chats"]') as HTMLElement | null
+        : vp.querySelector(`[aria-label="${view.server?.name}"]`) as HTMLElement | null;
+      if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+        return;
+      }
+      const addBtn = vp.querySelector('[aria-label="Create a new Space"]') as HTMLElement | null;
+      if (addBtn) addBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'end' });
+    });
   };
 
   const handleSpaceClick = (server: typeof servers[0]) => {
@@ -66,6 +122,7 @@ export const MainLayout: React.FC = () => {
   const handleHomeClick = () => {
     setSelectedServer(null);
     setSelectedChannel(null);
+    setSelectedDM(null);
   };
 
   // Swipe handlers
@@ -114,7 +171,7 @@ export const MainLayout: React.FC = () => {
 
           {/* Direct Chats section */}
           <div
-            className="flex items-center flex-shrink-0 px-2"
+            className="flex items-center flex-shrink-0 px-2 overflow-y-auto h-full min-h-0"
             style={{ borderRight: '1px solid rgba(30,50,72,0.8)' }}
           >
             <div className="flex flex-col mr-3 flex-shrink-0">
@@ -168,7 +225,7 @@ export const MainLayout: React.FC = () => {
                 Spaces
               </span>
             </div>
-            <ScrollArea className="flex-1">
+            <ScrollArea className="flex-1 spaces-scroll-area" viewportRef={spacesViewportRef}>
               <div className="flex items-center gap-1 py-1">
                 <TooltipProvider delayDuration={100}>
                   {userServers.map((server) => (
@@ -198,26 +255,28 @@ export const MainLayout: React.FC = () => {
                       </TooltipContent>
                     </Tooltip>
                   ))}
-
-                  {/* Add new space */}
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        onClick={() => setCreateSpaceOpen(true)}
-                        aria-label="Create a new Space"
-                        className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-sm text-[#94a3b8] hover:text-[#06b6d4] hover:bg-[#1a2d45] transition-all flex-shrink-0"
-                      >
-                        <Plus className="size-4" />
-                        <span className="hidden lg:block">New Space</span>
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom">
-                      <p>Create a Space</p>
-                    </TooltipContent>
-                  </Tooltip>
                 </TooltipProvider>
               </div>
             </ScrollArea>
+            <div className="ml-2 pl-2 flex-shrink-0 border-l border-[#1e3248]">
+              <TooltipProvider delayDuration={100}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => setCreateSpaceOpen(true)}
+                      aria-label="Create a new Space"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-white bg-[#06b6d4] hover:bg-[#0891b2] transition-all shadow-lg shadow-[#06b6d4]/20"
+                    >
+                      <Plus className="size-4" />
+                      <span className="hidden lg:block whitespace-nowrap">New Space</span>
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    <p>Create a Space</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
           </div>
 
           {/* Swipe nav arrows — desktop hint */}
@@ -226,7 +285,7 @@ export const MainLayout: React.FC = () => {
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
-                    onClick={() => goToViewIndex(currentViewIndex - 1)}
+                    onClick={() => { goToViewIndex(currentViewIndex - 1); scrollViewportBy(-240); }}
                     disabled={!canGoLeft}
                     aria-label="Go to previous view"
                     className={`p-1.5 rounded-lg transition-all ${
@@ -245,7 +304,7 @@ export const MainLayout: React.FC = () => {
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
-                    onClick={() => goToViewIndex(currentViewIndex + 1)}
+                    onClick={() => { goToViewIndex(currentViewIndex + 1); scrollViewportBy(240); }}
                     disabled={!canGoRight}
                     aria-label="Go to next view"
                     className={`p-1.5 rounded-lg transition-all ${
@@ -301,7 +360,15 @@ export const MainLayout: React.FC = () => {
             </div>
           )}
 
-          {/* Mobile menu — SheetContent only; trigger lives in the mobile context bar */}
+          <button
+            onClick={() => setMobileMenuOpen(true)}
+            aria-label="Open navigation menu"
+            className="md:hidden p-2 rounded-lg text-[#94a3b8] hover:text-white hover:bg-[#1a2d45] transition-all flex-shrink-0"
+          >
+            <Menu className="size-5" />
+          </button>
+
+          {/* Mobile menu */}
           <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
             <SheetContent side="left" className="p-0 w-[320px] bg-[#0a1628] border-[#1e3248]">
               <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
@@ -322,18 +389,44 @@ export const MainLayout: React.FC = () => {
                       Direct Chats
                     </p>
                     <button
-                      onClick={() => { handleHomeClick(); setMobileMenuOpen(false); }}
+                      onClick={() => {
+                        setMobileHomeTab('dms');
+                        handleHomeClick();
+                        setMobileMenuOpen(false);
+                      }}
                       className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all ${
-                        !selectedServer ? 'text-white' : 'text-[#94a3b8] hover:text-[#e2e8f0] hover:bg-[#1a2d45]'
+                        !selectedServer && mobileHomeTab === 'dms'
+                          ? 'text-white'
+                          : 'text-[#94a3b8] hover:text-[#e2e8f0] hover:bg-[#1a2d45]'
                       }`}
                       style={
-                        !selectedServer
+                        !selectedServer && mobileHomeTab === 'dms'
                           ? { background: 'linear-gradient(135deg, #06b6d4, #0891b2)' }
                           : {}
                       }
                     >
                       <MessageSquare className="size-4" />
                       Direct Chats
+                    </button>
+                    <button
+                      onClick={() => {
+                        setMobileHomeTab('friends');
+                        handleHomeClick();
+                        setMobileMenuOpen(false);
+                      }}
+                      className={`mt-1 w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all ${
+                        !selectedServer && mobileHomeTab === 'friends'
+                          ? 'text-white'
+                          : 'text-[#94a3b8] hover:text-[#e2e8f0] hover:bg-[#1a2d45]'
+                      }`}
+                      style={
+                        !selectedServer && mobileHomeTab === 'friends'
+                          ? { background: 'linear-gradient(135deg, #06b6d4, #0891b2)' }
+                          : {}
+                      }
+                    >
+                      <Users className="size-4" />
+                      Friends
                     </button>
                   </div>
 
@@ -382,7 +475,7 @@ export const MainLayout: React.FC = () => {
                     {selectedServer ? (
                       <ChannelList onChannelSelect={() => setMobileMenuOpen(false)} />
                     ) : (
-                      <UserSidebar onDMSelect={() => setMobileMenuOpen(false)} />
+                      <UserSidebar onDMSelect={() => setMobileMenuOpen(false)} defaultTab={mobileHomeTab} />
                     )}
                   </div>
                   <UserProfile />
@@ -393,33 +486,6 @@ export const MainLayout: React.FC = () => {
         </div>
       </div>
 
-      {/* ── Mobile: sub-strip (always rendered for consistent header height) ── */}
-      <div className="md:hidden bg-[#0a1628] border-b border-[#1e3248] flex-shrink-0 px-3 py-2">
-        {selectedServer ? (
-          <div className="relative">
-            <ServerSearchInput value={serverSearchQuery} onChange={setServerSearchQuery} />
-            <ServerSearch searchQuery={serverSearchQuery} onSearchChange={setServerSearchQuery} />
-          </div>
-        ) : (
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-[#475569]" />
-            <Input
-              value={dmSearchQuery}
-              onChange={(e) => setDmSearchQuery(e.target.value)}
-              placeholder="Search direct chats..."
-              className="pl-8 pr-8 bg-[#060c18] border border-[#1e3248] text-[#e2e8f0] placeholder:text-[#475569] text-sm h-8 focus-visible:ring-[#06b6d4]/50 w-full rounded-lg"
-            />
-            {dmSearchQuery && (
-              <button
-                onClick={() => setDmSearchQuery('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-[#475569] hover:text-[#94a3b8]"
-              >
-                <X className="size-4" />
-              </button>
-            )}
-          </div>
-        )}
-      </div>
       {/* ── BODY ── */}
       <div
         className="flex flex-1 overflow-hidden relative"
@@ -429,7 +495,7 @@ export const MainLayout: React.FC = () => {
       >
         {/* Left Sidebar — Desktop only */}
         <div className="hidden md:flex flex-col w-64 bg-[#0d1a2e] border-r border-[#1e3248] flex-shrink-0">
-          <div className="flex-1 overflow-hidden">
+          <div className="flex-1 overflow-hidden min-h-0">
             {selectedServer && (
               <div className="relative">
                 <ServerSearchInput value={serverSearchQuery} onChange={setServerSearchQuery} />
@@ -443,86 +509,6 @@ export const MainLayout: React.FC = () => {
 
         {/* Chat Area */}
         <div className="flex-1 flex flex-col min-w-0">
-          {/* Mobile: context header */}
-          <div className="md:hidden h-12 bg-[#0a1628] border-b border-[#1e3248] flex items-center px-3 gap-2">
-            {/* Burger — opens the navigation sheet */}
-            <button
-              onClick={() => setMobileMenuOpen(true)}
-              aria-label="Open navigation menu"
-              className="p-2 rounded-lg text-[#94a3b8] hover:text-white hover:bg-[#1a2d45] transition-all flex-shrink-0"
-            >
-              <Menu className="size-5" />
-            </button>
-
-            {/* Scrollable space tabs — mirrors the desktop nav */}
-            <div className="flex-1 min-w-0 overflow-hidden">
-              <ScrollArea className="w-full">
-                <div className="flex items-center gap-1 py-1">
-                  {/* Direct Chats */}
-                  <button
-                    onClick={handleHomeClick}
-                    aria-label="Direct Chats"
-                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-sm whitespace-nowrap flex-shrink-0 transition-all ${
-                      !selectedServer
-                        ? 'text-white shadow-lg shadow-[#06b6d4]/20'
-                        : 'text-[#94a3b8] hover:text-[#e2e8f0] hover:bg-[#1a2d45]'
-                    }`}
-                    style={!selectedServer ? { background: 'linear-gradient(135deg, #06b6d4, #0891b2)' } : {}}
-                  >
-                    <MessageSquare className="size-3.5 flex-shrink-0" />
-                    Chats
-                  </button>
-
-                  {/* Divider */}
-                  <div className="w-px h-4 bg-[#1e3248] flex-shrink-0 mx-0.5" />
-
-                  {/* Space pills */}
-                  {userServers.map((server) => (
-                    <button
-                      key={server.id}
-                      onClick={() => handleSpaceClick(server)}
-                      aria-label={server.name}
-                      aria-current={selectedServer?.id === server.id ? 'page' : undefined}
-                      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-sm whitespace-nowrap flex-shrink-0 transition-all ${
-                        selectedServer?.id === server.id
-                          ? 'text-white shadow-lg shadow-[#06b6d4]/20'
-                          : 'text-[#94a3b8] hover:text-[#e2e8f0] hover:bg-[#1a2d45]'
-                      }`}
-                      style={selectedServer?.id === server.id ? { background: 'linear-gradient(135deg, #06b6d4, #0891b2)' } : {}}
-                    >
-                      <span>{server.icon}</span>
-                      {server.name}
-                    </button>
-                  ))}
-                </div>
-              </ScrollArea>
-            </div>
-
-            {/* Right action: Toggle People (server) or Add Friend (DMs) */}
-            {selectedServer ? (
-              <button
-                onClick={() => setShowPeoplePanel(!showPeoplePanel)}
-                aria-label="Toggle People panel"
-                aria-pressed={showPeoplePanel}
-                className={`p-1.5 rounded-lg transition-all flex-shrink-0 ${
-                  showPeoplePanel
-                    ? 'bg-[#06b6d4]/20 text-[#06b6d4]'
-                    : 'text-[#94a3b8] hover:text-[#e2e8f0] hover:bg-[#1a2d45]'
-                }`}
-              >
-                <Users className="size-4" />
-              </button>
-            ) : (
-              <Button
-                onClick={() => setAddFriendOpen(true)}
-                size="sm"
-                className="bg-[#06b6d4] hover:bg-[#0891b2] text-white p-2 flex-shrink-0"
-              >
-                <UserPlus className="size-4" />
-              </Button>
-            )}
-          </div>
-
           <MessageArea />
         </div>
 

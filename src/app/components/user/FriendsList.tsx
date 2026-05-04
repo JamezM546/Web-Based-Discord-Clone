@@ -1,23 +1,64 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { ScrollArea } from '../ui/scroll-area';
 import { StatusDot, getStatusLabel } from '../ui/StatusDot';
-import { MessageCircle } from 'lucide-react';
+import { MessageCircle, UserMinus } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../ui/dialog';
+import { Button } from '../ui/button';
+import { User } from '../../types';
 
 interface FriendsListProps {
   searchQuery: string;
 }
 
 export const FriendsList: React.FC<FriendsListProps> = ({ searchQuery }) => {
-  const { getFriends, createDirectMessage } = useApp();
+  const { getFriends, createDirectMessage, removeFriend } = useApp();
   const friends = getFriends();
+  const [friendToRemove, setFriendToRemove] = useState<User | null>(null);
+  const [closingFriend, setClosingFriend] = useState<User | null>(null);
+  const [isRemoving, setIsRemoving] = useState(false);
+
+  const closeRemoveDialog = () => {
+    if (isRemoving) return;
+    setClosingFriend(friendToRemove);
+    setFriendToRemove(null);
+  };
 
   const filteredFriends = friends.filter((friend) =>
     (friend.displayName || friend.username).toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const handleRemoveFriend = async () => {
+    if (!friendToRemove) return;
+
+    try {
+      setIsRemoving(true);
+      await removeFriend(friendToRemove.id);
+      setClosingFriend(null);
+      setFriendToRemove(null);
+    } catch (error) {
+      console.error('Failed to remove friend:', error);
+    } finally {
+      setIsRemoving(false);
+    }
+  };
+
+  const activeFriend = friendToRemove || closingFriend;
+  const activeFriendName = activeFriend?.displayName || activeFriend?.username || 'friend';
+
+  const removeFriendMessage = activeFriend
+    ? `Are you sure you want to remove ${activeFriendName} from your friends?`
+    : 'Are you sure you want to remove this friend from your friends?';
+
   return (
-    <ScrollArea className="h-full">
+    <ScrollArea className="h-full flex-1 min-h-0 overflow-y-auto">
       <div className="px-2 py-2">
         <div
           className="text-xs text-[#475569] uppercase font-semibold tracking-wider px-2 mb-2"
@@ -60,19 +101,64 @@ export const FriendsList: React.FC<FriendsListProps> = ({ searchQuery }) => {
                     {/* Visible status text is aria-hidden — status is already in the avatar alt */}
                     <div className="text-[#475569] text-xs" aria-hidden="true">{statusLabel}</div>
                   </div>
-                  <button
-                    onClick={() => createDirectMessage(friend.id)}
-                    aria-label={`Send direct message to ${displayName}`}
-                    className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-[#06b6d4]/20 rounded-lg transition-all"
-                  >
-                    <MessageCircle className="size-4 text-[#06b6d4]" aria-hidden="true" />
-                  </button>
+                  <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all">
+                    <button
+                      onClick={() => createDirectMessage(friend.id)}
+                      aria-label={`Send direct message to ${displayName}`}
+                      className="p-1.5 hover:bg-[#06b6d4]/20 rounded-lg transition-all"
+                    >
+                      <MessageCircle className="size-4 text-[#06b6d4]" aria-hidden="true" />
+                    </button>
+                    <button
+                      onClick={() => setFriendToRemove(friend)}
+                      aria-label={`Remove ${displayName} from friends`}
+                      className="p-1.5 hover:bg-red-500/15 rounded-lg transition-all"
+                    >
+                      <UserMinus className="size-4 text-red-400" aria-hidden="true" />
+                    </button>
+                  </div>
                 </li>
               );
             })}
           </ul>
         )}
       </div>
+      <Dialog
+        open={!!friendToRemove}
+        onOpenChange={(open) => {
+          if (!open) {
+            closeRemoveDialog();
+          } else if (open) {
+            setClosingFriend(null);
+          }
+        }}
+      >
+        <DialogContent className="bg-[#0d1a2e] border border-[#1e3248] text-[#e2e8f0]">
+          <DialogHeader>
+            <DialogTitle>{`Remove '${activeFriendName}'`}</DialogTitle>
+            <DialogDescription className="text-[#94a3b8]">
+              {removeFriendMessage}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              disabled={isRemoving}
+              onClick={closeRemoveDialog}
+              className="text-[#94a3b8] hover:text-[#e2e8f0] hover:bg-[#1a2d45]"
+            >
+              Cancel
+            </Button>
+            <Button
+              disabled={isRemoving}
+              onClick={() => void handleRemoveFriend()}
+              className="bg-red-500 hover:bg-red-600 text-white border-none"
+            >
+              {isRemoving ? 'Removing...' : 'Remove Friend'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </ScrollArea>
   );
 };

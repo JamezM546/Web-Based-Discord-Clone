@@ -18,9 +18,9 @@ class User {
       return result.rows[0];
     } catch (error) {
       if (error.code === '23505') { // Unique violation
-        if (error.constraint === 'users_username_unique') {
+        if (error.constraint === 'users_username_unique' || error.constraint === 'users_username_key') {
           throw new Error('Username already exists');
-        } else if (error.constraint === 'users_email_unique') {
+        } else if (error.constraint === 'users_email_unique' || error.constraint === 'users_email_key') {
           throw new Error('Email already exists');
         }
       }
@@ -75,7 +75,7 @@ class User {
       UPDATE users 
       SET status = $1, updated_at = CURRENT_TIMESTAMP
       WHERE id = $2
-      RETURNING id, username, display_name, avatar, status
+      RETURNING id, username, email, display_name, avatar, status
     `;
     
     try {
@@ -177,6 +177,41 @@ class User {
     try {
       const result = await pool.query(query, [userId]);
       return result.rows;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  static async getStatusAudienceIds(userId) {
+    const query = `
+      WITH related_users AS (
+        SELECT $1::text AS user_id
+        UNION
+        SELECT CASE
+          WHEN fr.from_user_id = $1 THEN fr.to_user_id
+          ELSE fr.from_user_id
+        END AS user_id
+        FROM friend_requests fr
+        WHERE (fr.from_user_id = $1 OR fr.to_user_id = $1)
+          AND fr.status = 'accepted'
+        UNION
+        SELECT unnest(dm.participants) AS user_id
+        FROM direct_messages dm
+        WHERE $1 = ANY(dm.participants)
+        UNION
+        SELECT sm2.user_id
+        FROM server_members sm1
+        JOIN server_members sm2 ON sm1.server_id = sm2.server_id
+        WHERE sm1.user_id = $1
+      )
+      SELECT DISTINCT user_id
+      FROM related_users
+      WHERE user_id IS NOT NULL
+    `;
+
+    try {
+      const result = await pool.query(query, [userId]);
+      return result.rows.map((row) => row.user_id);
     } catch (error) {
       throw error;
     }

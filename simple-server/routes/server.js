@@ -336,4 +336,49 @@ router.delete('/:serverId/members/:userId', authenticateToken, async (req, res) 
   }
 });
 
+// Leave a server
+router.post('/:serverId/leave', authenticateToken, async (req, res) => {
+  try {
+    const { serverId } = req.params;
+    const userId = req.user.id;
+    
+    // Check if user is a member
+    const membership = await Server.isMember(serverId, userId);
+    if (!membership) {
+      return res.status(403).json({
+        success: false,
+        message: 'You are not a member of this server'
+      });
+    }
+    
+    // Prevent owner from leaving (server would be ownerless)
+    if (membership.role === 'owner') {
+      return res.status(403).json({
+        success: false,
+        message: 'Owner cannot leave the server. Delete the server instead.'
+      });
+    }
+    
+    const removed = await Server.removeMember(serverId, userId);
+    
+    if (!removed) {
+      return res.status(404).json({
+        success: false,
+        message: 'Failed to leave server'
+      });
+    }
+    
+    res.status(200).json({
+      success: true,
+      message: 'You have left the server'
+    });
+  } catch (error) {
+    console.error('Error leaving server:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to leave server'
+    });
+  }
+});
+
 module.exports = router;

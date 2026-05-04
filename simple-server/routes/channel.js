@@ -3,8 +3,30 @@ const Channel = require('../models/Channel');
 const Server = require('../models/Server');
 const { authenticateToken } = require('../middleware/auth');
 const { validate, channelSchema } = require('../utils/validation');
+const { getRealtimeRuntime } = require('../websocket/gateway');
 
 const router = express.Router();
+
+const publishRealtime = async (callback) => {
+  const runtime = getRealtimeRuntime();
+  if (!runtime) return;
+
+  try {
+    await callback(runtime);
+  } catch (error) {
+    console.error('Realtime publish failed:', error);
+  }
+};
+
+const publishServerChannelsUpdated = async (serverId) => {
+  const channels = await Channel.findByServerId(serverId);
+  await publishRealtime((runtime) =>
+    runtime.publishServerChannelsUpdated({
+      serverId,
+      channels,
+    })
+  );
+};
 
 // Create a new channel
 router.post('/', authenticateToken, validate(channelSchema), async (req, res) => {
@@ -40,6 +62,7 @@ router.post('/', authenticateToken, validate(channelSchema), async (req, res) =>
       message: 'Channel created successfully',
       data: { channel }
     });
+    await publishServerChannelsUpdated(serverId);
   } catch (error) {
     console.error('Error creating channel:', error);
     res.status(400).json({
@@ -145,6 +168,7 @@ router.put('/:channelId', authenticateToken, async (req, res) => {
       message: 'Channel updated successfully',
       data: { channel: updatedChannel }
     });
+    await publishServerChannelsUpdated(updatedChannel.server_id);
   } catch (error) {
     console.error('Error updating channel:', error);
     res.status(400).json({
@@ -169,6 +193,7 @@ router.delete('/:channelId', authenticateToken, async (req, res) => {
       });
     }
     
+    const channel = await Channel.findById(channelId);
     const deleted = await Channel.delete(channelId);
     
     if (!deleted) {
@@ -182,6 +207,9 @@ router.delete('/:channelId', authenticateToken, async (req, res) => {
       success: true,
       message: 'Channel deleted successfully'
     });
+    if (channel?.server_id) {
+      await publishServerChannelsUpdated(channel.server_id);
+    }
   } catch (error) {
     console.error('Error deleting channel:', error);
     res.status(500).json({
@@ -213,6 +241,7 @@ router.put('/server/:serverId/reorder', authenticateToken, async (req, res) => {
       success: true,
       message: 'Channels reordered successfully'
     });
+    await publishServerChannelsUpdated(serverId);
   } catch (error) {
     console.error('Error reordering channels:', error);
     res.status(400).json({

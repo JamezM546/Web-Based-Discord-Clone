@@ -5,12 +5,10 @@ import { MessageInput } from './MessageInput';
 import { WhatYouMissed } from './WhatYouMissed';
 import { ManualSummary } from './ManualSummary';
 import { Hash, Sparkles, MessageSquare } from 'lucide-react';
-import { ScrollArea } from '../ui/scroll-area';
 
 export const MessageArea: React.FC = () => {
-  const { selectedChannel, selectedDM, messages, users, currentUser, getUnreadMessages, markAsRead } = useApp();
+  const { selectedChannel, selectedDM, messages, users, currentUser, getUnreadMessages, markAsRead, getTypingUsers } = useApp();
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [dismissedSummaries, setDismissedSummaries] = useState<Record<string, boolean>>({});
   const [showManualSummary, setShowManualSummary] = useState(false);
   const unreadStartRef = useRef<HTMLDivElement>(null);
 
@@ -44,7 +42,9 @@ export const MessageArea: React.FC = () => {
     ? unreadMessages.slice(-100)
     : messagesFromLastHour.slice(-100);
 
-  const hasUnread = filteredUnreadMessages.length > 0;
+  // Require at least 3 unread messages before showing the WYM banner.
+  // Fewer messages aren't worth summarizing — the user can just read them.
+  const hasUnread = filteredUnreadMessages.length >= 3;
 
   if (!selectedChannel && !selectedDM) {
     return (
@@ -74,13 +74,15 @@ export const MessageArea: React.FC = () => {
   const otherUser = selectedDM
     ? users.find((u) => selectedDM.participants.includes(u.id) && u.id !== currentUser?.id)
     : null;
+  const typingUsers = getTypingUsers(selectedChannel?.id, selectedDM?.id);
+  const typingLabel = typingUsers
+    .map((user) => user.displayName || user.username)
+    .join(', ');
 
   const handleDismissSummary = () => {
     if (selectedChannel) {
-      setDismissedSummaries((prev) => ({ ...prev, [selectedChannel.id]: true }));
       markAsRead(selectedChannel.id);
     } else if (selectedDM) {
-      setDismissedSummaries((prev) => ({ ...prev, [selectedDM.id]: true }));
       markAsRead(undefined, selectedDM.id);
     }
   };
@@ -128,7 +130,7 @@ export const MessageArea: React.FC = () => {
       </div>
 
       {/* What You Missed — fixed panel between header and messages */}
-      {hasUnread && !dismissedSummaries[selectedChannel?.id || selectedDM?.id] && (
+      {hasUnread && (
         <WhatYouMissed
           unreadMessages={filteredUnreadMessages}
           channelId={selectedChannel?.id}
@@ -196,6 +198,11 @@ export const MessageArea: React.FC = () => {
 
       {/* Input */}
       <div className="flex-shrink-0 border-t border-[#1e3248]">
+        {typingUsers.length > 0 && (
+          <div className="px-4 pt-2 text-xs text-[#64748b]" aria-live="polite">
+            {typingLabel} {typingUsers.length === 1 ? 'is' : 'are'} typing...
+          </div>
+        )}
         <MessageInput channelId={selectedChannel?.id} dmId={selectedDM?.id} />
       </div>
 

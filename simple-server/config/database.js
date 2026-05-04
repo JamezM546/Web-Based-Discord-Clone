@@ -229,6 +229,110 @@ const createTables = async () => {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS server_invite_codes (
+        id VARCHAR(255) PRIMARY KEY,
+        code VARCHAR(64) UNIQUE NOT NULL,
+        server_id VARCHAR(255) NOT NULL REFERENCES servers(id) ON DELETE CASCADE,
+        created_by VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        expires_at TIMESTAMP,
+        max_uses INTEGER DEFAULT 0,
+        uses_count INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Channel read state table (tracks last read timestamp per user/channel)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS channel_read_state (
+        id VARCHAR(255) PRIMARY KEY,
+        user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        channel_id VARCHAR(255) NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
+        last_read_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, channel_id)
+      )
+    `);
+
+    // DM read state table (tracks last read timestamp per user/DM)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS direct_message_read_state (
+        id VARCHAR(255) PRIMARY KEY,
+        user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        dm_id VARCHAR(255) NOT NULL REFERENCES direct_messages(id) ON DELETE CASCADE,
+        last_read_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, dm_id)
+      )
+    `);
+
+    // Channel summaries cache table (24h cache per user/channel/options)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS channel_summaries (
+        id VARCHAR(255) PRIMARY KEY,
+        user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        channel_id VARCHAR(255) NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
+        format VARCHAR(20) DEFAULT 'paragraph',
+        options_json TEXT,
+        summary_text TEXT NOT NULL,
+        message_count INTEGER NOT NULL,
+        generated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        expires_at TIMESTAMP NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Direct message summaries cache table (24h cache per user/DM/options)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS direct_message_summaries (
+        id VARCHAR(255) PRIMARY KEY,
+        user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        dm_id VARCHAR(255) NOT NULL REFERENCES direct_messages(id) ON DELETE CASCADE,
+        format VARCHAR(20) DEFAULT 'paragraph',
+        options_json TEXT,
+        summary_text TEXT NOT NULL,
+        message_count INTEGER NOT NULL,
+        generated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        expires_at TIMESTAMP NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Channel previews cache table (short-lived previews per user/channel)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS channel_previews (
+        id VARCHAR(255) PRIMARY KEY,
+        user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        channel_id VARCHAR(255) NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
+        unread_count INTEGER NOT NULL,
+        time_range TEXT,
+        highlights JSONB NOT NULL,
+        last_message_time TIMESTAMP,
+        generated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        expires_at TIMESTAMP NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // DM previews cache table (short-lived previews per user/DM)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS direct_message_previews (
+        id VARCHAR(255) PRIMARY KEY,
+        user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        dm_id VARCHAR(255) NOT NULL REFERENCES direct_messages(id) ON DELETE CASCADE,
+        unread_count INTEGER NOT NULL,
+        time_range TEXT,
+        highlights JSONB NOT NULL,
+        last_message_time TIMESTAMP,
+        generated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        expires_at TIMESTAMP NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
     
     // Create indexes for better performance
     await client.query('CREATE INDEX IF NOT EXISTS idx_messages_channel_id ON messages(channel_id)');
@@ -238,8 +342,29 @@ const createTables = async () => {
     await client.query('CREATE INDEX IF NOT EXISTS idx_server_members_server_id ON server_members(server_id)');
     await client.query('CREATE INDEX IF NOT EXISTS idx_server_members_user_id ON server_members(user_id)');
     await client.query('CREATE INDEX IF NOT EXISTS idx_channels_server_id ON channels(server_id)');
+    await client.query('CREATE INDEX IF NOT EXISTS idx_server_invite_codes_server_id ON server_invite_codes(server_id)');
+    await client.query('CREATE INDEX IF NOT EXISTS idx_server_invite_codes_code ON server_invite_codes(code)');
     await client.query('CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)');
     await client.query('CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)');
+    await client.query('CREATE INDEX IF NOT EXISTS idx_channel_read_state_user_channel ON channel_read_state(user_id, channel_id)');
+    await client.query(
+      'CREATE INDEX IF NOT EXISTS idx_dm_read_state_user_dm ON direct_message_read_state(user_id, dm_id)'
+    );
+    await client.query('CREATE INDEX IF NOT EXISTS idx_channel_summaries_user_channel ON channel_summaries(user_id, channel_id)');
+    await client.query('CREATE INDEX IF NOT EXISTS idx_channel_summaries_expires_at ON channel_summaries(expires_at)');
+    await client.query(
+      'CREATE INDEX IF NOT EXISTS idx_dm_summaries_user_dm ON direct_message_summaries(user_id, dm_id)'
+    );
+    await client.query(
+      'CREATE INDEX IF NOT EXISTS idx_dm_summaries_expires_at ON direct_message_summaries(expires_at)'
+    );
+    await client.query('CREATE INDEX IF NOT EXISTS idx_channel_previews_user_channel ON channel_previews(user_id, channel_id)');
+    await client.query('CREATE INDEX IF NOT EXISTS idx_channel_previews_expires_at ON channel_previews(expires_at)');
+
+    await client.query(
+      'CREATE INDEX IF NOT EXISTS idx_dm_previews_user_dm ON direct_message_previews(user_id, dm_id)'
+    );
+    await client.query('CREATE INDEX IF NOT EXISTS idx_dm_previews_expires_at ON direct_message_previews(expires_at)');
     
     await client.query('COMMIT');
   } catch (error) {

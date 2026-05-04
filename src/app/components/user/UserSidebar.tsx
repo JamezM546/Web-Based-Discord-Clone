@@ -1,19 +1,26 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Search, X, MessageSquare, Users } from 'lucide-react';
 import { Input } from '../ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
+import { ScrollArea } from '../ui/scroll-area';
 import { FriendsList } from './FriendsList';
 import { FriendRequests } from './FriendRequests';
 import { DMList } from './DMList';
 
 interface UserSidebarProps {
   onDMSelect?: () => void;
+  defaultTab?: 'dms' | 'friends';
 }
 
-export const UserSidebar: React.FC<UserSidebarProps> = ({ onDMSelect }) => {
+export const UserSidebar: React.FC<UserSidebarProps> = ({ onDMSelect, defaultTab = 'dms' }) => {
   const { selectedServer, friendRequests, currentUser } = useApp();
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeTab, setActiveTab] = useState<'dms' | 'friends'>(defaultTab);
+
+  useEffect(() => {
+    setActiveTab(defaultTab);
+  }, [defaultTab]);
 
   if (selectedServer) return null;
 
@@ -22,7 +29,7 @@ export const UserSidebar: React.FC<UserSidebarProps> = ({ onDMSelect }) => {
   );
 
   return (
-    <div className="w-full bg-[#0d1a2e] flex flex-col h-full">
+    <div className="w-full bg-[#0d1a2e] flex flex-col h-full min-h-0">
       {/* Search bar */}
       <div className="h-12 px-3 flex items-center border-b border-[#1e3248]">
         <div className="relative flex-1">
@@ -44,7 +51,7 @@ export const UserSidebar: React.FC<UserSidebarProps> = ({ onDMSelect }) => {
         </div>
       </div>
 
-      <Tabs defaultValue="dms" className="flex-1 flex flex-col">
+      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'dms' | 'friends')} className="flex-1 flex flex-col h-full min-h-0">
         <TabsList className="w-full bg-[#0d1a2e] border-b border-[#1e3248] rounded-none h-auto p-1 gap-1">
           <TabsTrigger
             value="dms"
@@ -67,21 +74,25 @@ export const UserSidebar: React.FC<UserSidebarProps> = ({ onDMSelect }) => {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="dms" className="flex-1 m-0 overflow-hidden">
+        <TabsContent value="dms" className="flex-1 m-0 overflow-hidden min-h-0 h-full">
           <DMList searchQuery={searchQuery} onDMSelect={onDMSelect} />
         </TabsContent>
 
-        <TabsContent value="friends" className="flex-1 m-0 overflow-hidden">
+        <TabsContent value="friends" className="flex-1 m-0 overflow-hidden min-h-0 h-full">
           <div className="flex flex-col h-full">
             {pendingRequests.length > 0 && (
               <div className="px-3 py-2 border-b border-[#1e3248]">
                 <div className="text-xs text-[#475569] uppercase font-semibold tracking-wider px-1 mb-1">
                   Pending — {pendingRequests.length}
                 </div>
-                <FriendRequests />
+                <ScrollArea className="max-h-56 h-56">
+                  <div className="px-0">
+                    <FriendRequests />
+                  </div>
+                </ScrollArea>
               </div>
             )}
-            <div className="flex-1 overflow-hidden">
+            <div className="flex-1 overflow-hidden min-h-0">
               <FriendsList searchQuery={searchQuery} />
             </div>
           </div>

@@ -1,11 +1,13 @@
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { AppProvider, useApp } from '../src/app/context/AppContext';
 import { apiService } from '../src/app/services/apiService';
+import { websocketService } from '../src/app/services/websocketService';
 
 // Mock the apiService
 jest.mock('../src/app/services/apiService', () => ({
   apiService: {
     isAuthenticated: jest.fn(),
+    getToken: jest.fn(),
     getCurrentUser: jest.fn(),
     getServers: jest.fn(),
     getChannels: jest.fn(),
@@ -19,6 +21,7 @@ jest.mock('../src/app/services/apiService', () => ({
     login: jest.fn(),
     register: jest.fn(),
     logout: jest.fn(),
+    logoutFromServer: jest.fn(),
     createServer: jest.fn(),
     deleteServer: jest.fn(),
     updateServer: jest.fn(),
@@ -34,13 +37,31 @@ jest.mock('../src/app/services/apiService', () => ({
     sendFriendRequest: jest.fn(),
     acceptFriendRequest: jest.fn(),
     rejectFriendRequest: jest.fn(),
+    removeFriend: jest.fn(),
     createDirectMessage: jest.fn(),
     updateStatus: jest.fn(),
     updateProfile: jest.fn(),
+    getChannelReadStates: jest.fn(),
+    getDmReadStates: jest.fn(),
+    markChannelRead: jest.fn(),
+    markDmRead: jest.fn(),
+  },
+}));
+
+jest.mock('../src/app/services/websocketService', () => ({
+  websocketService: {
+    subscribe: jest.fn(() => jest.fn()),
+    connect: jest.fn(),
+    disconnect: jest.fn(),
+    setActiveRoom: jest.fn(),
+    setServerRoom: jest.fn(),
+    sendTypingStart: jest.fn(),
+    sendTypingStop: jest.fn(),
   },
 }));
 
 const mockApi = apiService as jest.Mocked<typeof apiService>;
+const mockWebsocket = websocketService as jest.Mocked<typeof websocketService>;
 
 const baseCurrentUser = {
   id: 'u1',
@@ -64,6 +85,7 @@ const createAuthResponse = (user: Partial<typeof baseCurrentUser> = {}) => ({
 const resetApiMocks = () => {
   jest.resetAllMocks();
   mockApi.isAuthenticated.mockReturnValue(false);
+  mockApi.getToken.mockImplementation(() => (mockApi.isAuthenticated() ? 'token' : null));
   mockApi.getCurrentUser.mockResolvedValue(createAuthResponse());
   mockApi.getServers.mockResolvedValue([]);
   mockApi.getChannels.mockResolvedValue([]);
@@ -74,19 +96,31 @@ const resetApiMocks = () => {
   mockApi.getFriendRequests.mockResolvedValue([]);
   mockApi.getPendingInvites.mockResolvedValue([]);
   mockApi.getServerDetails.mockResolvedValue({ members: [] });
-  mockApi.login.mockResolvedValue({
-    user: {
-      ...baseCurrentUser,
-    },
-    token: 'token',
-  } as any);
-  mockApi.register.mockResolvedValue({
-    user: {
-      ...baseCurrentUser,
-    },
-    token: 'token',
-  } as any);
-  mockApi.logout.mockImplementation(() => {});
+  mockApi.login.mockImplementation(async () => {
+    mockApi.isAuthenticated.mockReturnValue(true);
+    mockApi.getToken.mockReturnValue('token');
+    return {
+      user: {
+        ...baseCurrentUser,
+      },
+      token: 'token',
+    } as any;
+  });
+  mockApi.register.mockImplementation(async () => {
+    mockApi.isAuthenticated.mockReturnValue(true);
+    mockApi.getToken.mockReturnValue('token');
+    return {
+      user: {
+        ...baseCurrentUser,
+      },
+      token: 'token',
+    } as any;
+  });
+  mockApi.logout.mockImplementation(() => {
+    mockApi.isAuthenticated.mockReturnValue(false);
+    mockApi.getToken.mockReturnValue(null);
+  });
+  mockApi.logoutFromServer.mockResolvedValue(undefined as any);
   mockApi.createServer.mockResolvedValue({ id: 's-new', name: 'New Server', icon: '🚀', owner_id: 'u1' } as any);
   mockApi.deleteServer.mockResolvedValue(undefined as any);
   mockApi.updateServer.mockResolvedValue({ id: 's1', name: 'Updated Server', icon: '✨', owner_id: 'u1' } as any);
@@ -115,6 +149,7 @@ const resetApiMocks = () => {
   mockApi.sendFriendRequest.mockResolvedValue(undefined as any);
   mockApi.acceptFriendRequest.mockResolvedValue(undefined as any);
   mockApi.rejectFriendRequest.mockResolvedValue(undefined as any);
+  mockApi.removeFriend.mockResolvedValue({ removedUserId: 'u2' } as any);
   mockApi.createDirectMessage.mockResolvedValue({
     id: 'dm-default',
     participants: ['u1', 'u2'],
@@ -124,6 +159,11 @@ const resetApiMocks = () => {
   } as any);
   mockApi.updateStatus.mockResolvedValue(baseCurrentUser as any);
   mockApi.updateProfile.mockResolvedValue(baseCurrentUser as any);
+  mockApi.getChannelReadStates.mockResolvedValue([]);
+  mockApi.getDmReadStates.mockResolvedValue([]);
+  mockApi.markChannelRead.mockResolvedValue(undefined as any);
+  mockApi.markDmRead.mockResolvedValue(undefined as any);
+  mockWebsocket.subscribe.mockReturnValue(jest.fn());
 };
 
 const wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -454,6 +494,7 @@ describe('AppContext Unit Tests', () => {
 
     test('10. checkAuth: should fetch current user and set state if authenticated on mount', async () => {
       (apiService.isAuthenticated as jest.Mock).mockReturnValue(true);
+      (apiService.getToken as jest.Mock).mockReturnValue('restored-token');
       (apiService.getCurrentUser as jest.Mock).mockResolvedValue({
         success: true,
         data: { user: { id: "u1", username: "auth_user" } }
@@ -466,22 +507,29 @@ describe('AppContext Unit Tests', () => {
       });
 
       expect(apiService.getCurrentUser).toHaveBeenCalled();
-      
+
       // toMatchObject allows the test to pass even with generated fields like avatar/status
       expect(result.current.currentUser).toMatchObject({ id: "u1", username: "auth_user" });
+      expect(websocketService.subscribe).toHaveBeenCalled();
+      expect(websocketService.connect).toHaveBeenCalledWith('restored-token');
     });
 
     test('11. login: should authenticate user, update state, and return true on success', async () => {
       mockApi.isAuthenticated.mockReturnValue(false);
-      mockApi.login.mockResolvedValue({
-        user: {
-          ...baseCurrentUser,
-          id: 'u2',
-          username: 'login_user',
-          email: 'login@example.com',
-        },
-        token: 'fake-token',
-      } as any);
+      mockApi.getToken.mockReturnValue(null);
+      mockApi.login.mockImplementation(async () => {
+        mockApi.isAuthenticated.mockReturnValue(true);
+        mockApi.getToken.mockReturnValue('fake-token');
+        return {
+          user: {
+            ...baseCurrentUser,
+            id: 'u2',
+            username: 'login_user',
+            email: 'login@example.com',
+          },
+          token: 'fake-token',
+        } as any;
+      });
 
       const { result } = renderHook(() => useApp(), { wrapper });
 
@@ -497,19 +545,27 @@ describe('AppContext Unit Tests', () => {
       expect(apiService.login).toHaveBeenCalledWith("test@test.com", "password123");
       expect(loginResult).toBe(true);
       expect(result.current.currentUser).toMatchObject({ id: "u2", username: "login_user" });
+      await waitFor(() => {
+        expect(websocketService.connect).toHaveBeenCalledWith('fake-token');
+      });
     });
 
     test('12. register: should create account, update state, and return true on success', async () => {
       mockApi.isAuthenticated.mockReturnValue(false);
-      mockApi.register.mockResolvedValue({
-        user: {
-          ...baseCurrentUser,
-          id: 'u3',
-          username: 'new_user',
-          email: 'new@example.com',
-        },
-        token: 'fake-token',
-      } as any);
+      mockApi.getToken.mockReturnValue(null);
+      mockApi.register.mockImplementation(async () => {
+        mockApi.isAuthenticated.mockReturnValue(true);
+        mockApi.getToken.mockReturnValue('fake-token');
+        return {
+          user: {
+            ...baseCurrentUser,
+            id: 'u3',
+            username: 'new_user',
+            email: 'new@example.com',
+          },
+          token: 'fake-token',
+        } as any;
+      });
 
       const { result } = renderHook(() => useApp(), { wrapper });
 
@@ -525,10 +581,14 @@ describe('AppContext Unit Tests', () => {
       expect(apiService.register).toHaveBeenCalledWith("new_user", "test@test.com", "password123");
       expect(registerResult).toBe(true);
       expect(result.current.currentUser).toMatchObject({ id: "u3", username: "new_user" });
+      await waitFor(() => {
+        expect(websocketService.connect).toHaveBeenCalledWith('fake-token');
+      });
     });
 
     test('13. logout: should call apiService.logout and clear application state', async () => {
       (apiService.isAuthenticated as jest.Mock).mockReturnValue(true);
+      (apiService.getToken as jest.Mock).mockReturnValue('session-token');
       (apiService.getCurrentUser as jest.Mock).mockResolvedValue({
         success: true,
         data: { user: { id: "u4", username: "logout_user" } }
@@ -553,6 +613,82 @@ describe('AppContext Unit Tests', () => {
       await waitFor(() => {
         expect(result.current.currentUser).toBeNull();
         expect(result.current.servers).toHaveLength(0);
+      });
+      expect(websocketService.disconnect).toHaveBeenCalled();
+    });
+  });
+
+  describe('Realtime Websocket Functions', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+      mockWebsocket.subscribe.mockReturnValue(jest.fn());
+      (apiService.isAuthenticated as jest.Mock).mockReturnValue(true);
+      (apiService.getToken as jest.Mock).mockReturnValue('socket-token');
+      (apiService.getCurrentUser as jest.Mock).mockResolvedValue({
+        success: true,
+        data: { user: { id: 'u1', username: 'socket_user' } },
+      });
+      (apiService.getServers as jest.Mock).mockResolvedValue([]);
+      (apiService.getChannels as jest.Mock).mockResolvedValue([]);
+      (apiService.getDirectMessages as jest.Mock).mockResolvedValue([]);
+      (apiService.getFriends as jest.Mock).mockResolvedValue([]);
+      (apiService.getFriendRequests as jest.Mock).mockResolvedValue([]);
+      (apiService.getPendingInvites as jest.Mock).mockResolvedValue([]);
+    });
+
+    test('14. connects the websocket after restoring an authenticated session', async () => {
+      const { result } = renderHook(() => useApp(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      expect(websocketService.subscribe).toHaveBeenCalled();
+      expect(websocketService.connect).toHaveBeenCalledWith('socket-token');
+    });
+
+    test('15. updates the active websocket room when the selected conversation changes', async () => {
+      const { result } = renderHook(() => useApp(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.currentUser?.id).toBe('u1');
+      });
+
+      act(() => {
+        result.current.setSelectedChannel({ id: 'c1', name: 'general', serverId: 's1' } as any);
+      });
+
+      await waitFor(() => {
+        expect(websocketService.setActiveRoom).toHaveBeenCalledWith('channel:c1');
+      });
+
+      act(() => {
+        result.current.setSelectedChannel(null);
+        result.current.setSelectedDM({
+          id: 'dm1',
+          participants: ['u1', 'u2'],
+          lastMessageTime: new Date('2023-01-01T00:00:00Z'),
+        });
+      });
+
+      await waitFor(() => {
+        expect(websocketService.setActiveRoom).toHaveBeenCalledWith('dm:dm1');
+      });
+    });
+
+    test('16. subscribes to the selected server room for realtime channel updates', async () => {
+      const { result } = renderHook(() => useApp(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.currentUser?.id).toBe('u1');
+      });
+
+      act(() => {
+        result.current.setSelectedServer({ id: 's1', name: 'Test Server', icon: 'x', ownerId: 'u1', members: [] });
+      });
+
+      await waitFor(() => {
+        expect(websocketService.setServerRoom).toHaveBeenCalledWith('server:s1');
       });
     });
   });
@@ -1119,9 +1255,6 @@ describe('AppContext Unit Tests', () => {
       // Provide some initial servers and channels
       (apiService.getServers as jest.Mock).mockResolvedValue([{ id: "s1", name: "Test Server" }]);
       (apiService.getChannels as jest.Mock).mockResolvedValue([{ id: "c1", server_id: "s1", name: "general" }]);
-      
-      // Mock potential background API call for read states
-      (apiService as any).markAsRead = jest.fn().mockResolvedValue({ success: true });
 
       // Default safe resolves for the rest
       (apiService.getDirectMessages as jest.Mock).mockResolvedValue([]);
@@ -1237,7 +1370,27 @@ describe('AppContext Unit Tests', () => {
       });
     });
 
-    test('35. setReplyingTo: should update the replyingTo state with a message or null', async () => {
+    test('35. removeFriend: should remove the friend from local state', async () => {
+      mockApi.getFriends.mockResolvedValue([
+        { id: "u2", username: "remove_me", status: "online" }
+      ]);
+      mockApi.removeFriend.mockResolvedValue({ removedUserId: "u2" } as any);
+
+      const { result } = renderHook(() => useApp(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.getFriends()).toHaveLength(1);
+      });
+
+      await act(async () => {
+        await result.current.removeFriend("u2");
+      });
+
+      expect(apiService.removeFriend).toHaveBeenCalledWith("u2");
+      expect(result.current.getFriends()).toHaveLength(0);
+    });
+
+    test('36. setReplyingTo: should update the replyingTo state with a message or null', async () => {
       const { result } = renderHook(() => useApp(), { wrapper });
 
       await waitFor(() => {

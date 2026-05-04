@@ -11,6 +11,10 @@ interface DMListProps {
 
 export const DMList: React.FC<DMListProps> = ({ searchQuery, onDMSelect }) => {
   const { directMessages, users, currentUser, setSelectedDM, selectedDM, setSelectedChannel, messages, getUnreadCount, markAsRead } = useApp();
+  const truncateMessage = (message: string, maxLength: number = 30) => {
+    if (message.length <= maxLength) return message;
+    return `${message.substring(0, maxLength)}...`;
+  };
 
   const userDMs = directMessages.filter((dm) => dm.participants.includes(currentUser?.id || ''));
 
@@ -32,7 +36,8 @@ export const DMList: React.FC<DMListProps> = ({ searchQuery, onDMSelect }) => {
   const handleDMClick = (dm: typeof directMessages[0]) => {
     setSelectedDM(dm);
     setSelectedChannel(null);
-    markAsRead(undefined, dm.id);
+    // Don't markAsRead here — let WhatYouMissed show first.
+    // markAsRead is called when user dismisses the banner.
     if (onDMSelect) {
       onDMSelect();
     }
@@ -43,7 +48,7 @@ export const DMList: React.FC<DMListProps> = ({ searchQuery, onDMSelect }) => {
   };
 
   return (
-    <ScrollArea className="h-full">
+    <ScrollArea className="h-full flex-1 min-h-0 overflow-y-auto">
       <nav aria-label="Direct chats">
         <div className="px-2 py-2">
           {filteredDMs.length === 0 ? (
@@ -96,7 +101,7 @@ export const DMList: React.FC<DMListProps> = ({ searchQuery, onDMSelect }) => {
                         </div>
                         {lastMessage ? (
                           <div className={`text-xs truncate ${unread ? 'text-[#64748b]' : 'text-[#475569]'}`}>
-                            {lastMessage.content}
+                            {truncateMessage(lastMessage.content)}
                           </div>
                         ) : (
                           <div className="text-[#475569] text-xs">

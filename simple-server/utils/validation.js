@@ -34,6 +34,25 @@ const messageSchema = Joi.object({
   serverInviteId: Joi.string().optional()
 }).or('channelId', 'dmId');
 
+// Unified manual summary schema — exactly one of channelId / dmId is required.
+// hours and maxMessages are accepted at the top level (simpler API contract).
+const summaryRequestSchema = Joi.object({
+  channelId: Joi.string(),
+  dmId: Joi.string(),
+  hours: Joi.number().min(0.1).max(168).optional(),
+  maxMessages: Joi.number().integer().min(1).max(200).optional(),
+  format: Joi.string().valid('bullets', 'paragraph').optional()
+}).xor('channelId', 'dmId');
+
+// Kept for backward compatibility — not currently used by any route.
+const dmSummaryRequestSchema = Joi.object({
+  options: Joi.object({
+    maxMessages: Joi.number().integer().min(1).max(200).optional(),
+    timeWindow: Joi.number().integer().min(1).max(24 * 60).optional(),
+    format: Joi.string().valid('bullets', 'paragraph').optional()
+  }).optional()
+});
+
 // Generic validation middleware
 const validate = (schema) => {
   return (req, res, next) => {
@@ -55,5 +74,7 @@ module.exports = {
   serverSchema,
   channelSchema,
   messageSchema,
+  summaryRequestSchema,
+  dmSummaryRequestSchema,
   validate
 };

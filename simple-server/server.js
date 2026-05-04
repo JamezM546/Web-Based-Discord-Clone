@@ -2,7 +2,10 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const http = require('http');
 const { initializeDatabase } = require('./config/database');
+const { createLocalWebSocketServer } = require('./websocket/localServer');
+const { setRealtimeRuntime } = require('./websocket/gateway');
 
 // Import routes
 const authRoutes = require('./routes/auth');
@@ -11,9 +14,11 @@ const channelRoutes = require('./routes/channel');
 const messageRoutes = require('./routes/messages');
 const directMessageRoutes = require('./routes/directMessages');
 const summaryRoutes = require('./routes/summary');
+const readStateRoutes = require('./routes/readState');
 const userRoutes = require('./routes/users');
 const friendRoutes = require('./routes/friends');
 const inviteRoutes = require('./routes/serverInvites');
+const inviteCodeRoutes = require('./routes/inviteCodes');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -94,6 +99,9 @@ app.get('/api', (req, res) => {
         'POST /api/summaries/manual': 'Generate a manual AI summary for a channel or DM (protected)',
         'GET /api/summaries/preview': 'Get a What You Missed preview for a channel or DM (protected)'
       },
+      readState: {
+        'PUT /api/read-state': 'Sync read position to the backend for a channel or DM (protected)'
+      },
       search: {
         'GET /api/servers/search?q=': 'Search servers by name (protected)'
       },
@@ -116,6 +124,13 @@ app.get('/api', (req, res) => {
         'POST /api/invites': 'Create a server invite (protected)',
         'POST /api/invites/:id/accept': 'Accept a server invite (protected)',
         'POST /api/invites/:id/decline': 'Decline a server invite (protected)'
+      },
+      inviteCodes: {
+        'GET /api/invite-codes?serverId=': 'List invite links for a server (protected)',
+        'POST /api/invite-codes/:serverId': 'Create a server invite link (protected)',
+        'GET /api/invite-codes/:code': 'Resolve invite link details',
+        'POST /api/invite-codes/:code/join': 'Join a server by invite link (protected)',
+        'DELETE /api/invite-codes/:serverId/:inviteId': 'Delete an invite link (protected)'
       }
     }
   });
@@ -148,8 +163,11 @@ app.use('/api/messages', messageRoutes);
 // Direct message routes
 app.use('/api/direct-messages', directMessageRoutes);
 
-// Summary routes (manual summary + What You Missed preview)
+// Summary routes: POST /api/summaries/manual, POST /api/summaries/manual/dms/:dmId
 app.use('/api/summaries', summaryRoutes);
+
+// Read state sync: PUT /api/read-state
+app.use('/api/read-state', readStateRoutes);
 
 // User routes (search, profile, status)
 app.use('/api/users', userRoutes);
@@ -159,6 +177,9 @@ app.use('/api/friends', friendRoutes);
 
 // Server invite routes (create, pending, accept, decline)
 app.use('/api/invites', inviteRoutes);
+
+// Invite code routes (shareable invite links)
+app.use('/api/invite-codes', inviteCodeRoutes);
 
 // API Documentation/Explorer
 app.get('/api/docs', (req, res) => {
@@ -177,14 +198,23 @@ const initAll = async () => {
   await seedDatabase();
 };
 
+const createHttpServer = () => {
+  const server = http.createServer(app);
+  const { runtime } = createLocalWebSocketServer({ server });
+  setRealtimeRuntime(runtime);
+  return server;
+};
+
 // Only start listening when run directly (not when imported by tests)
 if (require.main === module) {
-  app.listen(PORT, '0.0.0.0', async () => {
+  const server = createHttpServer();
+  server.listen(PORT, '0.0.0.0', async () => {
     console.log(`Simple server running on port ${PORT}`);
     console.log(`Health check: http://localhost:${PORT}/health`);
     console.log(`API endpoint: http://localhost:${PORT}/api`);
     console.log(`Interactive docs: http://localhost:${PORT}/api/docs`);
     console.log(`Auth endpoints: http://localhost:${PORT}/api/auth`);
+    console.log(`WebSocket endpoint: ws://localhost:${PORT}/ws`);
 
     try {
       await initAll();
@@ -195,4 +225,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { app, initAll };
+module.exports = { app, initAll, createHttpServer };

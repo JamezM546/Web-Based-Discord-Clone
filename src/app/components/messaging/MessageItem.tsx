@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router';
 import { useApp } from '../../context/AppContext';
 import { Message } from '../../types';
-import { format } from 'date-fns';
-import { MoreVertical, Edit2, Trash2, Smile, Plus, Reply, CornerUpLeft } from 'lucide-react';
+import { format, isToday, isYesterday } from 'date-fns';
+import { MoreVertical, Edit2, Trash2, Smile, Plus, Reply, CornerUpLeft, ExternalLink, Link as LinkIcon } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,11 +22,23 @@ interface MessageItemProps {
 }
 
 export const MessageItem: React.FC<MessageItemProps> = ({ message, onScrollToMessage }) => {
-  const { users, currentUser, editMessage, deleteMessage, toggleReaction, messages, setReplyingTo, serverInvites, servers, acceptServerInvite, declineServerInvite } = useApp();
+  const { users, currentUser, editMessage, deleteMessage, toggleReaction, messages, setReplyingTo, serverInvites, servers, selectedDM, acceptServerInvite, declineServerInvite, resolveInviteCode } = useApp();
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(message.content);
   const [reactionPickerOpen, setReactionPickerOpen] = useState(false);
   const [hoverReactionPickerOpen, setHoverReactionPickerOpen] = useState(false);
+  const [inviteLinkPreview, setInviteLinkPreview] = useState<any>(null);
+
+  const inviteLinkMatch = useMemo(() => {
+    const match = message.content.match(/(https?:\/\/[^\s]+\/invite\/([A-Za-z0-9]+))/i);
+    if (!match) return null;
+
+    return {
+      url: match[1],
+      code: match[2],
+      path: `/invite/${match[2]}`,
+    };
+  }, [message.content]);
 
   const author = users.find((u) => u.id === message.authorId);
   const isOwnMessage = message.authorId === currentUser?.id;
@@ -39,9 +52,49 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, onScrollToMes
       (serverInvite.serverName ? { id: serverInvite.serverId, name: serverInvite.serverName, icon: serverInvite.serverIcon || '📁', ownerId: '', members: [] } : null)
     : null;
   const isInviteRecipient = serverInvite && currentUser && serverInvite.toUserId === currentUser.id;
+  const invitedUser =
+    (serverInvite ? users.find((u) => u.id === serverInvite.toUserId) : null) ||
+    (isOwnMessage && selectedDM
+      ? users.find((u) => selectedDM.participants.includes(u.id) && u.id !== currentUser?.id)
+      : null);
+  const fallbackInviteTarget = message.content.replace(/^invited you to join\s+/i, '').trim();
+  const inviteDisplayContent =
+    isOwnMessage && message.serverInviteId && invitedUser
+      ? `You invited ${invitedUser.displayName || invitedUser.username} to join ${
+          invitedServer ? `${invitedServer.name} ${invitedServer.icon || ''}`.trim() : fallbackInviteTarget
+        }`.trim()
+      : message.content;
 
   const authorDisplayName = author?.displayName || author?.username;
   const repliedAuthorDisplayName = repliedAuthor?.displayName || repliedAuthor?.username;
+
+  useEffect(() => {
+    if (!inviteLinkMatch || message.serverInviteId) {
+      setInviteLinkPreview(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadInvitePreview = async () => {
+      try {
+        const data = await resolveInviteCode(inviteLinkMatch.code);
+        if (!cancelled) {
+          setInviteLinkPreview(data);
+        }
+      } catch {
+        if (!cancelled) {
+          setInviteLinkPreview(null);
+        }
+      }
+    };
+
+    void loadInvitePreview();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [inviteLinkMatch, message.serverInviteId, resolveInviteCode]);
 
   const handleEdit = () => {
     if (editContent.trim() && editContent !== message.content) {
@@ -67,30 +120,58 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, onScrollToMes
   };
 
   const renderMessageContent = (content: string) => {
-    const mentionRegex = /@(\w+)/g;
+    const tokenRegex = /(https?:\/\/[^\s]+)|@(\w+)/g;
     const parts: React.ReactNode[] = [];
     let lastIndex = 0;
     let match;
 
-    while ((match = mentionRegex.exec(content)) !== null) {
+    while ((match = tokenRegex.exec(content)) !== null) {
       if (match.index > lastIndex) {
         parts.push(content.substring(lastIndex, match.index));
       }
-      const mentionedUsername = match[1];
-      const mentionedUser = users.find(u => u.username.toLowerCase() === mentionedUsername.toLowerCase());
-      const isMentioningCurrentUser = mentionedUser?.id === currentUser?.id;
-      parts.push(
-        <span
-          key={match.index}
-          className={`${
-            isMentioningCurrentUser
-              ? 'bg-[#06b6d4] text-white px-1.5 py-0.5 rounded-md text-sm font-medium'
-              : 'bg-[#06b6d4]/15 text-[#06b6d4] px-1.5 py-0.5 rounded-md text-sm hover:bg-[#06b6d4]/25 cursor-pointer'
-          }`}
-        >
-          @{mentionedUsername}
-        </span>
-      );
+
+      if (match[1]) {
+        const inviteMatch = match[1].match(/https?:\/\/[^\s]+\/invite\/([A-Za-z0-9]+)/i);
+        if (inviteMatch) {
+          parts.push(
+            <Link
+              key={match.index}
+              to={`/invite/${inviteMatch[1]}`}
+              className="text-[#67e8f9] underline underline-offset-2 hover:text-[#a5f3fc] break-all"
+            >
+              {match[1]}
+            </Link>
+          );
+          lastIndex = match.index + match[0].length;
+          continue;
+        }
+
+        parts.push(
+          <a
+            key={match.index}
+            href={match[1]}
+            className="text-[#67e8f9] underline underline-offset-2 hover:text-[#a5f3fc] break-all"
+          >
+            {match[1]}
+          </a>
+        );
+      } else {
+        const mentionedUsername = match[2];
+        const mentionedUser = users.find((u) => u.username.toLowerCase() === mentionedUsername.toLowerCase());
+        const isMentioningCurrentUser = mentionedUser?.id === currentUser?.id;
+        parts.push(
+          <span
+            key={match.index}
+            className={`${
+              isMentioningCurrentUser
+                ? 'bg-[#06b6d4] text-white px-1.5 py-0.5 rounded-md text-sm font-medium'
+                : 'bg-[#06b6d4]/15 text-[#06b6d4] px-1.5 py-0.5 rounded-md text-sm hover:bg-[#06b6d4]/25 cursor-pointer'
+            }`}
+          >
+            @{mentionedUsername}
+          </span>
+        );
+      }
       lastIndex = match.index + match[0].length;
     }
 
@@ -103,8 +184,22 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, onScrollToMes
 
   if (!author) return null;
 
-  const formattedTime = format(new Date(message.timestamp), 'h:mm a');
-  const isoTime = new Date(message.timestamp).toISOString();
+  const messageDate = new Date(message.timestamp);
+  const formattedTime = format(messageDate, 'h:mm a');
+  const isoTime = messageDate.toISOString();
+  
+  // Determine date display format
+  let dateDisplay = formattedTime;
+  if (isToday(messageDate)) {
+    dateDisplay = `Today at ${formattedTime}`;
+  } else if (isYesterday(messageDate)) {
+    dateDisplay = `Yesterday at ${formattedTime}`;
+  } else {
+    // Show MM/DD/YY format for older messages
+    dateDisplay = `${format(messageDate, 'MM/dd/yy')} at ${formattedTime}`;
+  }
+  
+  const fullDateDisplay = format(messageDate, 'MM/dd/yy h:mm:ss a');
 
   return (
     <article
@@ -161,16 +256,25 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, onScrollToMes
             {isOwnMessage && <span className="sr-only">(you)</span>}
 
             {/*
-              No aria-hidden — NVDA mouse-hover reads the aria-label ("Sent at 3:45 PM").
-              The dateTime attribute provides machine-readable precision.
+              Enhanced timestamp with smart date display and full tooltip
+              Shows time only for today, date + time for older messages
             */}
-            <time
-              dateTime={isoTime}
-              aria-label={`Sent at ${formattedTime}`}
-              className="text-[10px] text-[#334155]"
-            >
-              {formattedTime}
-            </time>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <time
+                    dateTime={isoTime}
+                    aria-label={`Sent at ${dateDisplay}`}
+                    className="text-[10px] text-[#334155] cursor-help hover:text-[#475569] transition-colors"
+                  >
+                    {dateDisplay}
+                  </time>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="text-xs">{fullDateDisplay}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
 
             {message.edited && (
               <span className="text-[10px] text-[#334155] italic" aria-label="edited">(edited)</span>
@@ -201,8 +305,36 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, onScrollToMes
                 their text content naturally as part of the paragraph.
               */}
               <p className="text-[#b0bec5] text-sm break-words leading-relaxed">
-                {renderMessageContent(message.content)}
+                {renderMessageContent(inviteDisplayContent)}
               </p>
+
+              {inviteLinkMatch && inviteLinkPreview?.server && (
+                <Link
+                  to={inviteLinkMatch.path}
+                  className="mt-2 block max-w-xs rounded-lg border border-[#1e3248] bg-[#0a1628] p-3 transition-colors hover:border-[#2a3f5a]"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className="text-2xl" aria-hidden="true">
+                      {inviteLinkPreview.server.icon || '📁'}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1 text-xs uppercase tracking-wider text-[#475569]">
+                        <LinkIcon className="size-3" />
+                        Invite Link
+                      </div>
+                      <div className="text-sm font-semibold text-[#e2e8f0] truncate">
+                        {inviteLinkPreview.server.name}
+                      </div>
+                      <div className="text-xs text-[#94a3b8]">
+                        {inviteLinkPreview.invite?.creator?.displayName || inviteLinkPreview.invite?.creator?.username
+                          ? `Shared by ${inviteLinkPreview.invite?.creator?.displayName || inviteLinkPreview.invite?.creator?.username}`
+                          : 'Open invite'}
+                      </div>
+                    </div>
+                    <ExternalLink className="size-4 text-[#64748b] flex-shrink-0" aria-hidden="true" />
+                  </div>
+                </Link>
+              )}
 
               {/* Server Invite Card */}
               {serverInvite && invitedServer && isInviteRecipient && serverInvite.status === 'pending' && (

@@ -1,5 +1,6 @@
 const rawApiBase = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 const API_BASE_URL = rawApiBase.replace(/\/api\/?$/, '');
+const TOKEN_STORAGE_KEY = 'jwtToken';
 
 export interface ApiResponse<T = any> {
   success: boolean;
@@ -57,16 +58,29 @@ class HttpResponseError extends Error {
   }
 }
 
+
 class ApiService {
   private token: string | null = null;
 
   constructor() {
-    this.token = localStorage.getItem('jwtToken');
+    const sessionToken = sessionStorage.getItem(TOKEN_STORAGE_KEY);
+    if (sessionToken) {
+      this.token = sessionToken;
+      return;
+    }
+
+    const legacyToken = localStorage.getItem(TOKEN_STORAGE_KEY);
+    if (legacyToken) {
+      this.token = legacyToken;
+      sessionStorage.setItem(TOKEN_STORAGE_KEY, legacyToken);
+      localStorage.removeItem(TOKEN_STORAGE_KEY);
+    }
   }
 
   setToken(token: string) {
     this.token = token;
-    localStorage.setItem('jwtToken', token);
+    sessionStorage.setItem(TOKEN_STORAGE_KEY, token);
+    localStorage.removeItem(TOKEN_STORAGE_KEY);
   }
 
   getToken(): string | null {
@@ -75,7 +89,8 @@ class ApiService {
 
   clearToken() {
     this.token = null;
-    localStorage.removeItem('jwtToken');
+    sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+    localStorage.removeItem(TOKEN_STORAGE_KEY);
   }
 
   private async request<T>(
@@ -170,6 +185,12 @@ class ApiService {
     this.clearToken();
   }
 
+  async logoutFromServer(): Promise<void> {
+    await this.request('/api/auth/logout', {
+      method: 'POST',
+    });
+  }
+
   // Server Management Methods
   async createServer(name: string, icon?: string): Promise<Server> {
     const response = await this.request<Server>('/api/servers', {
@@ -200,6 +221,12 @@ class ApiService {
   async deleteServer(serverId: string): Promise<void> {
     await this.request(`/api/servers/${serverId}`, {
       method: 'DELETE',
+    });
+  }
+
+  async leaveServer(serverId: string): Promise<void> {
+    await this.request(`/api/servers/${serverId}/leave`, {
+      method: 'POST',
     });
   }
 
@@ -337,10 +364,17 @@ class ApiService {
     hours?: number;
     maxMessages?: number;
   }): Promise<any> {
-    const response = await this.request<{ summary: any }>('/api/summaries/manual', {
+    const body: Record<string, any> = {};
+    if (payload.channelId) body.channelId = payload.channelId;
+    if (payload.dmId) body.dmId = payload.dmId;
+    if (payload.hours) body.hours = payload.hours;
+    if (payload.maxMessages) body.maxMessages = payload.maxMessages;
+
+    const response = await this.request<any>('/api/summaries/manual', {
       method: 'POST',
-      body: JSON.stringify(payload),
+      body: JSON.stringify(body),
     });
+
     return response.data?.summary;
   }
 
@@ -354,9 +388,7 @@ class ApiService {
     if (params.dmId) qs.set('dmId', params.dmId);
     if (params.since) qs.set('since', params.since);
 
-    const response = await this.request<{ preview: any }>(
-      `/api/summaries/preview?${qs.toString()}`
-    );
+    const response = await this.request<any>(`/api/summaries/preview?${qs.toString()}`);
     return response.data?.preview;
   }
 
@@ -426,6 +458,13 @@ class ApiService {
     return response.data?.request;
   }
 
+  async removeFriend(friendId: string): Promise<{ removedUserId?: string }> {
+    const response = await this.request<{ removedUserId?: string }>(`/api/friends/${friendId}`, {
+      method: 'DELETE',
+    });
+    return response.data || {};
+  }
+
   // Server invite endpoints
 
   async getPendingInvites(): Promise<any[]> {
@@ -449,6 +488,43 @@ class ApiService {
     await this.request(`/api/invites/${inviteId}/decline`, { method: 'POST' });
   }
 
+  // Invite code (invite links) endpoints
+  async getInviteCodes(serverId: string): Promise<any[]> {
+    const qs = new URLSearchParams();
+    if (serverId) qs.set('serverId', serverId);
+    const response = await this.request<any>(`/api/invite-codes?${qs.toString()}`);
+    return response.data?.invites || response.data?.codes || [];
+  }
+
+  async createInviteCode(serverId: string, opts?: { maxUses?: number; expiresAt?: string | Date }): Promise<any> {
+    const body: any = {};
+    if (opts?.maxUses !== undefined) body.maxUses = opts.maxUses;
+    if (opts?.expiresAt) body.expiresAt = opts.expiresAt;
+    const response = await this.request<{ invite: any }>(`/api/invite-codes/${serverId}`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+    return response.data?.invite;
+  }
+
+  async deleteInviteCode(serverId: string, inviteId: string): Promise<void> {
+    await this.request(`/api/invite-codes/${serverId}/${inviteId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async resolveInviteCode(code: string): Promise<any> {
+    const response = await this.request<any>(`/api/invite-codes/${code}`);
+    return response.data || response;
+  }
+
+  async joinInviteByCode(code: string): Promise<any> {
+    const response = await this.request<any>(`/api/invite-codes/${code}/join`, {
+      method: 'POST',
+    });
+    return response.data || response;
+  }
+
   // Server detail / members
 
   async getServerDetails(serverId: string): Promise<any> {
@@ -466,6 +542,18 @@ class ApiService {
       `/api/servers/search?${qs.toString()}`
     );
     return response.data?.servers || [];
+  }
+
+  // Read state sync — fire-and-forget; errors are logged but do not throw
+  async syncReadState(params: { channelId?: string; dmId?: string }): Promise<void> {
+    try {
+      await this.request('/api/read-state', {
+        method: 'PUT',
+        body: JSON.stringify(params),
+      });
+    } catch (err) {
+      console.warn('[syncReadState] Failed to sync read state to backend:', err);
+    }
   }
 }
 
