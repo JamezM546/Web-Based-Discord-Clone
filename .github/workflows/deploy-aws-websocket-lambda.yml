@@ -1,5 +1,4 @@
-# P6: package Express Lambda handler and upload to AWS (configure repo secrets first).
-name: Deploy backend to AWS Lambda
+name: Deploy websocket Lambda to AWS
 
 on:
   push:
@@ -8,7 +7,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  deploy-lambda:
+  deploy-websocket-lambda:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -36,8 +35,8 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Update Lambda function code
+      - name: Update websocket Lambda function code
         run: >
           aws lambda update-function-code
-          --function-name ${{ secrets.LAMBDA_FUNCTION_NAME }}
+          --function-name ${{ secrets.WS_LAMBDA_FUNCTION_NAME }}
           --zip-file fileb://lambda-deploy.zip

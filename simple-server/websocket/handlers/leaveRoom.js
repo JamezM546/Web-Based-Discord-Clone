@@ -6,8 +6,8 @@ module.exports = async ({ connectionId, data, runtime }) => {
     throw new Error('A valid roomId is required');
   }
 
-  runtime.requireAuthenticatedConnection(connectionId);
-  runtime.store.removeConnectionFromRoom(roomId, connectionId);
+  await runtime.requireAuthenticatedConnection(connectionId);
+  await runtime.store.removeConnectionFromRoom(roomId, connectionId);
 
   return {
     type: 'roomLeft',
