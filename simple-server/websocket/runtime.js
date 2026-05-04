@@ -9,7 +9,7 @@ const createRealtimeRuntime = ({ store, sendToConnection }) => {
     store: realtimeStore,
     sendToConnection,
     onDeliveryFailure: async (connectionId) => {
-      realtimeStore.removeConnection(connectionId);
+      await realtimeStore.removeConnection(connectionId);
     },
   });
 

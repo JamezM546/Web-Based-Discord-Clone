@@ -1,5 +1,4 @@
 const { createRealtimeRuntime } = require('./websocket/runtime');
-const { getRouteHandler, getActionHandler } = require('./websocket/lib/routes');
 
 const createWebSocketLambdaHandler = ({ store, sendToConnection }) => {
   const runtime = createRealtimeRuntime({
@@ -13,19 +12,16 @@ const createWebSocketLambdaHandler = ({ store, sendToConnection }) => {
 
     try {
       if (routeKey === '$connect' || routeKey === '$disconnect') {
-        const handler = getRouteHandler(routeKey);
-        await handler({
+        await runtime.dispatchRoute({
+          routeKey,
           connectionId,
           data: event.body ? JSON.parse(event.body) : null,
-          runtime,
         });
       } else {
         const body = event.body ? JSON.parse(event.body) : {};
-        const handler = getActionHandler(body.action);
-        await handler({
+        await runtime.dispatchAction({
           connectionId,
-          data: body.data,
-          runtime,
+          message: body,
         });
       }
 
