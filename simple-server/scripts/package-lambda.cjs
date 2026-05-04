@@ -20,6 +20,7 @@ const COPY_NAMES = [
   'config',
   'middleware',
   'models',
+  'prompts',
   'routes',
   'services',
   'utils',
