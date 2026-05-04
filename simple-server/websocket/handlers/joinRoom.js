@@ -6,8 +6,8 @@ module.exports = async ({ connectionId, data, runtime }) => {
     throw new Error('A valid roomId is required');
   }
 
-  const connection = runtime.requireAuthenticatedConnection(connectionId);
-  runtime.store.addConnectionToRoom(roomId, connectionId, {
+  const connection = await runtime.requireAuthenticatedConnection(connectionId);
+  await runtime.store.addConnectionToRoom(roomId, connectionId, {
     userId: connection.userId,
   });
 

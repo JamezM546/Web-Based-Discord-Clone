@@ -9,7 +9,7 @@ const createRealtimeRuntime = ({ store, sendToConnection }) => {
     store: realtimeStore,
     sendToConnection,
     onDeliveryFailure: async (connectionId) => {
-      realtimeStore.removeConnection(connectionId);
+      await realtimeStore.removeConnection(connectionId);
     },
   });
 
@@ -17,8 +17,8 @@ const createRealtimeRuntime = ({ store, sendToConnection }) => {
     await sendToConnection(connectionId, payload);
   };
 
-  const requireAuthenticatedConnection = (connectionId) => {
-    const connection = realtimeStore.getConnection(connectionId);
+  const requireAuthenticatedConnection = async (connectionId) => {
+    const connection = await realtimeStore.getConnection(connectionId);
     if (!connection?.authenticated || !connection.userId) {
       throw new Error('Authentication required');
     }
@@ -211,6 +211,7 @@ const createRealtimeRuntime = ({ store, sendToConnection }) => {
     store: realtimeStore,
     requireAuthenticatedConnection,
     broadcastToRoom: broadcaster.broadcastToRoom,
+    sendToConnection: sendEventToConnection,
     dispatchAction,
     dispatchRoute,
     publishMessageCreated,
